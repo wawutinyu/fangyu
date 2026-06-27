@@ -98,7 +98,7 @@ class Settings:
     # -----------------------------------------------------------------------
     CORS_ORIGINS: list[str] = os.getenv(
         "CORS_ORIGINS",
-        "http://localhost:5173,http://localhost:5174,http://localhost:5175",
+        "http://localhost:5173,http://localhost:5174,http://localhost:5175,file://",
     ).split(",")
     """
     允许跨域请求的来源列表。

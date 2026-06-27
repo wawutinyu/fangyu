@@ -74,6 +74,9 @@ async def init_db():
     # 每个 model 文件通过定义继承 Base 的类来注册到 Base.metadata
     from .project import Project, Save  # noqa: F401
     from .setting import Setting  # noqa: F401
+    from .knowledge import KnowledgeDoc, KnowledgeChunk  # noqa: F401
+    from .memory import MemoryFact  # noqa: F401
+    from .conversation import ConversationLog  # noqa: F401
 
     async with engine.begin() as conn:
         # run_sync：在异步连接中执行同步的 create_all

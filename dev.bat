@@ -13,7 +13,8 @@ REM   - 关闭窗口即停止所有服务。
 REM   - 如需单独启动，分别执行：
 REM       cd backend && py run.py
 REM       cd frontend && npm run dev
-REM   - 后端修改代码后自动重启（--reload），前端修改后自动热更新（HMR）。
+REM   - Electron 桌面版：cd frontend && npm run electron:dev
+REM     自动启动后端 + 前端 + Electron 窗口
 
 echo [fangyu] Starting backend (FastAPI) on port 8000...
 cd /d "%~dp0backend"

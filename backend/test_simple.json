@@ -1,0 +1,8 @@
+{
+  "nodes": [
+    {"id":"n0","data":{"originType":"start","config":{},"label":"入口"}},
+    {"id":"n1","data":{"originType":"memory-read","config":{"memory_key":"user_name","scope":"user"},"label":"读记忆"}}
+  ],
+  "edges": [{"source":"n0","target":"n1"}],
+  "external_inputs": {}
+}

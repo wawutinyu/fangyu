@@ -1,0 +1,252 @@
+import json
+import re
+from pathlib import Path
+from typing import Any
+
+REGISTRY_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "tools"
+REGISTRY_FILE = REGISTRY_DIR / "registry.json"
+
+
+def _ensure():
+    REGISTRY_DIR.mkdir(parents=True, exist_ok=True)
+    if not REGISTRY_FILE.exists():
+        REGISTRY_FILE.write_text("{}", encoding="utf-8")
+
+
+def _load() -> dict[str, Any]:
+    _ensure()
+    try:
+        return json.loads(REGISTRY_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _save(data: dict[str, Any]):
+    _ensure()
+    REGISTRY_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def register_tool(name: str, description: str, parameters: dict, implementation: dict) -> dict:
+    registry = _load()
+    if name in registry:
+        return {"success": False, "error": f"工具 '{name}' 已存在"}
+    registry[name] = {
+        "name": name,
+        "description": description,
+        "parameters": parameters,
+        "implementation": implementation,
+        "enabled": True,
+    }
+    _save(registry)
+    return {"success": True, "tool": registry[name]}
+
+
+def unregister_tool(name: str) -> dict:
+    registry = _load()
+    if name not in registry:
+        return {"success": False, "error": f"工具 '{name}' 不存在"}
+    del registry[name]
+    _save(registry)
+    return {"success": True}
+
+
+def list_tools() -> list[dict]:
+    registry = _load()
+    return list(registry.values())
+
+
+def get_tool(name: str) -> dict | None:
+    registry = _load()
+    return registry.get(name)
+
+
+async def execute_tool(name: str, args: dict, global_vars: dict) -> Any:
+    tool = get_tool(name)
+    if not tool:
+        raise ValueError(f"工具 '{name}' 未注册")
+
+    impl = tool.get("implementation", {})
+    impl_type = impl.get("type", "prompt")
+
+    if impl_type == "code":
+        code = impl.get("code", "")
+        full_code = code
+        after = impl.get("after", "")
+        if after:
+            full_code += "\n" + after
+        suffix = impl.get("suffix", "")
+        if suffix:
+            full_code += "\n" + suffix
+        safe_globals = {
+            "__builtins__": {
+                "__import__": __import__,
+                "True": True, "False": False, "None": None,
+                "abs": abs, "all": all, "any": any, "bool": bool, "bytes": bytes,
+                "dict": dict, "enumerate": enumerate, "filter": filter,
+                "float": float, "hash": hash, "hex": hex, "int": int,
+                "isinstance": isinstance, "len": len, "list": list,
+                "map": map, "max": max, "min": min, "object": object,
+                "oct": oct, "ord": ord, "range": range, "repr": repr,
+                "reversed": reversed, "round": round, "set": set,
+                "slice": slice, "sorted": sorted, "str": str, "sum": sum,
+                "tuple": tuple, "type": type, "zip": zip, "open": open,
+                "hasattr": hasattr, "getattr": getattr, "setattr": setattr,
+                "ImportError": ImportError, "Exception": Exception,
+                "ValueError": ValueError, "KeyError": KeyError,
+                "AttributeError": AttributeError, "TypeError": TypeError,
+                "ModuleNotFoundError": ModuleNotFoundError,
+                "OSError": OSError, "FileNotFoundError": FileNotFoundError,
+                "StopIteration": StopIteration,
+            }
+        }
+        safe_locals = {"args": args, "result": None}
+        try:
+            exec(full_code, safe_globals, safe_locals)
+        except Exception as e:
+            return {"error": str(e)}
+        return safe_locals.get("result")
+
+    if impl_type == "prompt":
+        template = impl.get("template", "")
+        result = template
+        for k, v in args.items():
+            result = result.replace(f"{{{{{k}}}}}", str(v))
+        return {"result": result}
+
+    if impl_type == "http":
+        import httpx
+        url = impl.get("url", "")
+        method = impl.get("method", "POST").upper()
+        body = {k: args.get(k) for k in impl.get("mapping", [])}
+        async with httpx.AsyncClient(timeout=15) as client:
+            if method == "GET":
+                resp = await client.get(url, params=body)
+            else:
+                resp = await client.post(url, json=body)
+            return resp.json()
+
+    raise ValueError(f"不支持的实现类型: {impl_type}")
+
+
+def register_from_llm_output(llm_content: str) -> list[dict]:
+    results = []
+    pattern = re.compile(
+        r'```(?:tool|json)\s*\n\{\s*"name"\s*:\s*"([^"]+)".*?\n\}',
+        re.DOTALL,
+    )
+
+    for match in pattern.finditer(llm_content):
+        try:
+            parsed = json.loads(match.group(0).removeprefix("```").removesuffix("```"))
+            name = parsed.get("name", "")
+            desc = parsed.get("description", "")
+            params = parsed.get("parameters", {})
+            impl = parsed.get("implementation", {"type": "prompt", "template": ""})
+            if name:
+                result = register_tool(name, desc, params, impl)
+                results.append(result)
+        except (json.JSONDecodeError, AttributeError):
+            continue
+
+    alt_pattern = re.compile(r'##\s*工具注册\s*\n```(?:tool|json)\s*\n(.*?)\n```', re.DOTALL)
+    for match in alt_pattern.finditer(llm_content):
+        try:
+            parsed = json.loads(match.group(1))
+            name = parsed.get("name", "")
+            desc = parsed.get("description", "")
+            params = parsed.get("parameters", {})
+            impl = parsed.get("implementation", {"type": "prompt", "template": ""})
+            if name:
+                result = register_tool(name, desc, params, impl)
+                results.append(result)
+        except (json.JSONDecodeError, AttributeError):
+            continue
+
+    return results
+
+
+BUILTIN_TOOLS: list[dict] = [
+    {
+        "name": "web_search",
+        "description": "搜索互联网获取最新信息",
+        "parameters": {"type": "object", "properties": {"query": {"type": "string", "description": "搜索关键词"}}, "required": ["query"]},
+        "implementation": {"type": "prompt", "template": "搜索: {{query}}"},
+    },
+    {
+        "name": "current_time",
+        "description": "获取当前日期和时间",
+        "parameters": {"type": "object", "properties": {"timezone": {"type": "string", "description": "时区，如 Asia/Shanghai", "default": "Asia/Shanghai"}}},
+        "implementation": {"type": "code", "code": "import datetime; result = datetime.datetime.now().isoformat()"},
+    },
+    {
+        "name": "code_execution",
+        "description": "在沙箱中执行 Python 代码",
+        "parameters": {"type": "object", "properties": {"code": {"type": "string", "description": "Python 代码"}}, "required": ["code"]},
+        "implementation": {"type": "code", "code": "import subprocess; result = subprocess.run(['python', '-c', args.get('code', '')], capture_output=True, text=True, timeout=30).stdout"},
+    },
+    {
+        "name": "read_url",
+        "description": "获取网页内容并转为文本",
+        "parameters": {"type": "object", "properties": {"url": {"type": "string", "description": "网页 URL"}}, "required": ["url"]},
+        "implementation": {"type": "http", "url": "", "method": "GET", "mapping": []},
+    },
+    {
+        "name": "memory_add",
+        "description": "添加一条新事实到用户记忆",
+        "parameters": {"type": "object", "properties": {"fact": {"type": "string", "description": "陈述式事实"}}, "required": ["fact"]},
+        "implementation": {"type": "code", "code": "from app.services.memory import memory_write; import hashlib; key = f'fact_{hashlib.md5(args[\"fact\"].encode()).hexdigest()[:8]}'; memory_write('user', key, args['fact']); result = {'key': key, 'value': args['fact']}"},
+    },
+    {
+        "name": "memory_replace",
+        "description": "替换用户记忆中的一条事实",
+        "parameters": {"type": "object", "properties": {"old_fact": {"type": "string", "description": "原事实内容"}, "new_fact": {"type": "string", "description": "新事实内容"}}, "required": ["old_fact", "new_fact"]},
+        "implementation": {"type": "code", "code": "from app.services.memory import memory_replace; ok = memory_replace('user', args['old_fact'], args['new_fact']); result = {'replaced': ok}"},
+    },
+    {
+        "name": "memory_remove",
+        "description": "删除用户记忆中的一条事实",
+        "parameters": {"type": "object", "properties": {"fact": {"type": "string", "description": "要删除的事实内容"}}, "required": ["fact"]},
+        "implementation": {"type": "code", "code": "from app.services.memory import memory_delete, memory_list; items = memory_list('user'); found = [it for it in items if it['value'] == args['fact']]; key = found[0]['key'] if found else None; ok = bool(key);", "after": "if key: memory_delete('user', key); result = {'removed': ok}"},
+    },
+    {
+        "name": "memory_search",
+        "description": "搜索用户记忆中的事实",
+        "parameters": {"type": "object", "properties": {"query": {"type": "string", "description": "搜索关键词"}}, "required": ["query"]},
+        "implementation": {"type": "code", "code": "from app.services.memory import memory_search; results = memory_search('user', args['query']); result = {'results': results}"},
+    },
+    {
+        "name": "file_operations",
+        "description": "读写、搜索、列出文件（沙箱路径内）",
+        "parameters": {"type": "object", "properties": {"action": {"type": "string", "enum": ["read", "write", "list", "search", "delete"], "description": "操作类型"}, "path": {"type": "string", "description": "文件路径"}, "content": {"type": "string", "description": "写入内容（write 时必填）"}, "pattern": {"type": "string", "description": "搜索模式（search 时必填）"}}, "required": ["action", "path"]},
+        "implementation": {"type": "code", "code": "import os, fnmatch; base = os.path.expanduser('~/.hermes'); action = args['action']; rel = args['path'].lstrip('/\\\\'); full = os.path.normpath(os.path.join(base, rel)); if not full.startswith(base): result = {'error': '路径越界'}\n"
+        + "elif action == 'read': result = open(full).read()\n"
+        + "elif action == 'write': open(full, 'w').write(args.get('content', '')); result = 'ok'\n"
+        + "elif action == 'list': result = os.listdir(full)\n"
+        + "elif action == 'search': result = [os.path.join(dp, f) for dp, dn, fn in os.walk(full) for f in fn if fnmatch.fnmatch(f, args.get('pattern', '*'))]\n"
+        + "elif action == 'delete': os.remove(full); result = 'ok'\n"
+        + "else: result = 'unknown'"},
+    },
+    {
+        "name": "skill_write_file",
+        "description": "写入技能附属文件（如模板、配置）",
+        "parameters": {"type": "object", "properties": {"skill_name": {"type": "string", "description": "技能名称"}, "filename": {"type": "string", "description": "文件名"}, "content": {"type": "string", "description": "文件内容"}}, "required": ["skill_name", "filename", "content"]},
+        "implementation": {"type": "code", "code": "from app.services.skill import skill_write_file; r = skill_write_file(args['skill_name'], args['filename'], args['content']); result = r"},
+    },
+    {
+        "name": "skill_remove_file",
+        "description": "删除技能附属文件",
+        "parameters": {"type": "object", "properties": {"skill_name": {"type": "string", "description": "技能名称"}, "filename": {"type": "string", "description": "文件名"}}, "required": ["skill_name", "filename"]},
+        "implementation": {"type": "code", "code": "from app.services.skill import skill_remove_file; r = skill_remove_file(args['skill_name'], args['filename']); result = r"},
+    },
+]
+
+
+def register_builtins():
+    _ensure()
+    existing = _load()
+    for tool in BUILTIN_TOOLS:
+        existing[tool["name"]] = {**tool, "enabled": True, "builtin": True}
+    _save(existing)
+
+
+register_builtins()

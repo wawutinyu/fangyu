@@ -1,105 +1,97 @@
-"""
-fangyu LLM API 代理模块
-========================
-功能：前端 LLM 调用不直接请求 OpenAI/DeepSeek 等外部 API，
-       而是通过此代理转发，避免 API Key 在浏览器端暴露。
+from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
-安全设计：
-- 浏览器 → 后端（携带会话 cookie/token）
-- 后端 → LLM API（携带 API Key，Key 仅存在于后端内存/数据库中）
-- 前端永远拿不到原始的 API Key
-
-当前状态：骨架代码，后续实现完整转发逻辑。
-
-支持的流式响应：
-使用 Server-Sent Events (SSE) 实现逐 token 返回。
-前端通过 EventSource 或 fetch + ReadableStream 接收。
-SSE 格式：
-  data: {"token": "你好"}\n\n
-  data: {"token": "世界"}\n\n
-  data: [DONE]\n\n
-
-注意事项：
-- 所有 LLM 提供商使用 /v1/chat/completions 兼容接口。
-- DeepSeek 额外支持 thinking 和 reasoning_effort 参数。
-- Anthropic 使用 /v1/messages 接口（不兼容 OpenAI 格式）。
-"""
-
-from fastapi import APIRouter
+from ..models.database import get_session
+from ..models.setting import Setting
+from ..core.config import settings as env_settings
+from ..services.llm import chat_completion, chat_completion_stream, get_provider, PROVIDER_BASE_URL
 
 router = APIRouter(prefix="/api/v1/llm", tags=["LLM 代理"])
 
 
+class ChatRequest(BaseModel):
+    model: str = 'gpt-4o'
+    messages: list = []
+    temperature: float = 0.7
+    max_tokens: int = 2048
+    thinking_mode: bool = False
+    reasoning_effort: str = 'medium'
+
+
+async def _resolve_credentials(provider_id: str, db: AsyncSession) -> tuple[str, str]:
+    provider_prefix = provider_id.lower()
+
+    api_key_from_db = ''
+    base_url_from_db = ''
+    result = await db.execute(
+        select(Setting).where(Setting.key.in_([f'{provider_prefix}_api_key', f'{provider_prefix}_base_url']))
+    )
+    for row in result.scalars().all():
+        if row.key.endswith('_api_key'):
+            api_key_from_db = row.value
+        elif row.key.endswith('_base_url'):
+            base_url_from_db = row.value
+
+    api_key = api_key_from_db or getattr(env_settings, f'{provider_prefix.upper()}_API_KEY', '')
+    base_url = base_url_from_db or PROVIDER_BASE_URL.get(provider_id, '')
+
+    return api_key, base_url
+
+
 @router.post("/chat")
-async def llm_chat():
-    """
-    LLM 聊天接口（非流式）
-    ======================
-    代理前端请求到 LLM API，返回完整响应。
+async def llm_chat(req: ChatRequest, db: AsyncSession = Depends(get_session)):
+    provider_id = get_provider(req.model)
+    api_key, base_url = await _resolve_credentials(provider_id, db)
 
-    请求体格式：
-    {
-        "provider": "openai|deepseek|anthropic|custom",
-        "model": "gpt-4o",
-        "messages": [{"role": "user", "content": "你好"}],
-        "temperature": 0.7,
-        "max_tokens": 2048,
-        "thinking_mode": false,
-        "reasoning_effort": "medium"
-    }
+    result = await chat_completion(
+        model=req.model,
+        messages=req.messages,
+        api_key=api_key,
+        base_url=base_url,
+        temperature=req.temperature,
+        max_tokens=req.max_tokens,
+        thinking_mode=req.thinking_mode,
+        reasoning_effort=req.reasoning_effort,
+    )
+    return result
 
-    响应格式：
-    {
-        "result": "生成的文本内容",
-        "usage": {"prompt_tokens": 50, "completion_tokens": 100}
-    }
 
-    后续实现流程：
-    1. 解析请求体，获取 provider/model/messages 等参数。
-    2. 根据 provider 从数据库或环境变量获取 API Key 和 Base URL。
-    3. 调用对应的 API（OpenAI 兼容 / Anthropic 原生）。
-    4. 返回结果和 token 用量。
+@router.post("/chat/stream")
+async def llm_chat_stream(req: ChatRequest, db: AsyncSession = Depends(get_session)):
+    provider_id = get_provider(req.model)
+    api_key, base_url = await _resolve_credentials(provider_id, db)
 
-    错误处理：
-    - API Key 不存在：返回 400 "请先设置 API Key"。
-    - API 返回 401：提示 "API Key 无效"。
-    - API 超时：返回 504 "请求超时"。
-    """
-    return {"result": "", "usage": {}}
+    return StreamingResponse(
+        chat_completion_stream(
+            model=req.model,
+            messages=req.messages,
+            api_key=api_key,
+            base_url=base_url,
+            temperature=req.temperature,
+            max_tokens=req.max_tokens,
+            thinking_mode=req.thinking_mode,
+            reasoning_effort=req.reasoning_effort,
+        ),
+        media_type='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no',
+        },
+    )
 
 
 @router.get("/models")
 async def list_models():
-    """
-    获取模型列表
-    =============
-    返回所有已知的模型名称及其所属提供商。
-    前端用于 LLM 节点的模型选择下拉框。
-
-    当前返回静态列表（硬编码），
-    后续可改为从各提供商 API 动态获取可用模型列表。
-
-    响应格式：
-    {
-        "models": [
-            {"id": "gpt-4o", "provider": "openai", "name": "GPT-4o"},
-            {"id": "deepseek-chat", "provider": "deepseek", "name": "DeepSeek Chat"}
-        ]
-    }
-
-    模型更新方式：
-    修改此函数中的静态列表即可。
-    新增提供商时，同步更新 models 列表和 PROVIDER_MAP（executor.js）。
-    """
     return {
         "models": [
-            # OpenAI
             {"id": "gpt-4o", "provider": "openai", "name": "GPT-4o"},
             {"id": "gpt-4o-mini", "provider": "openai", "name": "GPT-4o Mini"},
-            # DeepSeek
             {"id": "deepseek-v4-flash", "provider": "deepseek", "name": "DeepSeek V4 Flash"},
             {"id": "deepseek-v4-pro", "provider": "deepseek", "name": "DeepSeek V4 Pro"},
-            # Claude
             {"id": "claude-3.5-sonnet", "provider": "anthropic", "name": "Claude 3.5 Sonnet"},
         ]
     }

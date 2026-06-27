@@ -43,9 +43,16 @@ from .core.config import settings
 from .models.database import init_db
 
 # 路由模块：每个子模块对应一组相关 API 接口
-from .routers import flow as flow_router      # POST /api/v1/flow/execute
-from .routers import llm as llm_router        # POST /api/v1/llm/chat, GET /api/v1/llm/models
-from .routers import settings as settings_router  # GET/PUT /api/v1/settings/
+from .routers import flow as flow_router              # POST /api/v1/flow/execute
+from .routers import llm as llm_router                # POST /api/v1/llm/chat, GET /api/v1/llm/models
+from .routers import settings as settings_router      # GET/PUT /api/v1/settings/
+from .routers import knowledge as knowledge_router    # POST /api/v1/knowledge/*
+from .routers import project as project_router        # /api/v1/projects/*
+from .routers import memory as memory_router          # /api/v1/memory/*
+from .routers import search as search_router          # /api/v1/search/*
+from .routers import tools as tools_router            # /api/v1/tools/*
+from .routers import skills as skills_router          # /api/v1/skills/*
+from .routers import variables as variables_router    # /api/v1/variables/*
 
 
 # ---------------------------------------------------------------------------
@@ -118,6 +125,13 @@ app.add_middleware(
 app.include_router(flow_router.router)
 app.include_router(llm_router.router)
 app.include_router(settings_router.router)
+app.include_router(knowledge_router.router)
+app.include_router(project_router.router)
+app.include_router(memory_router.router)
+app.include_router(search_router.router)
+app.include_router(tools_router.router)
+app.include_router(skills_router.router)
+app.include_router(variables_router.router)
 
 
 # ---------------------------------------------------------------------------

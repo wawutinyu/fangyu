@@ -1,0 +1,465 @@
+{
+  "version": "2.0.0",
+  "kind": "agent",
+  "agent": {
+    "name": "Hermes AI Agent",
+    "icon": "🤖",
+    "description": "自进化 AI 智能体 —— 引擎级强制记忆 + 运行时自注册工具 + 自动技能学习 + FTS5 全文搜索",
+    "model": {
+      "provider": "openai_api_compatible",
+      "name": "deepseek-chat",
+      "mode": "chat",
+      "completion_params": {
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "max_tokens": 16384,
+        "frequency_penalty": 0,
+        "presence_penalty": 0
+      }
+    }
+  },
+
+  "prompt": {
+    "architecture": "three_tier",
+    "tiers": {
+      "stable": {
+        "type": "static",
+        "content": "## 身份\n你是 Hermes，一个自进化的 AI 智能体。你通过持续积累记忆和创建技能来变得越来越了解用户、越来越高效。\n\n## 记忆协议\n- MEMORY.md 存放用户相关的持久化陈述式事实\n- USER.md 存放用户元信息（姓名、偏好、沟通风格等）\n- 记忆由引擎自动管理，你只需在对话中自然发现和确认事实\n\n## 技能协议\n- 当发现可重复的工作流时，用技能工具创建 SKILL.md\n- /learn 命令可以根据你的描述自动生成技能"
+      },
+      "context": {
+        "type": "dynamic",
+        "auto_inject": ["memory_snapshot", "skill_registry", "session_context"],
+        "refresh": "per_turn"
+      },
+      "volatile": {
+        "type": "dynamic",
+        "auto_inject": ["current_turn_instructions"],
+        "refresh": "per_message"
+      }
+    },
+    "assembly": {
+      "strategy": "auto",
+      "order": ["stable", "context", "volatile"],
+      "separator": "\n---\n"
+    }
+  },
+
+  "memory": {
+    "cross_session": {
+      "enabled": true,
+      "backend": {
+        "type": "file_based",
+        "path": "~/.hermes/memory",
+        "files": {
+          "facts": {
+            "filename": "MEMORY.md",
+            "format": "bullet_list",
+            "initial_content": "# MEMORY\n\n<!-- 每行一条陈述式事实，引擎自动管理 -->\n"
+          },
+          "profile": {
+            "filename": "USER.md",
+            "format": "yaml_frontmatter_markdown",
+            "initial_content": "---\nname: \npreferences: []\ncommunication_style: \n---\n"
+          }
+        }
+      },
+      "engine_managed": {
+        "inject": {
+          "timing": "before_each_turn",
+          "target": "prompt.context",
+          "content": "从 MEMORY.md 和 USER.md 读取的完整内容，按以下格式注入：\n\n## 当前记忆快照\n{{MEMORY.md 内容}}\n\n## 用户画像\n{{USER.md 内容}}\n"
+        },
+        "extract": {
+          "timing": "after_each_turn",
+          "strategy": "llm_extract",
+          "prompt": "从本轮对话中提取新发现的用户事实（最多 3 条）：\n- 只提取确定的事实，不要猜测\n- 格式：每行一条 Markdown 列表项\n- 跳过临时状态（任务进度、中间结果等）",
+          "max_facts": 3,
+          "conflict_resolution": "replace",
+          "target_file": "MEMORY.md"
+        }
+      },
+      "tools": [
+        {
+          "name": "memory_add",
+          "description": "添加一条新事实到 MEMORY.md",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "fact": {"type": "string", "description": "陈述式事实，如「用户喜欢简洁回答」"}
+            },
+            "required": ["fact"]
+          }
+        },
+        {
+          "name": "memory_replace",
+          "description": "替换 MEMORY.md 中的一条事实",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "old_fact": {"type": "string"},
+              "new_fact": {"type": "string"}
+            },
+            "required": ["old_fact", "new_fact"]
+          }
+        },
+        {
+          "name": "memory_remove",
+          "description": "删除 MEMORY.md 中的一条事实",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "fact": {"type": "string"}
+            },
+            "required": ["fact"]
+          }
+        }
+      ]
+    },
+
+    "session_search": {
+      "enabled": true,
+      "backend": {
+        "type": "fts5",
+        "path": "~/.hermes/conversations.db",
+        "table": "conversations",
+        "columns": ["id", "user_id", "role", "content", "timestamp"],
+        "auto_index": {
+          "enabled": true,
+          "timing": "after_each_turn",
+          "target": "assistant_messages + user_messages"
+        }
+      },
+      "tool": {
+        "name": "search_sessions",
+        "description": "全文搜索历史会话记录",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "query": {"type": "string", "description": "搜索关键词"},
+            "user_id": {"type": "string", "description": "用户 ID（可选，默认当前用户）"},
+            "limit": {"type": "integer", "description": "返回结果数", "default": 10}
+          },
+          "required": ["query"]
+        },
+        "result_format": "按相关度排序的会话片段列表，每条包含时间戳和内容摘要"
+      }
+    }
+  },
+
+  "skills": {
+    "enabled": true,
+    "backend": {
+      "type": "file_based",
+      "path": "~/.hermes/skills",
+      "file_format": {
+        "type": "yaml_frontmatter_markdown",
+        "extension": ".md",
+        "schema": {
+          "frontmatter": {
+            "required": ["name", "description", "version", "created"],
+            "optional": ["author", "tags", "dependencies", "updated"]
+          },
+          "body": "Markdown 格式的操作步骤，支持代码块、列表、嵌套步骤"
+        }
+      }
+    },
+    "learn_command": {
+      "trigger": "/learn",
+      "mode": "interactive",
+      "flow": [
+        {
+          "step": 1,
+          "action": "parse_user_input",
+          "description": "用户输入 /learn <描述>，LLM 生成 SKILL.md 草稿"
+        },
+        {
+          "step": 2,
+          "action": "confirm_with_user",
+          "description": "展示生成的技能概要，询问用户是否确认"
+        },
+        {
+          "step": 3,
+          "action": "write_skill_file",
+          "description": "用户确认后写入磁盘，注册到 skill_registry"
+        }
+      ]
+    },
+    "tools": [
+      {
+        "name": "skill_create",
+        "description": "创建一个新技能文件",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string", "description": "技能名称，用作文件名"},
+            "description": {"type": "string", "description": "技能描述"},
+            "content": {"type": "string", "description": "Markdown 正文内容"}
+          },
+          "required": ["name", "description", "content"]
+        },
+        "auto_frontmatter": {
+          "version": "1.0",
+          "created": "{{auto_timestamp}}",
+          "engine_generated": ["version", "created"]
+        }
+      },
+      {
+        "name": "skill_edit",
+        "description": "编辑已有技能文件（完整覆盖）",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string"},
+            "content": {"type": "string"}
+          },
+          "required": ["name", "content"]
+        }
+      },
+      {
+        "name": "skill_patch",
+        "description": "部分更新技能文件（只替换指定部分）",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string"},
+            "section": {"type": "string", "description": "要替换的章节标题"},
+            "new_content": {"type": "string"}
+          },
+          "required": ["name", "section", "new_content"]
+        }
+      },
+      {
+        "name": "skill_delete",
+        "description": "删除一个技能文件",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string"}
+          },
+          "required": ["name"]
+        }
+      },
+      {
+        "name": "skill_write_file",
+        "description": "写入技能附属文件（如模板、配置）",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "skill_name": {"type": "string"},
+            "filename": {"type": "string"},
+            "content": {"type": "string"}
+          },
+          "required": ["skill_name", "filename", "content"]
+        }
+      },
+      {
+        "name": "skill_remove_file",
+        "description": "删除技能附属文件",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "skill_name": {"type": "string"},
+            "filename": {"type": "string"}
+          },
+          "required": ["skill_name", "filename"]
+        }
+      },
+      {
+        "name": "skill_list",
+        "description": "列出所有技能",
+        "parameters": {"type": "object", "properties": {}}
+      },
+      {
+        "name": "skill_view",
+        "description": "查看指定技能的完整内容",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string"}
+          },
+          "required": ["name"]
+        }
+      }
+    ],
+    "registry": {
+      "type": "auto_synced",
+      "storage": "~/.hermes/skills/registry.json",
+      "auto_update": true,
+      "fields": ["name", "description", "version", "created", "file_path"]
+    }
+  },
+
+  "tool_registry": {
+    "dynamic_registration": {
+      "enabled": true,
+      "scope": "session_or_persistent",
+      "max_tools": 50,
+      "tool": {
+        "name": "register_tool",
+        "description": "运行时注册一个新工具，LLM 可自主创建工具",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string", "description": "工具名称（蛇形命名）"},
+            "description": {"type": "string", "description": "工具描述"},
+            "parameters": {"type": "object", "description": "JSON Schema"},
+            "implementation": {
+              "type": "object",
+              "description": "工具实现",
+              "properties": {
+                "type": {"type": "string", "enum": ["code", "http", "prompt_chain"]},
+                "code": {"type": "string", "description": "Python 代码（type=code 时）"},
+                "url": {"type": "string", "description": "HTTP 端点（type=http 时）"},
+                "steps": {"type": "array", "description": "子步骤（type=prompt_chain 时）"}
+              }
+            }
+          },
+          "required": ["name", "description", "parameters", "implementation"]
+        }
+      }
+    },
+    "builtin_tools": [
+      {
+        "name": "web_search",
+        "provider": "duckduckgo",
+        "description": "搜索互联网获取最新信息",
+        "enabled": true
+      },
+      {
+        "name": "current_time",
+        "description": "获取当前日期和时间，支持时区",
+        "enabled": true
+      },
+      {
+        "name": "code_execution",
+        "type": "python_sandbox",
+        "description": "在沙箱中执行 Python 代码，支持安装 pip 包",
+        "enabled": true,
+        "config": {
+          "timeout": 30,
+          "memory_limit": "256mb",
+          "network_access": false,
+          "allowed_packages": ["requests", "numpy", "pandas", "json", "yaml"]
+        }
+      },
+      {
+        "name": "file_operations",
+        "description": "读写、搜索、列出文件",
+        "enabled": true,
+        "allowed_actions": ["read", "write", "append", "list", "search", "delete"],
+        "sandbox_paths": {
+          "allowed": ["~/.hermes", "~/projects"],
+          "denied": ["~/.ssh", "~/.aws", "/etc", "/sys"]
+        }
+      },
+      {
+        "name": "read_url",
+        "description": "获取网页内容并转为 Markdown",
+        "enabled": true,
+        "config": {
+          "timeout": 15,
+          "max_size": "1mb"
+        }
+      }
+    ]
+  },
+
+  "conversation_variables": {
+    "persistent": [
+      {
+        "name": "user_profile",
+        "type": "object",
+        "schema": {
+          "name": {"type": "string"},
+          "preferences": {"type": "array"},
+          "communication_style": {"type": "string"},
+          "known_facts": {"type": "array"}
+        },
+        "auto_persist": true,
+        "sync_to": "USER.md"
+      },
+      {
+        "name": "session_notes",
+        "type": "string",
+        "description": "本次会话上下文摘要",
+        "auto_persist": false
+      },
+      {
+        "name": "skill_registry",
+        "type": "object",
+        "auto_persist": true,
+        "sync_to": "~/.hermes/skills/registry.json"
+      },
+      {
+        "name": "memory_snapshot",
+        "type": "string",
+        "description": "当前 MEMORY.md 内容缓存",
+        "auto_persist": true,
+        "sync_to": "MEMORY.md"
+      }
+    ],
+    "ephemeral": [
+      {
+        "name": "last_search_results",
+        "type": "array",
+        "description": "最近一次搜索的结果缓存"
+      },
+      {
+        "name": "pending_tasks",
+        "type": "array",
+        "description": "当前会话中的待办事项"
+      }
+    ]
+  },
+
+  "per_turn_pipeline": {
+    "order": [
+      {
+        "phase": "pre_llm",
+        "steps": [
+          {
+            "action": "load_memory",
+            "description": "从 MEMORY.md 和 USER.md 读取内容",
+            "target": "prompt.context"
+          },
+          {
+            "action": "load_skill_registry",
+            "description": "从 registry.json 加载技能清单",
+            "target": "prompt.context"
+          },
+          {
+            "action": "load_session_context",
+            "description": "加载持久化会话变量",
+            "target": "prompt.context"
+          },
+          {
+            "action": "inject_volatile",
+            "description": "注入当前消息的特定指令（如有）",
+            "target": "prompt.volatile"
+          }
+        ]
+      },
+      {
+        "phase": "post_llm",
+        "steps": [
+          {
+            "action": "extract_memory",
+            "description": "LLM 提取本轮新事实，写入 MEMORY.md"
+          },
+          {
+            "action": "index_conversation",
+            "description": "将本轮对话写入 FTS5 索引"
+          },
+          {
+            "action": "update_registry",
+            "description": "同步 skill_registry 到 registry.json"
+          },
+          {
+            "action": "persist_variables",
+            "description": "将标记为 auto_persist 的变量写入磁盘"
+          }
+        ]
+      }
+    ]
+  }
+}
