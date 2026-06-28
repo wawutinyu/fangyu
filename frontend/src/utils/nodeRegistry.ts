@@ -136,6 +136,7 @@ export const NODE_CATEGORIES: Category[] = [
         defaultConfig: {
           model: 'deepseek-v4-flash', prompt: '', system_prompt: '', temperature: 0.7, max_tokens: 2048,
           thinking_mode: false, reasoning_effort: 'medium', auto_inject_memory: true,
+          top_p: 1, frequency_penalty: 0, presence_penalty: 0,
         },
         inputSchema: [
           { name: 'input', type: 'string', label: '用户输入', required: false },
@@ -156,6 +157,9 @@ export const NODE_CATEGORIES: Category[] = [
           { key: 'thinking_mode', label: 'DeepSeek Think 模式', type: 'select', default: false, options: [false, true] },
           { key: 'reasoning_effort', label: '推理强度', type: 'select', default: 'medium', options: ['low', 'medium', 'high'] },
           { key: 'auto_inject_memory', label: '自动注入记忆', type: 'select', default: true, options: [true, false] },
+          { key: 'top_p', label: 'Top P', type: 'number', default: 1, min: 0, max: 1, step: 0.05 },
+          { key: 'frequency_penalty', label: '频率惩罚', type: 'number', default: 0, min: -2, max: 2, step: 0.1 },
+          { key: 'presence_penalty', label: '存在惩罚', type: 'number', default: 0, min: -2, max: 2, step: 0.1 },
         ],
       },
       {

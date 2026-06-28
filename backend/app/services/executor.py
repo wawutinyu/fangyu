@@ -10,7 +10,7 @@ from .sandbox import run_code
 from .memory import memory_read, memory_write, memory_extract_facts, memory_list
 from .search import index_message, search_messages
 from .tool_registry import execute_tool, register_from_llm_output as parse_tools, list_tools
-from .skill import get_skill_content, learn_from_llm as learn_skills, list_skills
+from .skill import get_skill_content, learn_from_llm as learn_skills, list_skills as get_skills
 from .variable import variable_get as var_get, variable_set as var_set
 from ..models.database import get_session
 
@@ -577,13 +577,24 @@ async def _exec_llm(
     model = config.get("model", "gpt-4o")
     user_content = prompt or inputs.get("input") or external_inputs.get("query", "")
 
-    # ── Hermes pre_llm: auto-inject memory ──
+    # ── Hermes pre_llm: auto-inject memory + skills + context ──
     auto_inject = config.get("auto_inject_memory", True)
-    if auto_inject and not system_prompt:
-        facts = memory_list("user")
-        if facts:
-            lines = [f"- {f['key']}: {f['value']}" for f in facts]
-            system_prompt = f"## 用户记忆\n以下是你已知的用户信息：\n" + "\n".join(lines)
+    if auto_inject:
+        inject_parts = []
+        if not system_prompt:
+            facts = memory_list("user")
+            if facts:
+                lines = [f"- {f['key']}: {f['value']}" for f in facts]
+                inject_parts.append("## 用户记忆\n" + "\n".join(lines))
+        skills = get_skills()
+        if skills:
+            skill_lines = [f"- {s['name']}: {s.get('description', '')}" for s in skills[:20]]
+            inject_parts.append("## 已注册技能\n" + "\n".join(skill_lines))
+        session_notes = var_get("session_notes")
+        if session_notes:
+            inject_parts.append(f"## 会话上下文\n{session_notes}")
+        if inject_parts:
+            system_prompt = (system_prompt + "\n\n" if system_prompt else "") + "\n\n".join(inject_parts)
 
     messages: list[dict] = []
     if system_prompt:
@@ -610,6 +621,9 @@ async def _exec_llm(
         max_tokens=config.get("max_tokens", 2048),
         thinking_mode=config.get("thinking_mode", False),
         reasoning_effort=config.get("reasoning_effort", "medium"),
+        top_p=config.get("top_p"),
+        frequency_penalty=config.get("frequency_penalty"),
+        presence_penalty=config.get("presence_penalty"),
     )
 
     content = result.get("result", "")
@@ -619,7 +633,7 @@ async def _exec_llm(
     global_vars["_chatHistory"].append({"role": "user", "content": str(user_content)})
     global_vars["_chatHistory"].append({"role": "assistant", "content": content})
 
-    # ── Hermes post_llm: auto-extract facts + index ──
+    # ── Hermes post_llm: auto-extract facts + index + sync registry ──
     if auto_inject and content:
         try:
             facts = memory_extract_facts(content, max_facts=3)
@@ -628,6 +642,8 @@ async def _exec_llm(
                 memory_write("user", k, fact)
             index_message("default", "user", str(user_content))
             index_message("default", "assistant", content)
+            current_skills = get_skills()
+            var_set("skill_registry", {"skills": current_skills, "updated": int(__import__('time').time())})
         except Exception:
             pass
 

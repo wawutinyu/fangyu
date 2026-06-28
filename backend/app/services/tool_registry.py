@@ -125,6 +125,17 @@ async def execute_tool(name: str, args: dict, global_vars: dict) -> Any:
                 resp = await client.post(url, json=body)
             return resp.json()
 
+    if impl_type == "prompt_chain":
+        steps = impl.get("steps", [])
+        chain_vars = dict(args)
+        for step in steps:
+            template = step.get("prompt", "")
+            result = template
+            for k, v in chain_vars.items():
+                result = result.replace(f"{{{{{k}}}}}", str(v))
+            chain_vars["_step_result"] = result
+        return {"result": chain_vars["_step_result"], "chain_vars": chain_vars}
+
     raise ValueError(f"不支持的实现类型: {impl_type}")
 
 
@@ -237,6 +248,36 @@ BUILTIN_TOOLS: list[dict] = [
         "description": "删除技能附属文件",
         "parameters": {"type": "object", "properties": {"skill_name": {"type": "string", "description": "技能名称"}, "filename": {"type": "string", "description": "文件名"}}, "required": ["skill_name", "filename"]},
         "implementation": {"type": "code", "code": "from app.services.skill import skill_remove_file; r = skill_remove_file(args['skill_name'], args['filename']); result = r"},
+    },
+    {
+        "name": "skill_create",
+        "description": "创建一个新技能文件",
+        "parameters": {"type": "object", "properties": {"name": {"type": "string", "description": "技能名称"}, "description": {"type": "string", "description": "技能描述"}, "content": {"type": "string", "description": "Markdown 正文内容"}}, "required": ["name", "description", "content"]},
+        "implementation": {"type": "code", "code": "from app.services.skill import create_skill; r = create_skill(args['name'], args['description'], args['content']); result = r"},
+    },
+    {
+        "name": "skill_edit",
+        "description": "编辑已有技能文件（完整覆盖）",
+        "parameters": {"type": "object", "properties": {"name": {"type": "string", "description": "技能名称"}, "content": {"type": "string", "description": "新内容"}}, "required": ["name", "content"]},
+        "implementation": {"type": "code", "code": "from app.services.skill import edit_skill; r = edit_skill(args['name'], args['content']); result = r"},
+    },
+    {
+        "name": "skill_delete",
+        "description": "删除一个技能文件",
+        "parameters": {"type": "object", "properties": {"name": {"type": "string", "description": "技能名称"}}, "required": ["name"]},
+        "implementation": {"type": "code", "code": "from app.services.skill import delete_skill; r = delete_skill(args['name']); result = r"},
+    },
+    {
+        "name": "skill_list",
+        "description": "列出所有技能",
+        "parameters": {"type": "object", "properties": {}},
+        "implementation": {"type": "code", "code": "from app.services.skill import list_skills; result = list_skills()"},
+    },
+    {
+        "name": "skill_view",
+        "description": "查看指定技能的完整内容",
+        "parameters": {"type": "object", "properties": {"name": {"type": "string", "description": "技能名称"}}, "required": ["name"]},
+        "implementation": {"type": "code", "code": "from app.services.skill import get_skill_content; r = get_skill_content(args['name']); result = {'found': r is not None, 'content': r}"},
     },
 ]
 

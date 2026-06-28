@@ -37,6 +37,8 @@ def _build_headers(api_key: str, provider_id: str) -> dict:
 def _build_body(
     model: str, messages: list, temperature: float, max_tokens: int,
     thinking_mode: bool, reasoning_effort: str, provider_id: str, stream: bool = False,
+    top_p: float | None = None, frequency_penalty: float | None = None,
+    presence_penalty: float | None = None,
 ) -> dict:
     if provider_id == 'anthropic':
         system = None
@@ -59,6 +61,12 @@ def _build_body(
         'temperature': temperature,
         'max_tokens': max_tokens,
     }
+    if top_p is not None:
+        body['top_p'] = top_p
+    if frequency_penalty is not None:
+        body['frequency_penalty'] = frequency_penalty
+    if presence_penalty is not None:
+        body['presence_penalty'] = presence_penalty
     if provider_id == 'deepseek' and thinking_mode:
         body['thinking'] = {'type': 'enabled'}
         body['reasoning_effort'] = reasoning_effort
@@ -76,6 +84,9 @@ async def chat_completion(
     max_tokens: int = 2048,
     thinking_mode: bool = False,
     reasoning_effort: str = 'medium',
+    top_p: float | None = None,
+    frequency_penalty: float | None = None,
+    presence_penalty: float | None = None,
 ) -> dict:
     if not api_key:
         return {'result': '[错误: API Key 未配置，请在设置中填写]', 'usage': {}}
@@ -85,7 +96,7 @@ async def chat_completion(
     if provider_id == 'anthropic':
         return await _call_anthropic(api_key, base_url, model, messages, max_tokens, temperature)
     else:
-        return await _call_openai_compat(provider_id, api_key, base_url, model, messages, temperature, max_tokens, thinking_mode, reasoning_effort)
+        return await _call_openai_compat(provider_id, api_key, base_url, model, messages, temperature, max_tokens, thinking_mode, reasoning_effort, top_p, frequency_penalty, presence_penalty)
 
 
 async def _call_openai_compat(
@@ -98,10 +109,13 @@ async def _call_openai_compat(
     max_tokens: int,
     thinking_mode: bool,
     reasoning_effort: str,
+    top_p: float | None = None,
+    frequency_penalty: float | None = None,
+    presence_penalty: float | None = None,
 ) -> dict:
     url = f'{base_url.rstrip("/")}/chat/completions'
     headers = _build_headers(api_key, provider_id)
-    body = _build_body(model, messages, temperature, max_tokens, thinking_mode, reasoning_effort, provider_id)
+    body = _build_body(model, messages, temperature, max_tokens, thinking_mode, reasoning_effort, provider_id, False, top_p, frequency_penalty, presence_penalty)
 
     async with httpx.AsyncClient(timeout=60.0) as client:
         try:
