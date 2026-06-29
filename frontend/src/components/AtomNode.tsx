@@ -31,12 +31,9 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
   const catColor = CATEGORY_COLORS[meta.category] || '#999'
   const label = (data.label as string) || meta.name
   const desc = (data.desc as string) || ''
-  const [hovered, setHovered] = useState(false)
   const [pickerVisible, setPickerVisible] = useState(false)
   const [pickerSourcePort, setPickerSourcePort] = useState('__default')
   const [pickerAnchor, setPickerAnchor] = useState<DOMRect | null>(null)
-
-  const showPlus = hovered || selected || pickerVisible
 
   const inPorts = meta.inputSchema
   const outPorts = buildPorts(
@@ -61,7 +58,7 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
   }, [id, pickerSourcePort])
 
   return (
-    <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{
+    <div style={{
       width: 160,
       border: `1.5px solid ${selected ? '#37352f' : data._simulating ? '#52c41a' : catColor}`,
       borderRadius: 8,
@@ -120,18 +117,18 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
         ))
       )}
       {outPorts.length <= 1 ? (
-        <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{ position: 'relative', paddingBottom: 20 }}>
+        <div style={{ position: 'relative' }}>
           <Handle type="source" position={Position.Bottom} id="__default" style={{ background: '#b0b0ae', width: 8, height: 8, border: '2px solid #fff' }} />
           {hasOutput && (
-            <div style={{ position: 'absolute', left: '50%', bottom: 0, transform: 'translateX(-50%)', zIndex: 10, pointerEvents: 'none' }}>
+            <div style={{ position: 'absolute', left: '50%', bottom: -18, transform: 'translateX(-50%)', zIndex: 10 }}>
               <div onClick={(e) => openPicker('__default', e)}
-                style={{ width: 18, height: 18, borderRadius: '50%', background: '#37352f', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 14, lineHeight: 1, boxShadow: '0 2px 6px rgba(0,0,0,0.15)', userSelect: 'none', opacity: showPlus ? 1 : 0, transition: 'opacity 0.15s', pointerEvents: showPlus ? 'auto' : 'none' }}
+                style={{ width: 18, height: 18, borderRadius: '50%', background: '#37352f', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 14, lineHeight: 1, boxShadow: '0 2px 6px rgba(0,0,0,0.15)', userSelect: 'none' }}
               >+</div>
             </div>
           )}
         </div>
       ) : (
-        <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{ position: 'relative', paddingBottom: 20 }}>
+        <div style={{ position: 'relative', height: outPorts.length > 2 ? outPorts.length * 18 : 0 }}>
           {outPorts.map((port, i) => (
             <div key={port.name} style={{ position: 'relative', height: 18 }}>
               <Handle type="source" position={Position.Bottom} id={port.name}
@@ -146,9 +143,9 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
               }}>
                 {port.label || port.name}
               </div>
-              <div style={{ position: 'absolute', left: '50%', bottom: -16, transform: 'translateX(-50%)', zIndex: 10, pointerEvents: 'none' }}>
+              <div style={{ position: 'absolute', left: '50%', bottom: -16, transform: 'translateX(-50%)', zIndex: 10 }}>
                 <div onClick={(e) => openPicker(port.name, e)}
-                  style={{ width: 16, height: 16, borderRadius: '50%', background: '#37352f', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 12, lineHeight: 1, boxShadow: '0 2px 6px rgba(0,0,0,0.15)', userSelect: 'none', opacity: showPlus ? 1 : 0, transition: 'opacity 0.15s', pointerEvents: showPlus ? 'auto' : 'none' }}
+                  style={{ width: 16, height: 16, borderRadius: '50%', background: '#37352f', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 12, lineHeight: 1, boxShadow: '0 2px 6px rgba(0,0,0,0.15)', userSelect: 'none' }}
                 >+</div>
               </div>
             </div>
