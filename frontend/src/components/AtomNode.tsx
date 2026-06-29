@@ -31,9 +31,12 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
   const catColor = CATEGORY_COLORS[meta.category] || '#999'
   const label = (data.label as string) || meta.name
   const desc = (data.desc as string) || ''
+  const [hovered, setHovered] = useState(false)
   const [pickerVisible, setPickerVisible] = useState(false)
   const [pickerSourcePort, setPickerSourcePort] = useState('__default')
   const [pickerAnchor, setPickerAnchor] = useState<DOMRect | null>(null)
+
+  const showPlus = hovered || selected || pickerVisible
 
   const inPorts = meta.inputSchema
   const outPorts = buildPorts(
@@ -57,7 +60,7 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
   }, [id, pickerSourcePort])
 
   return (
-    <div style={{
+    <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{
       width: 160,
       border: `1.5px solid ${selected ? '#37352f' : data._simulating ? '#52c41a' : catColor}`,
       borderRadius: 8,
@@ -121,7 +124,7 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
           {hasOutput && (
             <div style={{ position: 'absolute', left: '50%', bottom: -18, transform: 'translateX(-50%)', zIndex: 10 }}>
               <div onClick={(e) => openPicker('__default', e)}
-                style={{ width: 18, height: 18, borderRadius: '50%', background: '#37352f', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 14, lineHeight: 1, boxShadow: '0 2px 6px rgba(0,0,0,0.15)', userSelect: 'none' }}
+                style={{ width: 18, height: 18, borderRadius: '50%', background: '#37352f', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 14, lineHeight: 1, boxShadow: '0 2px 6px rgba(0,0,0,0.15)', userSelect: 'none', opacity: showPlus ? 1 : 0, transition: 'opacity 0.15s', pointerEvents: showPlus ? 'auto' : 'none' }}
               >+</div>
             </div>
           )}
@@ -144,7 +147,7 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
               </div>
               <div style={{ position: 'absolute', left: '50%', bottom: -16, transform: 'translateX(-50%)', zIndex: 10 }}>
                 <div onClick={(e) => openPicker(port.name, e)}
-                  style={{ width: 16, height: 16, borderRadius: '50%', background: '#37352f', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 12, lineHeight: 1, boxShadow: '0 2px 6px rgba(0,0,0,0.15)', userSelect: 'none' }}
+                  style={{ width: 16, height: 16, borderRadius: '50%', background: '#37352f', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 12, lineHeight: 1, boxShadow: '0 2px 6px rgba(0,0,0,0.15)', userSelect: 'none', opacity: showPlus ? 1 : 0, transition: 'opacity 0.15s', pointerEvents: showPlus ? 'auto' : 'none' }}
                 >+</div>
               </div>
             </div>
