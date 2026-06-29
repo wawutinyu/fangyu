@@ -1,9 +1,9 @@
-import { useMemo, useCallback, useState, useRef, useEffect, useLayoutEffect } from 'react'
+import { useMemo, useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { NODE_CATEGORIES } from '../utils/nodeRegistry'
 
 interface NodePickerProps {
   sourceType: string
-  anchorRef: React.RefObject<HTMLDivElement | null>
+  anchorRect: DOMRect
   onSelect: (nodeType: string) => void
   onClose: () => void
 }
@@ -17,28 +17,24 @@ function getValidTargets(sourceType: string, allNodes: { type: string }[]): Set<
   return new Set(allNodes.filter(n => !NO_INPUT.has(n.type)).map(n => n.type))
 }
 
-export default function NodePicker({ sourceType, anchorRef: _anchorRef, onSelect, onClose }: NodePickerProps) {
+export default function NodePicker({ sourceType, anchorRect, onSelect, onClose }: NodePickerProps) {
   const [search, setSearch] = useState('')
   const popupRef = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState({ x: 0, y: 0 })
 
   useLayoutEffect(() => {
-    const el = _anchorRef.current
-    if (!el) return
-    const rect = el.getBoundingClientRect()
     const popupW = 320
-    let x = rect.right + 4
-    let y = rect.top - 8
+    let x = anchorRect.right + 4
+    let y = anchorRect.top - 8
     if (x + popupW > window.innerWidth - 16) {
-      x = rect.left - popupW - 4
+      x = anchorRect.left - popupW - 4
     }
     if (y < 8) y = 8
-    const maxH = window.innerHeight - y - 16
-    if (maxH < 200) {
-      y = Math.max(8, rect.bottom - 300)
+    if (y + 300 > window.innerHeight) {
+      y = Math.max(8, window.innerHeight - 316)
     }
     setPos({ x, y })
-  }, [_anchorRef])
+  }, [anchorRect])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }

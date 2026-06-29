@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, useLayoutEffect, useMemo } from 'react'
+import { useCallback, useState } from 'react'
 import { Handle, Position, type NodeProps } from 'reactflow'
 import { getNodeMeta } from '../utils/nodeRegistry'
 import NodePicker from './NodePicker'
@@ -33,7 +33,7 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
   const desc = (data.desc as string) || ''
   const [pickerVisible, setPickerVisible] = useState(false)
   const [pickerSourcePort, setPickerSourcePort] = useState('__default')
-  const plusBtnRef = useRef<HTMLDivElement>(null)
+  const [pickerAnchor, setPickerAnchor] = useState<DOMRect | null>(null)
 
   const inPorts = meta.inputSchema
   const outPorts = buildPorts(
@@ -41,6 +41,12 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
     originType === 'condition' ? (config.branch_count as number) || 2 : undefined,
   )
   const hasOutput = outPorts.length > 0
+
+  const openPicker = useCallback((port: string, e: React.MouseEvent) => {
+    setPickerSourcePort(port)
+    setPickerAnchor(e.currentTarget.getBoundingClientRect())
+    setPickerVisible(true)
+  }, [])
 
   const handleAddNode = useCallback((nodeType: string) => {
     const event = new CustomEvent('flow:add-node', {
@@ -113,8 +119,8 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
         <div style={{ position: 'relative' }}>
           <Handle type="source" position={Position.Bottom} id="__default" style={{ background: '#b0b0ae', width: 8, height: 8, border: '2px solid #fff' }} />
           {hasOutput && (
-            <div ref={plusBtnRef} style={{ position: 'absolute', left: '50%', bottom: -18, transform: 'translateX(-50%)', zIndex: 10 }}>
-              <div onClick={() => { setPickerSourcePort('__default'); setPickerVisible(true) }}
+            <div style={{ position: 'absolute', left: '50%', bottom: -18, transform: 'translateX(-50%)', zIndex: 10 }}>
+              <div onClick={(e) => openPicker('__default', e)}
                 style={{ width: 18, height: 18, borderRadius: '50%', background: '#37352f', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 14, lineHeight: 1, boxShadow: '0 2px 6px rgba(0,0,0,0.15)', userSelect: 'none' }}
               >+</div>
             </div>
@@ -136,8 +142,8 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
               }}>
                 {port.label || port.name}
               </div>
-              <div ref={i === 0 ? plusBtnRef : undefined} style={{ position: 'absolute', left: '50%', bottom: -16, transform: 'translateX(-50%)', zIndex: 10 }}>
-                <div onClick={() => { setPickerSourcePort(port.name); setPickerVisible(true) }}
+              <div style={{ position: 'absolute', left: '50%', bottom: -16, transform: 'translateX(-50%)', zIndex: 10 }}>
+                <div onClick={(e) => openPicker(port.name, e)}
                   style={{ width: 16, height: 16, borderRadius: '50%', background: '#37352f', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 12, lineHeight: 1, boxShadow: '0 2px 6px rgba(0,0,0,0.15)', userSelect: 'none' }}
                 >+</div>
               </div>
@@ -146,10 +152,10 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
         </div>
       )}
 
-      {pickerVisible && (
+      {pickerVisible && pickerAnchor && (
         <NodePicker
           sourceType={originType}
-          anchorRef={plusBtnRef}
+          anchorRect={pickerAnchor}
           onSelect={handleAddNode}
           onClose={() => setPickerVisible(false)}
         />
