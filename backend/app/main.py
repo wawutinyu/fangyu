@@ -53,6 +53,7 @@ from .routers import search as search_router          # /api/v1/search/*
 from .routers import tools as tools_router            # /api/v1/tools/*
 from .routers import skills as skills_router          # /api/v1/skills/*
 from .routers import variables as variables_router    # /api/v1/variables/*
+from .routers import monitor as monitor_router        # /api/v1/monitor/*
 
 
 # ---------------------------------------------------------------------------
@@ -132,6 +133,7 @@ app.include_router(search_router.router)
 app.include_router(tools_router.router)
 app.include_router(skills_router.router)
 app.include_router(variables_router.router)
+app.include_router(monitor_router.router)
 
 
 # ---------------------------------------------------------------------------

@@ -76,6 +76,7 @@ async def init_db():
     from .setting import Setting  # noqa: F401
     from .knowledge import KnowledgeDoc, KnowledgeChunk  # noqa: F401
     from .memory import MemoryFact  # noqa: F401
+    from .execution_log import ExecutionLog  # noqa: F401
     from .conversation import ConversationLog  # noqa: F401
 
     async with engine.begin() as conn:

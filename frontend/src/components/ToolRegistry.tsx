@@ -8,7 +8,11 @@ interface ToolEntry {
   enabled: boolean
 }
 
-export default function ToolRegistry() {
+interface ToolRegistryProps {
+  headerless?: boolean
+}
+
+export default function ToolRegistry({ headerless }: ToolRegistryProps) {
   const [tools, setTools] = useState<ToolEntry[]>([])
   const [expanded, setExpanded] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -36,6 +40,32 @@ export default function ToolRegistry() {
     } catch { /* ignore */ }
   }, [fetchTools])
 
+  const content = (
+    <div style={{ overflowY: 'auto', padding: '8px 14px' }}>
+      {loading && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>加载中...</div>}
+      {!loading && tools.length === 0 && (
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: 12 }}>
+          暂无注册工具。使用「工具注册」节点从 LLM 输出自动注册。
+        </div>
+      )}
+      {tools.map(tool => (
+        <div key={tool.name} style={{ marginBottom: 8, padding: 8, borderRadius: 6, border: '1px solid var(--border-light)', background: 'var(--bg-secondary)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, fontFamily: 'monospace' }}>{tool.name}</span>
+            <button style={{ fontSize: 10, color: '#ff4d4f', border: '1px solid #ffccc7', borderRadius: 4, padding: '1px 6px', background: '#fff2f0', cursor: 'pointer' }}
+              onClick={() => handleRemove(tool.name)}
+            >删除</button>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{tool.description}</div>
+        </div>
+      ))}
+    </div>
+  )
+
+  if (headerless) {
+    return <div style={{ height: '100%', background: 'var(--bg-primary)' }}>{content}</div>
+  }
+
   return (
     <div style={{ borderTop: '1px solid var(--border-color)', background: 'var(--bg-primary)', flexShrink: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 14px', cursor: 'pointer', userSelect: 'none', borderBottom: '1px solid var(--border-light)' }}
@@ -49,27 +79,7 @@ export default function ToolRegistry() {
           <polyline points="6 9 12 15 18 9"/>
         </svg>
       </div>
-      {expanded && (
-        <div style={{ maxHeight: 200, overflowY: 'auto', padding: '8px 14px' }}>
-          {loading && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>加载中...</div>}
-          {!loading && tools.length === 0 && (
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: 12 }}>
-              暂无注册工具。使用「工具注册」节点从 LLM 输出自动注册。
-            </div>
-          )}
-          {tools.map(tool => (
-            <div key={tool.name} style={{ marginBottom: 8, padding: 8, borderRadius: 6, border: '1px solid var(--border-light)', background: 'var(--bg-secondary)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, fontFamily: 'monospace' }}>{tool.name}</span>
-                <button style={{ fontSize: 10, color: '#ff4d4f', border: '1px solid #ffccc7', borderRadius: 4, padding: '1px 6px', background: '#fff2f0', cursor: 'pointer' }}
-                  onClick={() => handleRemove(tool.name)}
-                >删除</button>
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{tool.description}</div>
-            </div>
-          ))}
-        </div>
-      )}
+      {expanded && content}
     </div>
   )
 }

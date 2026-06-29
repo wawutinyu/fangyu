@@ -20,3 +20,4 @@ class KnowledgeChunk(Base):
     doc_id = Column(Integer, ForeignKey('knowledge_docs.id', ondelete='CASCADE'), nullable=False)
     content = Column(Text, nullable=False)
     idx = Column(Integer, default=0)
+    embedding = Column(Text, nullable=True)

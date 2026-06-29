@@ -123,6 +123,22 @@ export const NODE_CATEGORIES: Category[] = [
         ],
         configSchema: [],
       },
+      {
+        type: 'input', name: '输入', desc: '注入外部输入值',
+        defaultConfig: { default_value: '' },
+        inputSchema: [],
+        outputSchema: [{ name: 'input', type: 'any', label: '输出值' }],
+        configSchema: [
+          { key: 'default_value', label: '默认值', type: 'input', default: '', placeholder: '外部输入为空时的默认值' },
+        ],
+      },
+      {
+        type: 'output', name: '输出', desc: '流程输出节点',
+        defaultConfig: {},
+        inputSchema: [{ name: 'input', type: 'any', label: '输入', required: true }],
+        outputSchema: [],
+        configSchema: [],
+      },
     ],
   },
   {
@@ -135,7 +151,7 @@ export const NODE_CATEGORIES: Category[] = [
         type: 'llm', name: '大模型调用', desc: '调用语言模型进行推理',
         defaultConfig: {
           model: 'deepseek-v4-flash', prompt: '', system_prompt: '', temperature: 0.7, max_tokens: 2048,
-          thinking_mode: false, reasoning_effort: 'medium', auto_inject_memory: true,
+          thinking_mode: false, reasoning_effort: 'medium', auto_inject_memory: false,
           top_p: 1, frequency_penalty: 0, presence_penalty: 0,
         },
         inputSchema: [

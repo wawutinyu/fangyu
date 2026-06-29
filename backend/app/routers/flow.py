@@ -48,6 +48,8 @@ async def _inject_settings(global_vars: dict, db: AsyncSession) -> dict:
 
 @router.post("/run")
 async def run_flow_endpoint(body: RunFlowBody, db: AsyncSession = Depends(get_session)):
+    from ..models.execution_log import ExecutionLog
+
     global_vars = await _inject_settings(body.global_vars, db)
     result = await run_flow(
         nodes=body.nodes,
@@ -55,6 +57,28 @@ async def run_flow_endpoint(body: RunFlowBody, db: AsyncSession = Depends(get_se
         external_inputs=body.external_inputs,
         global_vars=global_vars,
     )
+
+    # Persist execution logs
+    session_id = global_vars.get("session_id", global_vars.get("_chatHistory", id(body)))
+    flow_name = body.global_vars.get("flow_id", "")
+    if isinstance(session_id, list):
+        session_id = str(id(body))
+
+    for log_entry in result.get("logs", []):
+        db.add(ExecutionLog(
+            flow_id=str(flow_name),
+            session_id=str(session_id),
+            node_id=log_entry.get("nodeId", ""),
+            node_name=log_entry.get("nodeName", ""),
+            node_type=log_entry.get("type", ""),
+            log_type="start" if log_entry.get("type") == "start" else "complete" if log_entry.get("type") == "complete" else "error",
+            inputs_json=json.dumps(log_entry.get("data", {}).get("inputs", {}), ensure_ascii=False),
+            outputs_json=json.dumps(log_entry.get("data", {}).get("outputs", {}), ensure_ascii=False),
+            error=log_entry.get("data", {}).get("error", ""),
+            duration_ms=log_entry.get("time", 0),
+        ))
+
+    await db.commit()
     return result
 
 

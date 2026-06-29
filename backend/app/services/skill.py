@@ -17,7 +17,12 @@ def _ensure():
 def _registry() -> list[dict]:
     _ensure()
     try:
-        return json.loads(REGISTRY_FILE.read_text(encoding="utf-8"))
+        data = json.loads(REGISTRY_FILE.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            return data.get("skills", [])
+        if isinstance(data, list):
+            return data
+        return []
     except (json.JSONDecodeError, OSError):
         return []
 

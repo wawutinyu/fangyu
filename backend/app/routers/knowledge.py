@@ -1,3 +1,4 @@
+import json
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,6 +7,7 @@ from sqlalchemy import select, delete
 from ..models.database import get_session
 from ..models.knowledge import KnowledgeDoc, KnowledgeChunk
 from ..services.knowledge import save_upload_file, extract_and_chunk, search_chunks
+from ..services.embedding import get_embeddings_batch
 
 router = APIRouter(prefix="/api/v1/knowledge", tags=["知识库"])
 
@@ -29,8 +31,11 @@ async def upload_doc(file: UploadFile = File(...), db: AsyncSession = Depends(ge
     db.add(doc)
     await db.flush()
 
+    embeddings = await get_embeddings_batch(chunks)
+
     for i, chunk_text in enumerate(chunks):
-        db.add(KnowledgeChunk(doc_id=doc.id, content=chunk_text, idx=i))
+        emb_json = json.dumps(embeddings[i]) if i < len(embeddings) and embeddings[i] else None
+        db.add(KnowledgeChunk(doc_id=doc.id, content=chunk_text, idx=i, embedding=emb_json))
 
     await db.commit()
 
@@ -61,8 +66,11 @@ async def search(req: SearchRequest, db: AsyncSession = Depends(get_session)):
     result = await db.execute(select(KnowledgeChunk))
     all_chunks = result.scalars().all()
 
-    chunks_data = [{'id': c.id, 'doc_id': c.doc_id, 'content': c.content} for c in all_chunks]
-    matched = search_chunks(chunks_data, req.query, req.top_k)
+    chunks_data = [
+        {'id': c.id, 'doc_id': c.doc_id, 'content': c.content, 'embedding': c.embedding}
+        for c in all_chunks
+    ]
+    matched = await search_chunks(chunks_data, req.query, req.top_k)
     context = '\n\n'.join([f'[{i+1}] {m["content"]}' for i, m in enumerate(matched)])
 
     return {

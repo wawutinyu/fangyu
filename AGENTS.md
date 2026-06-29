@@ -1,133 +1,163 @@
 # fangyu — AI Flow Canvas
 
-可视化 AI 工作流编排工具，对标 Dify/Coze。
+可视化 AI 工作流编排工具，对标 Dify/Coze，支持嵌套子图执行、RAG 知识库、实时监控。
 
-## 项目结构（前后端分离）
+## 项目结构
 
 ```
 .
-├── frontend/               # React + Vite + React Flow
+├── frontend/               # React 19 + Vite 8 + React Flow v11
 │   ├── src/
-│   │   ├── components/     # React 组件（TSX）
-│   │   ├── store/          # Redux Toolkit
-│   │   ├── utils/          # 工具函数（TS）
-│   │   └── styles/         # 全局样式
+│   │   ├── components/     # TSX 组件
+│   │   │   ├── App.tsx            # 主布局
+│   │   │   ├── AtomNode.tsx       # 通用节点渲染（含多端口）
+│   │   │   ├── CompositeNode.tsx  # 组合节点
+│   │   │   ├── ConfigPanel.tsx    # 右侧配置面板
+│   │   │   ├── FlowCanvas.tsx     # 核心画布
+│   │   │   ├── NodeLibrary.tsx    # 左侧组件库
+│   │   │   ├── BottomPanel.tsx    # 底部标签页容器（可拖拽）
+│   │   │   ├── ChatInterface.tsx  # 运行预览（底部标签页）
+│   │   │   ├── SettingsPanel.tsx  # API Key 设置
+│   │   │   ├── SaveHistory.tsx    # 保存历史
+│   │   │   ├── ToolRegistry.tsx   # 工具注册表（底部标签页）
+│   │   │   ├── SkillManager.tsx   # 技能库（底部标签页）
+│   │   │   ├── KnowledgePanel.tsx # 知识库管理（底部标签页）
+│   │   │   ├── MonitorPanel.tsx   # 执行日志查看（底部标签页）
+│   │   │   └── SubFlowEditor.tsx  # 子图编辑器（弹窗）
+│   │   ├── store/          # Redux Toolkit (flowSlice/settingsSlice/saveSlice)
+│   │   ├── utils/          # nodeRegistry.ts / flowHelper.ts / executor.ts
+│   │   └── styles/
 │   ├── index.html
 │   ├── package.json
-│   └── vite.config.ts      # 含 /api 代理到后端 8000
+│   └── vite.config.ts      # 代理 /api → localhost:8000
 │
-├── backend/                # Python + FastAPI
+├── backend/                # Python 3.14 + FastAPI + SQLite (aiosqlite)
 │   ├── app/
-│   │   ├── main.py         # 应用入口 + 路由注册
-│   │   ├── core/config.py  # 集中配置（.env + 环境变量）
-│   │   ├── models/         # SQLAlchemy 数据模型
-│   │   ├── routers/        # API 路由（flow/llm/settings/knowledge/project）
-│   │   └── services/       # 业务逻辑层（LLM 代理、知识库、沙箱）
-│   ├── run.py              # 开发启动脚本
+│   │   ├── main.py
+│   │   ├── core/config.py
+│   │   ├── models/         # database / knowledge / execution_log / setting
+│   │   ├── routers/        # flow / llm / settings / knowledge / project / monitor / tools / skills
+│   │   └── services/       # executor / llm / memory / embedding / sandbox / tool_registry / skill / variable / search / knowledge
+│   ├── data/               # SQLite DB、工具注册表、技能文件
 │   └── requirements.txt
 │
-├── dev.bat                 # 一键启动前后端（热重载）
+├── tests/
+│   └── test_all_features.py   # 全功能测试（10 项）
+├── ROADMAP.md              # 后续规划
 ├── AGENTS.md
-└── .gitignore
+└── dev.bat                 # 一键启动
 ```
 
 ## 开发启动
 
 ```bash
-# 方式一：一键启动（推荐）
+# 一键启动
 dev.bat
 
-# 方式二：分别启动
-cd backend && py run.py          # 后端 http://localhost:8000
-cd frontend && npm run dev        # 前端 http://localhost:5173
+# 分别启动
+cd backend && py run.py          # http://localhost:8000（热重载）
+cd frontend && npm run dev        # http://localhost:5173（热重载）
+
+# 重启后端（Windows）
+taskkill -f -fi "IMAGENAME eq python.exe"
+cd backend && py -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-两个服务都是热重载的——改代码后自动刷新。
+## 节点类型（25 种，全部实现）
 
-## API 设计
-
-版本化：`/api/v1/{resource}/{action}`
-
-| 端点 | 说明 | 状态 |
+| 分类 | 节点 | 说明 |
 |------|------|------|
-| `GET /api/health` | 健康检查 | ✅ |
-| `POST /api/v1/flow/execute` | 执行流程 | ⬜ 骨架 |
-| `POST /api/v1/flow/execute-code` | 执行代码沙箱 | ✅ |
-| `POST /api/v1/llm/chat` | LLM 聊天代理 | ✅ |
-| `POST /api/v1/llm/chat/stream` | LLM 流式聊天（SSE） | ✅ |
-| `GET /api/v1/llm/models` | 模型列表 | ✅ 静态 |
-| `GET /api/v1/settings/` | 获取设置 | ✅ |
-| `PUT /api/v1/settings/` | 保存设置 | ✅ |
-| `GET /api/v1/projects/` | 项目列表 | ✅ |
-| `POST /api/v1/projects/` | 创建项目 | ✅ |
-| `PUT /api/v1/projects/{id}` | 更新项目 | ✅ |
-| `DELETE /api/v1/projects/{id}` | 删除项目 | ✅ |
-| `GET /api/v1/projects/{id}/saves` | 保存历史列表 | ✅ |
-| `POST /api/v1/projects/{id}/saves` | 创建保存 | ✅ |
-| `DELETE /api/v1/projects/saves/{id}` | 删除保存 | ✅ |
-| `POST /api/v1/knowledge/upload` | 上传文档 | ✅ |
-| `GET /api/v1/knowledge/docs` | 文档列表 | ✅ |
-| `DELETE /api/v1/knowledge/docs/{id}` | 删除文档 | ✅ |
-| `POST /api/v1/knowledge/search` | 知识库检索 | ✅ |
+| **流程控制** | start / end / trigger / condition / switch / loop / input / output | 含多分支条件、循环体子图 |
+| **AI 能力** | llm / code / knowledge / prompt-assembly | LLM、Python 沙箱、RAG |
+| **工具集成** | http / json-parse / search / tool-call / register-tool / execute-skill / learn-skill | web/news/academic 搜索、arXiv |
+| **数据操作** | variable-set / variable-get / transform / text-process | 变量、字段映射、文本 |
+| **记忆存储** | memory-read / memory-write / extract-memory / search-sessions | 持久化记忆 |
 
-## 会话记录
+### 特殊节点
+- **composite** — 组合节点，内部可编辑子图（右键 → "编辑内部节点"）
+- **loop** — 循环节点，支持 inner_nodes 子图作为循环体执行
 
-### 2026-06-25 — Vue → React + React Flow 完整前端迁移
+## API 端点
 
-**背景**: 用户要求放弃 Vue 3 + Vue Flow，改用 React + React Flow + Redux Toolkit。
+| 端点 | 说明 |
+|------|------|
+| `POST /api/v1/flow/run` | 执行流程（返回 results + logs） |
+| `POST /api/v1/flow/run/stream` | SSO 流式执行 |
+| `POST /api/v1/flow/execute-code` | 代码沙箱 |
+| `POST /api/v1/llm/chat` | LLM 代理 |
+| `POST /api/v1/llm/chat/stream` | SSO 流式 |
+| `GET /api/v1/llm/models` | 模型列表 |
+| `GET/PUT /api/v1/settings/` | 设置 |
+| `GET/POST/PUT/DELETE /api/v1/projects/` | 项目 CRUD |
+| `POST/GET/DELETE /api/v1/knowledge/upload\|docs\|docs/{id}` | 文档管理 |
+| `POST /api/v1/knowledge/search` | 语义搜索（n-gram + vector） |
+| `GET/DELETE /api/v1/monitor/logs` | 执行日志 |
+| `GET/POST/DELETE /api/v1/tools/` | 工具注册 |
+| `GET/DELETE /api/v1/skills/` | 技能管理 |
 
-**改动文件**（全部新建，删除旧 Vue 文件）：
-- `frontend/` — 整个目录重新初始化
+## 核心架构
 
-**做了什么**:
-- 用 Vite 的 `react-ts` 模板重建 `frontend/`
-- 前端框架：React 19 + TypeScript + Vite 8
-- 状态管理：Redux Toolkit（3 个 slice，TypeScript 安全）
-- 画布引擎：React Flow v11（`reactflow` 包）
-- 自定义节点：AtomNode（带分类色标的通用 AI 节点）、CompositeNode（组合原子）
-- 组件完整迁移清单：
-  - `App.tsx` — 主布局（顶栏 + 侧栏 + 画布 + 配置面板 + 底栏 + 弹窗）
-  - `FlowCanvas.tsx` — 核心画布（forwardRef + useImperativeHandle 暴露 API）
-  - `NodeLibrary.tsx` — 左侧组件库（HTML5 原生拖拽，`dataTransfer` 传参）
-  - `TopToolbar.tsx` — 顶栏（新建/保存/导入/导出/组合/运行）
-  - `ConfigPanel.tsx` — 右侧配置面板（节点参数 + 端口 + 变量映射 + 连线配置）
-  - `SettingsPanel.tsx` — API Key 设置弹窗（Provider 切换、按需持久化）
-  - `SaveHistory.tsx` — 保存历史侧栏（项目 CRUD + 版本恢复）
-  - `ChatInterface.tsx` — 底部运行预览（Executor 直调 + 日志展示）
-- 工具函数 TypeScript 化：`nodeRegistry.ts`、`flowHelper.ts`、`executor.ts`
-- Redux Store：`flowSlice`（画布状态）、`settingsSlice`（设置）、`saveSlice`（项目/保存）
-- 保留 Electron 配置（`electron/main.cjs` + `package.json` 中的 build 配置）
+### 执行引擎（executor.py）
+- DAG 拓扑排序 → 按深度分批并行执行
+- 27 种节点类型全部实现 dispatch
+- **composite-node 递归**: `inner_nodes` + `inner_links` 作为子图递归调用 `run_flow`
+- **loop 循环体**: 支持 `inner_nodes` 子图每个迭代执行
+- **condition 多分支**: `branch_count>2` 时 eval 返回整数索引 → `branch_{idx}`
+- **search**: Bing 爬取（web）+ freshness 过滤（news）+ arXiv API（academic）
+- **tool-call**: 自动解析 LLM JSON 输出（支持 OpenAI function-calling 格式）
+- **RAG**: 上传文档 → 分块 → n-gram 字符相似度 + 可选 sentence-transformers
 
-**TS 配置要点**:
-- `jsx: "react-jsx"`（无需手动 `import React`，但使用 `React.xxx` 仍需）
-- `verbatimModuleSyntax: true`（type-only 导入须用 `import type`）
-- `noUnusedLocals/noUnusedParameters: true`（未使用变量会报错）
+### 前端节点渲染（AtomNode.tsx）
+- 多端口渲染：outputSchema > 1 时渲染独立 Handle 并显示端口名
+- 端口 ID 与 edge sourceHandle/targetHandle 匹配
 
-**构建结果**: `npx tsc -b --noEmit` 零错误，`npx vite build` 成功（431KB JS + 9.6KB CSS gzip 后 135KB + 2.3KB）
+### 监控（MonitorPanel）
+- `ExecutionLog` 表持久化每次 flow 的节点级日志
+- 面板展示：flow_id 过滤、节点输入/输出/耗时/错误查看
 
-## 后续计划
+## 关键文件
 
-- 组合/展开节点功能（groupSelected/ungroupSelected）
-- 执行引擎移到后端（参考 Dify DAG）
-- 流程执行时节点高亮
-- 连线自定义样式（分支/并行线型）
-- Community marketplace（远期）
-
-## 桌面版
-
-Electron 桌面版已配置：
-- `cd frontend && npm run electron:dev` — 开发模式（Vite + Electron）
-- `cd frontend && npm run electron:build` — 打包为安装程序（输出到 frontend/release/）
-- Electron 主进程自动启动 Python 后端，等待就绪后打开窗口
-- 安装前需确保目标机器有 Python 3.10+（或打包时用 PyInstaller 将后端打成 exe）
+| 文件 | 作用 |
+|------|------|
+| `backend/app/services/executor.py` | 核心执行引擎（~920 行） |
+| `backend/app/services/tool_registry.py` | 24 个内置工具 + 动态注册 |
+| `backend/app/services/embedding.py` | n-gram 语义相似度 |
+| `backend/app/services/knowledge.py` | 文档分块 + 编码检测 |
+| `frontend/src/components/AtomNode.tsx` | 节点渲染（多端口） |
+| `frontend/src/components/SubFlowEditor.tsx` | 子图编辑器弹窗 |
+| `frontend/src/components/KnowledgePanel.tsx` | 知识库管理面板 |
+| `frontend/src/components/MonitorPanel.tsx` | 日志查看面板 |
+| `frontend/src/utils/nodeRegistry.ts` | 25 种节点定义 + schema |
+| `tests/test_all_features.py` | 全功能测试（10/10 通过） |
+| `ROADMAP.md` | Agent 节点、独立导出等规划 |
 
 ## 给 AI 的注意事项
 
-- 所有 API Key 只能存在于后端，前端通过后端代理调用 LLM
-- 数据库使用 SQLite + aiosqlite（异步），换 PG 只需改连接字符串
-- 前端使用 Redux Toolkit + React Flow，状态通过 `store.dispatch` / `useAppSelector` 访问
-- 画布组件 `FlowCanvas` 通过 `forwardRef` 暴露 `newFlow/importFlow/exportFlow/saveFlow/runSimulation/getNodesAndEdges` 方法
-- 外部访问 React Flow 实例可使用 `getReactFlowInstance()`（从 FlowCanvas 模块导出）
-- 拖拽使用 React Flow 的 `onDrop/onDragOver` + HTML5 Drag API
-- 热启动脚本 dev.bat 用 start 命令开新窗口，关闭窗口自动杀进程
-- Git Bash 中 curl 传中文 JSON 会编码错误，通过文件传参解决
+- 所有 API Key 只存在于后端（数据库 settings 表或环境变量）
+- DB 迁移：不用 Alembic，直接 Python 脚本 `ALTER TABLE`
+- 后端重启用 `taskkill -f -fi "IMAGENAME eq python.exe"` 杀干净
+- 调试 curl: 用 Python `urllib.request` 而非 curl.exe（PowerShell 引号问题）
+- composite 和 loop 的 `inner_nodes` 格式：`[{id, originType, config, mappings, relativeX, relativeY}]`
+- 添加新节点类型需同时更新：后端 registry、前端 NODE_CATEGORIES、`getNodeMeta`、AtomNode 多端口
+- 执行器 `_execute_node` 签名包含 `node_data` 参数（原 `nd` 对象），新节点类型如需要可访问
+
+## AI 工作流规则（严格执行）
+
+接到任何需求后，按以下顺序执行：
+
+1. **读源码** — 先理解现有代码结构、数据流、已有约定，不跳过不臆测
+2. **思考架构** — 分析改动波及的范围，画清楚改动前后的数据流变化
+3. **检查接口兼容** — 新增/改动的 API 必须向后兼容；前端 Redux store 结构变更需同步更新所有 selector；后端路由/模型变更需检查所有调用方
+4. **动手写代码** — 遵守现有代码风格，不加注释，不引入新依赖
+5. **写测试代码** — 每次新增功能必须有配套测试（后端 `tests/` 目录，前端如有测试框架也补充）
+6. **提交 git** — `git add -A` → `git commit -m`，提交信息写明改动内容和原因
+7. **更新文档** — `AGENTS.md`（文件列表、API、架构说明）、`ROADMAP.md`（功能进度），如有需要
+
+> 这条规则本身也适用于你对 AGENTS.md 本身的修改——你现在正在执行第 6 步。
+
+## 后续规划（详见 ROADMAP.md）
+
+1. Agent 节点（LLM + tool-call + memory 闭环）
+2. 独立可执行导出（flow → 单文件 .py）
+3. 真·循环体执行（可视化选择体节点）
+4. 画布性能优化（虚拟化、增量保存）

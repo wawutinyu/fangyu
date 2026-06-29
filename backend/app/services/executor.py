@@ -309,7 +309,7 @@ async def run_flow(
         try:
             node_outputs = await _execute_node(
                 origin_type, inputs, config, meta, outputs,
-                external_inputs, global_vars, node_map,
+                external_inputs, global_vars, node_map, nd,
             )
             outputs[node_id] = node_outputs
             outputs[node_name] = node_outputs
@@ -360,19 +360,63 @@ async def _exec_loop(
     external_inputs: dict[str, Any],
     global_vars: dict[str, Any],
     node_map: dict[str, dict],
+    node_data: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     arr = inputs.get("array", [])
     if not isinstance(arr, list):
         arr = [arr]
     max_iter = int(config.get("max_iterations", 100))
     loop_var = config.get("loop_var", "item")
+    inner_nodes_raw = (node_data or {}).get("inner_nodes", [])
+    inner_links_raw = (node_data or {}).get("inner_links", [])
+
     results = []
     for i, item in enumerate(arr):
         if i >= max_iter:
             break
         global_vars[loop_var] = item
         global_vars["_loop_index"] = i
-        results.append({"index": i, loop_var: item})
+
+        if inner_nodes_raw:
+            inner_nodes = [
+                {
+                    "id": n["id"],
+                    "data": {
+                        "originType": n.get("originType", "start"),
+                        "config": n.get("config", {}),
+                        "mappings": n.get("mappings", {}),
+                    },
+                }
+                for n in inner_nodes_raw
+            ]
+            inner_edges = [
+                {
+                    "source": e["sourceNodeId"],
+                    "target": e["targetNodeId"],
+                    "data": {
+                        "linkType": e.get("linkType", "serial"),
+                        "mappings": e.get("mappings", {}),
+                    },
+                }
+                for e in inner_links_raw
+            ]
+            inner_result = await run_flow(
+                nodes=inner_nodes,
+                edges=inner_edges,
+                external_inputs={"item": item, "index": i, **inputs},
+                global_vars=global_vars,
+            )
+            inner_outputs = {}
+            for r in inner_result.get("results", []):
+                inner_outputs[r["nodeId"]] = r.get("outputs", {})
+            results.append({
+                "index": i,
+                loop_var: item,
+                "body_outputs": inner_outputs,
+            })
+        else:
+            results.append({"index": i, loop_var: item})
+
     return {"result": results, "count": len(results)}
 
 
@@ -385,6 +429,7 @@ async def _execute_node(
     external_inputs: dict[str, Any],
     global_vars: dict[str, Any],
     node_map: dict[str, dict],
+    node_data: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if origin_type == "start":
         return {**external_inputs, "trigger": True}
@@ -398,6 +443,14 @@ async def _execute_node(
         return await _exec_http(inputs, config)
     elif origin_type == "condition":
         expr = config.get("expression", "true")
+        branch_count = int(config.get("branch_count", 2))
+        if branch_count > 2:
+            try:
+                idx = int(eval(expr, {"__builtins__": {}}, {"input": inputs.get("input")}))
+                idx = max(0, min(idx, branch_count - 1))
+            except Exception:
+                idx = 0
+            return {"result": idx, "branch": f"branch_{idx}"}
         try:
             result = bool(eval(expr, {"__builtins__": {}}, {"input": inputs.get("input")}))
         except Exception:
@@ -411,26 +464,30 @@ async def _execute_node(
             value = inputs.get("input")
         return {"result": value}
     elif origin_type == "loop":
-        return await _exec_loop(inputs, config, all_outputs, external_inputs, global_vars, node_map)
+        return await _exec_loop(inputs, config, all_outputs, external_inputs, global_vars, node_map, node_data)
     elif origin_type == "knowledge":
         return await _exec_knowledge(inputs, config)
     elif origin_type == "search":
-        await asyncio.sleep(0.4)
-        query = inputs.get("query", "")
-        top_k = config.get("top_k", 5)
-        return {
-            "results": [{"title": f"结果 {i+1}: {query}", "snippet": f'这是关于 "{query}" 的第 {i+1} 条搜索结果。', "url": f"https://example.com/result/{i}"} for i in range(top_k)],
-            "summary": f'搜索 "{query}" 返回 {top_k} 条结果。',
-        }
+        return await _exec_search(inputs, config)
     elif origin_type == "json-parse":
         source = inputs.get("source", config.get("source", ""))
+        strict = config.get("strict", True)
         try:
             return {"result": json.loads(source) if isinstance(source, str) else source, "error": None}
         except (json.JSONDecodeError, TypeError) as e:
-            return {"result": None, "error": str(e)}
+            if strict:
+                return {"result": None, "error": str(e)}
+            import ast
+            try:
+                return {"result": ast.literal_eval(source) if isinstance(source, str) else source, "error": None}
+            except Exception:
+                return {"result": None, "error": str(e)}
     elif origin_type == "variable-set":
         var_name = config.get("var_name", "var")
-        value = inputs.get("value")
+        if config.get("var_value") and (inputs.get("value") is None or inputs.get("value") is True):
+            value = config.get("var_value")
+        else:
+            value = inputs.get("value")
         var_set(var_name, value)
         global_vars[var_name] = value
         return {"result": value, f"var_{var_name}": value}
@@ -497,6 +554,36 @@ async def _execute_node(
     elif origin_type == "tool-call":
         tool_name = inputs.get("tool_name", config.get("tool_name", ""))
         args = inputs.get("args", config.get("args", {}))
+        if not tool_name:
+            candidates = [v for v in inputs.values() if isinstance(v, str)]
+            llm_out = global_vars.get("_lastLLMOutput", "")
+            if llm_out:
+                candidates.append(llm_out)
+            for v in candidates:
+                import re as _re
+                m = _re.search(r'```(?:json)?\s*\n?(\{.*?"(?:tool|tool_name|function)".*?\})\s*\n?```', v, _re.DOTALL)
+                if not m:
+                    m = _re.search(r'\{[\s\n]*"(?:tool|tool_name)"[\s\n]*:[\s\n]*"([^"]+)"[\s\n]*,[\s\n]*"args"[\s\n]*:[\s\n]*(\{.*?\})[\s\n]*\}', v, _re.DOTALL)
+                if m:
+                    try:
+                        parsed = json.loads(m.group(1))
+                        tool_name = parsed.get("tool", parsed.get("tool_name", ""))
+                        args = parsed.get("args", {})
+                        if not tool_name:
+                            func = parsed.get("function", {})
+                            if func.get("name"):
+                                tool_name = func["name"]
+                                raw_args = func.get("arguments", "{}")
+                                if isinstance(raw_args, str):
+                                    try:
+                                        args = json.loads(raw_args) if raw_args.strip() else {}
+                                    except json.JSONDecodeError:
+                                        args = {}
+                                elif isinstance(raw_args, dict):
+                                    args = raw_args
+                    except json.JSONDecodeError:
+                        pass
+                    break
         try:
             result = await execute_tool(str(tool_name), args, global_vars)
             return {"result": result, "success": True}
@@ -547,8 +634,43 @@ async def _execute_node(
     elif origin_type == "trigger":
         user_message = external_inputs.get("message", inputs.get("message", ""))
         return {"message": user_message, "triggered": True}
-    elif origin_type == "composite-node":
-        return {"output": inputs.get("input")}
+    elif origin_type == "composite":
+        inner_nodes_raw = (node_data or {}).get("inner_nodes", [])
+        inner_links_raw = (node_data or {}).get("inner_links", [])
+        if not inner_nodes_raw:
+            return {"output": inputs.get("input"), "success": True}
+        inner_nodes = [
+            {
+                "id": n["id"],
+                "data": {
+                    "originType": n.get("originType", "start"),
+                    "config": n.get("config", {}),
+                    "mappings": n.get("mappings", {}),
+                },
+            }
+            for n in inner_nodes_raw
+        ]
+        inner_edges = [
+            {
+                "source": e["sourceNodeId"],
+                "target": e["targetNodeId"],
+                "data": {
+                    "linkType": e.get("linkType", "serial"),
+                    "mappings": e.get("mappings", {}),
+                },
+            }
+            for e in inner_links_raw
+        ]
+        inner_result = await run_flow(
+            nodes=inner_nodes,
+            edges=inner_edges,
+            external_inputs=inputs,
+            global_vars=global_vars,
+        )
+        inner_outputs = {}
+        for r in inner_result.get("results", []):
+            inner_outputs[r["nodeId"]] = r.get("outputs", {})
+        return {"outputs": inner_outputs, "success": inner_result.get("success", False)}
     elif origin_type == "input":
         return {**external_inputs, **inputs}
     elif origin_type == "output":
@@ -578,7 +700,7 @@ async def _exec_llm(
     user_content = prompt or inputs.get("input") or external_inputs.get("query", "")
 
     # ── Hermes pre_llm: auto-inject memory + skills + context ──
-    auto_inject = config.get("auto_inject_memory", True)
+    auto_inject = config.get("auto_inject_memory", False)
     if auto_inject:
         inject_parts = []
         if not system_prompt:
@@ -695,6 +817,7 @@ async def _exec_http(inputs: dict[str, Any], config: dict[str, Any]) -> dict[str
 async def _exec_knowledge(inputs: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
     query = inputs.get("query", "")
     top_k = config.get("top_k", 5)
+    min_score = float(config.get("min_score", 0.0))
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(
@@ -703,7 +826,94 @@ async def _exec_knowledge(inputs: dict[str, Any], config: dict[str, Any]) -> dic
             )
             if resp.status_code == 200:
                 json_data = resp.json()
-                return {"results": json_data.get("results", []), "context": json_data.get("context", "")}
+                results = json_data.get("results", [])
+                if min_score > 0:
+                    results = [r for r in results if r.get("score", 1.0) >= min_score]
+                return {"results": results, "context": json_data.get("context", "")}
     except Exception:
         pass
     return {"results": [], "context": "[知识库检索失败]"}
+
+
+async def _exec_search(inputs: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
+    query = inputs.get("query", "")
+    if not query:
+        return {"results": [], "summary": ""}
+    top_k = min(int(config.get("top_k", 5)), 10)
+    source = config.get("source", "web")
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    import re as _re
+
+    def _parse_bing_html(html: str, max_k: int) -> list[dict]:
+        results = []
+        for block in _re.finditer(r'<li class="b_algo"[^>]*>(.*?)</li>', html, _re.DOTALL):
+            if len(results) >= max_k:
+                break
+            block_html = block.group(1)
+            title_m = _re.search(r'<h2[^>]*>.*?<a[^>]*href="([^"]*)"[^>]*>(.*?)</a>', block_html, _re.DOTALL)
+            snippet_m = _re.search(r'<p[^>]*class="b_lineclamp[^"]*"[^>]*>(.*?)</p>', block_html, _re.DOTALL)
+            if title_m:
+                href = title_m.group(1)
+                title = _re.sub(r'<[^>]+>', '', title_m.group(2)).strip()
+                snippet = _re.sub(r'<[^>]+>', '', snippet_m.group(1)).strip() if snippet_m else ""
+                results.append({"title": title, "snippet": snippet, "url": href})
+            else:
+                alt_m = _re.search(r'<a[^>]*href="(https?://[^"]+)"[^>]*>(.*?)</a>', block_html, _re.DOTALL)
+                if alt_m:
+                    href = alt_m.group(1)
+                    title = _re.sub(r'<[^>]+>', '', alt_m.group(2)).strip()
+                    snippet = _re.sub(r'<[^>]+>', '', snippet_m.group(1)).strip() if snippet_m else ""
+                    results.append({"title": title, "snippet": snippet, "url": href})
+        return results
+
+    # —— web / news: Bing search ——
+    if source in ("web", "news"):
+        params = {"q": query}
+        if source == "news":
+            params["freshness"] = "Day"
+            params["qft"] = "interval%3d%227%22"
+        try:
+            async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
+                resp = await client.get("https://www.bing.com/search", params=params, headers=headers)
+                if resp.status_code == 200:
+                    results = _parse_bing_html(resp.text, top_k)
+                    if results:
+                        return {"results": results, "summary": f'搜索 "{query}" 返回 {len(results)} 条结果。'}
+        except Exception:
+            pass
+
+    # —— academic: arXiv ——
+    if source == "academic":
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.get(
+                    "https://export.arxiv.org/api/query",
+                    params={"search_query": f"all:{query}", "max_results": top_k},
+                )
+                if resp.status_code == 200:
+                    titles = _re.findall(r'<title>(.*?)</title>', resp.text, _re.DOTALL)
+                    links = _re.findall(r'<id>(https?://arxiv\.org/[^<]+)</id>', resp.text)
+                    summaries = _re.findall(r'<summary>(.*?)</summary>', resp.text, _re.DOTALL)
+                    results = []
+                    for i in range(min(len(titles) - 1, top_k)):
+                        title = titles[i + 1].strip() if i + 1 < len(titles) else ""
+                        url = links[i] if i < len(links) else ""
+                        snippet = _re.sub(r'<[^>]+>', '', summaries[i]).strip()[:200] if i < len(summaries) else ""
+                        results.append({"title": title[:200], "snippet": snippet, "url": url})
+                    if results:
+                        return {"results": results, "summary": f'搜索学术论文 "{query}" 返回 {len(results)} 条结果。'}
+        except Exception:
+            pass
+
+    # —— fallback: Bing general ——
+    try:
+        async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
+            resp = await client.get("https://www.bing.com/search", params={"q": query}, headers=headers)
+            if resp.status_code == 200:
+                results = _parse_bing_html(resp.text, top_k)
+                if results:
+                    return {"results": results, "summary": f'搜索 "{query}" 返回 {len(results)} 条结果。'}
+    except Exception:
+        pass
+
+    return {"results": [], "summary": f'搜索 "{query}" 无结果。'}

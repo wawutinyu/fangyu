@@ -4,11 +4,9 @@ import TopToolbar from './TopToolbar'
 import NodeLibrary from './NodeLibrary'
 import FlowCanvas, { type FlowCanvasHandle } from './FlowCanvas'
 import ConfigPanel from './ConfigPanel'
-import ChatInterface from './ChatInterface'
+import BottomPanel from './BottomPanel'
 import SaveHistory from './SaveHistory'
 import SettingsPanel from './SettingsPanel'
-import ToolRegistry from './ToolRegistry'
-import SkillManager from './SkillManager'
 import { store } from '../store'
 import { toggleSettings, fetchSettings } from '../store/settingsSlice'
 import { toggleHistory, saveFlowApi, fetchAllProjects, createProjectApi } from '../store/saveSlice'
@@ -197,9 +195,7 @@ export default function App() {
           onDeleteEdge={handleDeleteEdge}
         />
       </div>
-      <ChatInterface />
-      <ToolRegistry />
-      <SkillManager />
+      <BottomPanel />
       <SaveHistory onRestore={handleRestore} />
       <SettingsPanel />
     </div>

@@ -4,7 +4,11 @@ import { Executor } from '../utils/executor'
 import type { ExecutorLog } from '../utils/executor'
 import { convertToExportFormat } from '../utils/flowHelper'
 
-export default function ChatInterface() {
+interface ChatInterfaceProps {
+  headerless?: boolean
+}
+
+export default function ChatInterface({ headerless }: ChatInterfaceProps) {
   const [expanded, setExpanded] = useState(true)
   const [inputText, setInputText] = useState('')
   const [messages, setMessages] = useState<{ role: string; content: string; logs?: ExecutorLog[]; _showLogs?: boolean; _pendingSkill?: string; _pendingSkillDesc?: string }[]>([])
@@ -114,26 +118,9 @@ export default function ChatInterface() {
     scrollToBottom()
   }, [inputText, running, messages, scrollToBottom])
 
-  return (
-    <div style={{ borderTop: '1px solid var(--border-color)', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', flexShrink: 0, height: expanded ? 280 : 'auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 14px', cursor: 'pointer', userSelect: 'none', flexShrink: 0, borderBottom: '1px solid var(--border-light)' }}
-        onClick={() => setExpanded(!expanded)}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          <span>运行预览</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {messages.length > 0 && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{messages.length} 条消息</span>}
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: expanded ? 'rotate(180deg)' : undefined }}>
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
-        </div>
-      </div>
-
-      {expanded && (
-        <>
-          <div ref={msgListRef} style={{ flex: 1, overflowY: 'auto', padding: '8px 12px' }}>
+  const content = (
+    <>
+      <div ref={msgListRef} style={{ flex: 1, overflowY: 'auto', padding: '8px 12px' }}>
             {messages.length === 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, height: '100%', minHeight: 80 }}>
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#bfbeba" strokeWidth="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -243,7 +230,29 @@ export default function ChatInterface() {
             </div>
           </div>
         </>
-      )}
+      )
+
+  if (headerless) {
+    return <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-primary)' }}>{content}</div>
+  }
+
+  return (
+    <div style={{ borderTop: '1px solid var(--border-color)', background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', flexShrink: 0, height: expanded ? 280 : 'auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 14px', cursor: 'pointer', userSelect: 'none', flexShrink: 0, borderBottom: '1px solid var(--border-light)' }}
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span>运行预览</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {messages.length > 0 && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{messages.length} 条消息</span>}
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: expanded ? 'rotate(180deg)' : undefined }}>
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </div>
+      </div>
+      {expanded && content}
     </div>
   )
 }

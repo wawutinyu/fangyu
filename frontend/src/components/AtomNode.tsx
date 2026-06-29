@@ -9,12 +9,32 @@ const CATEGORY_COLORS: Record<string, string> = {
   '记忆存储': '#13c2c2',
 }
 
+function buildPorts(schema: { name: string; label?: string }[], branchCount?: number) {
+  const ports = schema.map(s => ({ ...s }))
+  if (branchCount && branchCount > 2) {
+    const first = ports.slice(0, 2)
+    const extras = Array.from({ length: branchCount - 2 }, (_, i) => ({
+      name: `branch_${i}`,
+      label: `分支 ${i}`,
+    }))
+    return [...first, ...extras]
+  }
+  return ports
+}
+
 export default function AtomNode({ data, selected }: NodeProps) {
   const originType = (data.originType as string) || 'start'
+  const config = (data.config as Record<string, unknown>) || {}
   const meta = getNodeMeta(originType)
   const catColor = CATEGORY_COLORS[meta.category] || '#999'
   const label = (data.label as string) || meta.name
   const desc = (data.desc as string) || ''
+
+  const inPorts = meta.inputSchema
+  const outPorts = buildPorts(
+    meta.outputSchema,
+    originType === 'condition' ? (config.branch_count as number) || 2 : undefined,
+  )
 
   return (
     <div style={{
@@ -22,10 +42,11 @@ export default function AtomNode({ data, selected }: NodeProps) {
       border: `1.5px solid ${selected ? '#37352f' : data._simulating ? '#52c41a' : catColor}`,
       borderRadius: 8,
       background: selected ? '#f0f0ee' : '#fff',
-      overflow: 'hidden',
+      overflow: 'visible',
       boxShadow: selected ? '0 0 0 2px rgba(55, 50, 47, 0.15)' : data._simulating ? '0 0 12px rgba(82, 196, 26, 0.4), 0 0 0 3px rgba(82, 196, 26, 0.2)' : undefined,
       animation: data._simulating ? 'simulatePulse 1.2s ease-in-out infinite' : undefined,
       transition: 'border-color 0.2s, box-shadow 0.2s, background 0.15s',
+      position: 'relative',
     }}>
       <div style={{
         height: 20,
@@ -61,8 +82,41 @@ export default function AtomNode({ data, selected }: NodeProps) {
           {desc}
         </div>
       )}
-      <Handle type="target" position={Position.Top} style={{ background: '#b0b0ae', width: 8, height: 8, border: '2px solid #fff' }} />
-      <Handle type="source" position={Position.Bottom} style={{ background: '#b0b0ae', width: 8, height: 8, border: '2px solid #fff' }} />
+      {inPorts.length <= 1 ? (
+        <Handle type="target" position={Position.Top} id="__default" style={{ background: '#b0b0ae', width: 8, height: 8, border: '2px solid #fff' }} />
+      ) : (
+        inPorts.map((port, i) => (
+          <Handle key={port.name} type="target" position={Position.Top} id={port.name}
+            style={{
+              background: '#1890ff', width: 8, height: 8, border: '2px solid #fff',
+              left: `${((i + 1) / (inPorts.length + 1)) * 100}%`,
+              transform: 'translateX(-50%)',
+            }}
+          />
+        ))
+      )}
+      {outPorts.length <= 1 ? (
+        <Handle type="source" position={Position.Bottom} id="__default" style={{ background: '#b0b0ae', width: 8, height: 8, border: '2px solid #fff' }} />
+      ) : (
+        <div style={{ position: 'relative', height: outPorts.length > 2 ? outPorts.length * 18 : 0 }}>
+          {outPorts.map((port, i) => (
+            <div key={port.name} style={{ position: 'relative', height: 18 }}>
+              <Handle type="source" position={Position.Bottom} id={port.name}
+                style={{
+                  background: '#52c41a', width: 8, height: 8, border: '2px solid #fff',
+                  position: 'absolute', left: '50%', transform: 'translateX(-50%)', top: 0,
+                }}
+              />
+              <div style={{
+                position: 'absolute', left: '55%', top: -1, fontSize: 9, color: '#52c41a',
+                whiteSpace: 'nowrap', userSelect: 'none', pointerEvents: 'none',
+              }}>
+                {port.label || port.name}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -227,15 +227,21 @@ BUILTIN_TOOLS: list[dict] = [
     },
     {
         "name": "file_operations",
-        "description": "读写、搜索、列出文件（沙箱路径内）",
-        "parameters": {"type": "object", "properties": {"action": {"type": "string", "enum": ["read", "write", "list", "search", "delete"], "description": "操作类型"}, "path": {"type": "string", "description": "文件路径"}, "content": {"type": "string", "description": "写入内容（write 时必填）"}, "pattern": {"type": "string", "description": "搜索模式（search 时必填）"}}, "required": ["action", "path"]},
-        "implementation": {"type": "code", "code": "import os, fnmatch; base = os.path.expanduser('~/.hermes'); action = args['action']; rel = args['path'].lstrip('/\\\\'); full = os.path.normpath(os.path.join(base, rel)); if not full.startswith(base): result = {'error': '路径越界'}\n"
-        + "elif action == 'read': result = open(full).read()\n"
+        "description": "读写、搜索、列出文件（支持绝对路径，默认工作目录）",
+        "parameters": {"type": "object", "properties": {"action": {"type": "string", "enum": ["read", "write", "list", "search", "delete"], "description": "操作类型"}, "path": {"type": "string", "description": "文件路径（绝对路径或相对于工作目录）"}, "content": {"type": "string", "description": "写入内容（write 时必填）"}, "pattern": {"type": "string", "description": "搜索模式（search 时必填）"}}, "required": ["action", "path"]},
+        "implementation": {"type": "code", "code": "import os, fnmatch; cwd = os.getcwd(); action = args['action']; p = args['path']; full = os.path.abspath(p) if os.path.isabs(p) else os.path.normpath(os.path.join(cwd, p)); os.makedirs(os.path.dirname(full), exist_ok=True)\n"
+        + "if action == 'read': result = open(full).read()\n"
         + "elif action == 'write': open(full, 'w').write(args.get('content', '')); result = 'ok'\n"
         + "elif action == 'list': result = os.listdir(full)\n"
         + "elif action == 'search': result = [os.path.join(dp, f) for dp, dn, fn in os.walk(full) for f in fn if fnmatch.fnmatch(f, args.get('pattern', '*'))]\n"
         + "elif action == 'delete': os.remove(full); result = 'ok'\n"
         + "else: result = 'unknown'"},
+    },
+    {
+        "name": "shell_execution",
+        "description": "在系统 shell 中执行命令（Windows CMD / PowerShell）",
+        "parameters": {"type": "object", "properties": {"command": {"type": "string", "description": "要执行的 shell 命令"}}, "required": ["command"]},
+        "implementation": {"type": "code", "code": "import subprocess, sys; cmd = args['command']; result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=60); r = {'stdout': result.stdout, 'stderr': result.stderr, 'returncode': result.returncode}"},
     },
     {
         "name": "skill_write_file",

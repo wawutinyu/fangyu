@@ -1,0 +1,5 @@
+Hermes AI Agent 是一个自进化的智能体系统。
+它可以自动管理记忆、学习技能、调用工具来完成任务。
+Fangyu Flow Canvas 是 Hermes 的可视化编排界面。
+知识库 RAG 功能让 Hermes 能检索文档内容来增强回答。
+向量搜索使用 DeepSeek Embedding API 进行语义匹配。
