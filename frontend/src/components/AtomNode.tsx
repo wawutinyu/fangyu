@@ -120,10 +120,10 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
         ))
       )}
       {outPorts.length <= 1 ? (
-        <div style={{ position: 'relative' }}>
+        <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{ position: 'relative', paddingBottom: 20 }}>
           <Handle type="source" position={Position.Bottom} id="__default" style={{ background: '#b0b0ae', width: 8, height: 8, border: '2px solid #fff' }} />
           {hasOutput && (
-            <div style={{ position: 'absolute', left: '50%', bottom: -18, transform: 'translateX(-50%)', zIndex: 10 }}>
+            <div style={{ position: 'absolute', left: '50%', bottom: 0, transform: 'translateX(-50%)', zIndex: 10, pointerEvents: 'none' }}>
               <div onClick={(e) => openPicker('__default', e)}
                 style={{ width: 18, height: 18, borderRadius: '50%', background: '#37352f', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 14, lineHeight: 1, boxShadow: '0 2px 6px rgba(0,0,0,0.15)', userSelect: 'none', opacity: showPlus ? 1 : 0, transition: 'opacity 0.15s', pointerEvents: showPlus ? 'auto' : 'none' }}
               >+</div>
@@ -131,7 +131,7 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
           )}
         </div>
       ) : (
-        <div style={{ position: 'relative', height: outPorts.length > 2 ? outPorts.length * 18 : 0 }}>
+        <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{ position: 'relative', paddingBottom: 20 }}>
           {outPorts.map((port, i) => (
             <div key={port.name} style={{ position: 'relative', height: 18 }}>
               <Handle type="source" position={Position.Bottom} id={port.name}
@@ -146,7 +146,7 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
               }}>
                 {port.label || port.name}
               </div>
-              <div style={{ position: 'absolute', left: '50%', bottom: -16, transform: 'translateX(-50%)', zIndex: 10 }}>
+              <div style={{ position: 'absolute', left: '50%', bottom: -16, transform: 'translateX(-50%)', zIndex: 10, pointerEvents: 'none' }}>
                 <div onClick={(e) => openPicker(port.name, e)}
                   style={{ width: 16, height: 16, borderRadius: '50%', background: '#37352f', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 12, lineHeight: 1, boxShadow: '0 2px 6px rgba(0,0,0,0.15)', userSelect: 'none', opacity: showPlus ? 1 : 0, transition: 'opacity 0.15s', pointerEvents: showPlus ? 'auto' : 'none' }}
                 >+</div>
