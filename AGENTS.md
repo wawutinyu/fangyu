@@ -141,6 +141,49 @@ cd backend && py -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - 添加新节点类型需同时更新：后端 registry、前端 NODE_CATEGORIES、`getNodeMeta`、AtomNode 多端口、`NodePicker.tsx` 的兼容规则
 - 执行器 `_execute_node` 签名包含 `node_data` 参数（原 `nd` 对象），新节点类型如需要可访问
 
+## Dify 设计模式（参考实现）
+
+### "+" 按钮弹出菜单（block-selector）
+- **触发方式**：Dify 将 "+" 集成在 Handle 组件中，节点 hover/选中时可见（opacity-0 → group-hover:opacity-100）
+- **定位**：使用 floating-ui Popover，`placement="right-start"`，弹出菜单位于按钮右侧，自动处理视角边缘
+- **无遮罩**：浮层面板，无半透明背景，ESC / 外部点击关闭
+- **搜索**：每个 tab 下有搜索框（Input/SearchBox），debounce 500ms
+- **Tab 切换**：Blocks / Sources / Tools / Start / Snippets 五个 tab，每个 tab 下筛选不同数据源
+- **选中后行为**：创建 `candidateNode` 预览状态（非直接添加），用户确认后正式插入
+
+### 节点 Handle 设计（node-handle.tsx）
+```tsx
+// Dify 的 Handle 直接内嵌 BlockSelector 作为 trigger 的子元素
+<Handle type="source" position={Position.Right}>
+  {isConnectable && !getNodesReadOnly() && (
+    <BlockSelector
+      open={open}
+      onOpenChange={handleOpenChange}
+      onSelect={handleSelect}
+      placement="right"
+      triggerClassName={open => `
+        absolute top-0 left-0 opacity-0 pointer-events-none
+        group-hover:opacity-100
+        ${data.selected && 'opacity-100'}
+        ${open && 'opacity-100'}
+      `}
+      availableBlocksTypes={availableNextBlocks}
+    />
+  )}
+</Handle>
+```
+关键设计：
+- Handle 同时是连接端口和 "+" 按钮的容器
+- 触发区域默认透明（`opacity-0`），节点 hover 或选中时显示
+- 点击 Handle 本身打开 popover（不需要单独的 "+" 图标）
+- 我们的实现（AtomNode.tsx + NodePicker.tsx）简化版：底部 "+" 按钮 + `position:fixed` 浮层
+
+### 可用块兼容性（use-available-blocks.ts）
+- `availableNextBlocks`（源端口 → 后面可添加的块）：`StartPlaceholder`/`LoopEnd`/`KnowledgeBase` 返回空数组，其余返回全部
+- `availablePrevBlocks`（目标端口 → 前面可添加的块）：`Start`/`StartPlaceholder`/`DataSource`/Triggers 返回空数组，其余返回全部
+- 容器内（Iteration/Loop）：额外排除 `Iteration`/`Loop`/`End`/`DataSource`/`KnowledgeBase`/`HumanInput`
+- 我们的 `getValidTargets` 实现更简单：`NO_INPUT` 集 + 按 sourceType 过滤
+
 ## 节点连接兼容规则
 
 **画布交互**（Dify 风格 + 拖拽并存）：
