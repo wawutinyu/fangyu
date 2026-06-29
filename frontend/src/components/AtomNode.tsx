@@ -11,25 +11,6 @@ const CATEGORY_COLORS: Record<string, string> = {
   '记忆存储': '#13c2c2',
 }
 
-function PlusButton({ port, onOpen, size }: { port: string; onOpen: (port: string, rect: DOMRect) => void; size: number }) {
-  const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const handler = (e: MouseEvent) => {
-      e.stopPropagation()
-      onOpen(port, el.getBoundingClientRect())
-    }
-    el.addEventListener('click', handler)
-    return () => el.removeEventListener('click', handler)
-  }, [port, onOpen])
-  return (
-    <div ref={ref}
-      style={{ width: size, height: size, borderRadius: '50%', background: '#37352f', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: size > 16 ? 14 : 12, lineHeight: 1, boxShadow: '0 2px 6px rgba(0,0,0,0.15)', userSelect: 'none' }}
-    >+</div>
-  )
-}
-
 function buildPorts(schema: { name: string; label?: string }[], branchCount?: number) {
   const ports = schema.map(s => ({ ...s }))
   if (branchCount && branchCount > 2) {
@@ -136,19 +117,16 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
       )}
       {outPorts.length <= 1 ? (
         <div style={{ position: 'relative' }}>
-          <Handle type="source" position={Position.Bottom} id="__default" style={{ background: '#b0b0ae', width: 8, height: 8, border: '2px solid #fff' }} />
-          {hasOutput && (
-            <div style={{ position: 'absolute', left: '50%', bottom: -18, transform: 'translateX(-50%)', zIndex: 10 }}>
-              <PlusButton port="__default" onOpen={openPicker} size={18} />
-            </div>
-          )}
+          <SourceArea port="__default" hasOutput={hasOutput} onOpen={openPicker}
+            handleStyle={{ background: '#b0b0ae', width: 8, height: 8, border: '2px solid #fff' }}
+          />
         </div>
       ) : (
         <div style={{ position: 'relative', height: outPorts.length > 2 ? outPorts.length * 18 : 0 }}>
           {outPorts.map((port, i) => (
             <div key={port.name} style={{ position: 'relative', height: 18 }}>
-              <Handle type="source" position={Position.Bottom} id={port.name}
-                style={{
+              <SourceArea port={port.name} hasOutput={true} onOpen={openPicker}
+                handleStyle={{
                   background: '#52c41a', width: 8, height: 8, border: '2px solid #fff',
                   position: 'absolute', left: '50%', transform: 'translateX(-50%)', top: 0,
                 }}
@@ -158,9 +136,6 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
                 whiteSpace: 'nowrap', userSelect: 'none', pointerEvents: 'none',
               }}>
                 {port.label || port.name}
-              </div>
-              <div style={{ position: 'absolute', left: '50%', bottom: -16, transform: 'translateX(-50%)', zIndex: 10 }}>
-                <PlusButton port={port.name} onOpen={openPicker} size={16} />
               </div>
             </div>
           ))}
@@ -174,6 +149,37 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
           onSelect={handleAddNode}
           onClose={() => setPickerVisible(false)}
         />
+      )}
+    </div>
+  )
+}
+
+function SourceArea({ port, hasOutput, onOpen, handleStyle }: {
+  port: string; hasOutput: boolean; onOpen: (port: string, rect: DOMRect) => void; handleStyle: React.CSSProperties
+}) {
+  const areaRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = areaRef.current
+    if (!el) return
+    const handler = (e: MouseEvent) => {
+      e.stopPropagation()
+      onOpen(port, el.getBoundingClientRect())
+    }
+    el.addEventListener('click', handler)
+    return () => el.removeEventListener('click', handler)
+  }, [port, onOpen])
+
+  return (
+    <div ref={areaRef} style={{ position: 'relative', display: 'flex', justifyContent: 'center', paddingBottom: 18, cursor: 'pointer' }}>
+      <Handle type="source" position={Position.Bottom} id={port} style={handleStyle} />
+      {hasOutput && (
+        <div style={{
+          position: 'absolute', bottom: 0, width: 18, height: 18, borderRadius: '50%',
+          background: '#37352f', color: '#fff', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', fontSize: 14, lineHeight: 1,
+          boxShadow: '0 2px 6px rgba(0,0,0,0.15)', userSelect: 'none', pointerEvents: 'none',
+        }}>+</div>
       )}
     </div>
   )
