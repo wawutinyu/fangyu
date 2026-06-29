@@ -454,6 +454,52 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
     }
   }, [reduxSaveTimestamp, reduxEdges, selectedEdgeId, setLocalEdges])
 
+  React.useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { afterNodeId: string; sourcePort: string; nodeType: string }
+      if (!detail || !rfInstanceRef.current) return
+
+      const sourceNode = nodes.find(n => n.id === detail.afterNodeId)
+      if (!sourceNode) return
+
+      const meta = getNodeMeta(detail.nodeType)
+      const id = generateId('node')
+      const newNode: Node = {
+        id,
+        type: 'atom-node',
+        position: { x: sourceNode.position.x, y: sourceNode.position.y + 140 },
+        data: {
+          originType: detail.nodeType,
+          name: meta.name,
+          category: meta.category,
+          label: meta.name,
+          is_group: false,
+          config: getDefaultConfig(detail.nodeType),
+          mappings: {},
+          inner_nodes: [],
+          inner_links: [],
+        },
+      }
+
+      const targetFirstInput = meta.inputSchema[0]?.name || '__default'
+      const newEdge: Edge = {
+        id: generateId('edge'),
+        source: detail.afterNodeId,
+        sourceHandle: detail.sourcePort,
+        target: id,
+        targetHandle: targetFirstInput,
+        type: 'flow-edge',
+        data: { linkType: 'serial', mappings: {} },
+      }
+
+      pushHistory()
+      setLocalNodes(nds => nds.concat(newNode))
+      setLocalEdges(eds => eds.concat(newEdge))
+    }
+    window.addEventListener('flow:add-node', handler)
+    return () => window.removeEventListener('flow:add-node', handler)
+  }, [nodes, setLocalNodes, setLocalEdges, pushHistory])
+
   return (
     <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden', background: '#fcfcfb' }}>
       {toast && (

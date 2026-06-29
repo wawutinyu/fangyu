@@ -48,6 +48,21 @@ export default function App() {
   const handleNewFlow = useCallback(() => {
     if (!confirm('新建将清空当前画布，是否继续？')) return
     flowCanvasRef.current?.newFlow()
+    setTimeout(() => {
+      flowCanvasRef.current?.importFlow({
+        nodes: [{
+          id: 'start_default',
+          originType: 'start',
+          name: '开始',
+          category: '流程控制',
+          label: '开始',
+          config: {},
+          mappings: {},
+          x: 300, y: 100,
+        }],
+        links: [],
+      })
+    }, 50)
   }, [])
 
   const handleSaveFlow = useCallback(async () => {
