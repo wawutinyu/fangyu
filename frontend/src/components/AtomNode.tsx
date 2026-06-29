@@ -43,6 +43,7 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
   const hasOutput = outPorts.length > 0
 
   const openPicker = useCallback((port: string, e: React.MouseEvent) => {
+    e.preventDefault()
     e.stopPropagation()
     setPickerSourcePort(port)
     setPickerAnchor(e.currentTarget.getBoundingClientRect())
@@ -121,7 +122,7 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
           <Handle type="source" position={Position.Bottom} id="__default" style={{ background: '#b0b0ae', width: 8, height: 8, border: '2px solid #fff' }} />
           {hasOutput && (
             <div style={{ position: 'absolute', left: '50%', bottom: -18, transform: 'translateX(-50%)', zIndex: 10 }}>
-              <div onClick={(e) => openPicker('__default', e)}
+              <div onMouseDown={(e) => openPicker('__default', e)}
                 style={{ width: 18, height: 18, borderRadius: '50%', background: '#37352f', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 14, lineHeight: 1, boxShadow: '0 2px 6px rgba(0,0,0,0.15)', userSelect: 'none' }}
               >+</div>
             </div>
@@ -144,7 +145,7 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
                 {port.label || port.name}
               </div>
               <div style={{ position: 'absolute', left: '50%', bottom: -16, transform: 'translateX(-50%)', zIndex: 10 }}>
-                <div onClick={(e) => openPicker(port.name, e)}
+                <div onMouseDown={(e) => openPicker(port.name, e)}
                   style={{ width: 16, height: 16, borderRadius: '50%', background: '#37352f', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 12, lineHeight: 1, boxShadow: '0 2px 6px rgba(0,0,0,0.15)', userSelect: 'none' }}
                 >+</div>
               </div>
