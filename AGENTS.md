@@ -138,8 +138,29 @@ cd backend && py -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - 后端重启用 `taskkill -f -fi "IMAGENAME eq python.exe"` 杀干净
 - 调试 curl: 用 Python `urllib.request` 而非 curl.exe（PowerShell 引号问题）
 - composite 和 loop 的 `inner_nodes` 格式：`[{id, originType, config, mappings, relativeX, relativeY}]`
-- 添加新节点类型需同时更新：后端 registry、前端 NODE_CATEGORIES、`getNodeMeta`、AtomNode 多端口
+- 添加新节点类型需同时更新：后端 registry、前端 NODE_CATEGORIES、`getNodeMeta`、AtomNode 多端口、`NodePicker.tsx` 的兼容规则
 - 执行器 `_execute_node` 签名包含 `node_data` 参数（原 `nd` 对象），新节点类型如需要可访问
+
+## 节点连接兼容规则
+
+**画布交互**（Dify 风格 + 拖拽并存）：
+- 新建流程默认带一个「开始」节点
+- 节点底部输出端口有 "+" 按钮，点击弹出兼容节点菜单
+- 选中后自动添加节点并连线
+- 也可从左侧组件库拖拽节点到画布任意位置（不自动连线）
+
+**兼容规则**（定义在 AtomNode.tsx → NodePicker.tsx）：
+```
+不可作为目标（无输入端口，不会出现在 + 菜单）：
+  - 开始 (start) / 输入 (input) / 读取变量 (variable-get)
+
+不可作为源（无输出端口，没有 + 按钮）：
+  - 结束 (end) / 输出 (output)
+
+特殊规则：
+  - 开始 → + 菜单只显示「输入」（开始只输出 trigger 信号，连其他节点无意义）
+  - 其余所有节点 → + 菜单显示所有有输入端口的节点
+```
 
 ## AI 工作流规则（严格执行）
 
