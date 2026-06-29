@@ -109,7 +109,7 @@ export default function NodePicker({ sourceType, anchorRect, onSelect, onClose }
               {cat.name} ({cat.nodes.length})
             </div>
             {cat.nodes.map(node => (
-              <div key={node.type} onClick={() => onSelect(node.type)}
+              <div key={node.type} onClick={(e) => { e.stopPropagation(); onSelect(node.type) }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 7, padding: '5px 8px',
                   borderRadius: 5, cursor: 'pointer', fontSize: 12, color: '#333',

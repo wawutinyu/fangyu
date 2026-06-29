@@ -46,6 +46,7 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
   const hasOutput = outPorts.length > 0
 
   const openPicker = useCallback((port: string, e: React.MouseEvent) => {
+    e.stopPropagation()
     setPickerSourcePort(port)
     setPickerAnchor(e.currentTarget.getBoundingClientRect())
     setPickerVisible(true)
