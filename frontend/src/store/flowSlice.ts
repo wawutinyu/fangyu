@@ -29,6 +29,7 @@ export interface FlowState {
   simulationRunning: boolean
   saveTimestamp: number
   dirty: boolean
+  breakpoints: string[]
   draggedNode: DragInfo | null
   showLogPanel: boolean
   simLogs: SimLog[]
@@ -55,6 +56,7 @@ const initialState: FlowState = {
   simulationRunning: false,
   saveTimestamp: 0,
   dirty: false,
+  breakpoints: [],
   draggedNode: null,
   showLogPanel: false,
   simLogs: [],
@@ -139,6 +141,15 @@ export const flowSlice = createSlice({
     setGlobalPrompts(state, action: PayloadAction<GlobalPrompts>) {
       state.globalPrompts = action.payload
     },
+    toggleBreakpoint(state, action: PayloadAction<string>) {
+      const id = action.payload
+      if (state.breakpoints.includes(id)) {
+        state.breakpoints = state.breakpoints.filter(b => b !== id)
+      } else {
+        state.breakpoints.push(id)
+      }
+    },
+    clearBreakpoints(state) { state.breakpoints = [] },
     setDraggedNode(state, action: PayloadAction<DragInfo | null>) {
       state.draggedNode = action.payload
     },
@@ -189,5 +200,6 @@ export const {
   openEdgeConfigPanel,
   setSimulationRunning, addSimLog, clearSimLogs, setShowLogPanel,
   setDraggedNode, importFlow, newFlow, setGlobalPrompts, markClean,
+  toggleBreakpoint, clearBreakpoints,
 } = flowSlice.actions
 export default flowSlice.reducer

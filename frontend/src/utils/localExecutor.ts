@@ -4,7 +4,7 @@ import { VariablePool } from './variablePool'
 import type { Node, Edge } from 'reactflow'
 
 export interface PendingInteraction {
-  type: 'approval' | 'input'
+  type: 'approval' | 'input' | 'breakpoint'
   nodeId: string
   nodeName: string
   inputData: Record<string, unknown>
@@ -34,6 +34,7 @@ export interface LocalExecutorOptions {
   onProgress: (nodeId: string, status: 'running' | 'done' | 'error') => void
   onPending: (interaction: PendingInteraction) => void
   autoResolveInput?: boolean
+  breakpoints?: string[]
 }
 
 export async function runLocalFlow(
@@ -41,7 +42,7 @@ export async function runLocalFlow(
   edges: Edge[],
   options: LocalExecutorOptions,
 ): Promise<{ success: boolean; results: NodeResult[] }> {
-  const { onProgress, onPending, autoResolveInput } = options
+  const { onProgress, onPending, autoResolveInput, breakpoints } = options
   const nodeMap = new Map(nodes.map(n => [n.id, n]))
   const order = getExecutionOrder(nodes.map(n => n.id), edges)
 
@@ -61,6 +62,20 @@ export async function runLocalFlow(
 
     onProgress(nodeId, 'running')
     await sleep(100)
+
+    // Breakpoint pause
+    if (breakpoints?.includes(nodeId)) {
+      await new Promise<null>(resolve => {
+        onPending({
+          type: 'breakpoint',
+          nodeId,
+          nodeName,
+          inputData: {},
+          config,
+          resolve: resolve as unknown as PendingInteraction['resolve'],
+        })
+      })
+    }
 
     try {
       if (originType === 'approval') {

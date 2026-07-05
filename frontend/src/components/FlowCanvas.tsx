@@ -181,6 +181,7 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
       setLocalNodes(nds => nds.map(n => ({ ...n, data: { ...n.data, _simulating: false, _output: null, _status: null } })))
       const result = await runLocalFlow(curNodes, curEdges, {
         autoResolveInput,
+        breakpoints: store.getState().flow.breakpoints,
         onProgress: (nodeId, status) => {
           setLocalNodes(prev => prev.map(n => ({
             ...n,
@@ -643,6 +644,66 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
     setConnectPickerRect({ left: screenX + 80, top: screenY })
   }, [connectTarget, connectTargetNode])
 
+  const clipboardRef = React.useRef<Node[]>([])
+
+  React.useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Ignore if focus is in an input/textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+
+      const selected = nodes.filter(n => n.selected)
+
+      // Ctrl+C: copy
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        if (selected.length === 0) return
+        clipboardRef.current = JSON.parse(JSON.stringify(selected))
+        return
+      }
+
+      // Ctrl+V: paste
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        e.preventDefault()
+        if (clipboardRef.current.length === 0) return
+        const maxX = Math.max(...nodes.map(n => n.position.x)) + 200
+        const clones = clipboardRef.current.map(n => ({
+          ...JSON.parse(JSON.stringify(n)),
+          id: `node_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          position: { x: n.position.x + maxX * 0.1 + 30, y: n.position.y + 30 },
+          selected: false,
+        }))
+        pushHistory()
+        setLocalNodes(nds => [...nds, ...clones])
+        return
+      }
+
+      if (selected.length === 0) return
+
+      // Ctrl+D: duplicate
+      if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+        e.preventDefault()
+        const maxX = Math.max(...nodes.map(n => n.position.x)) + 200
+        const clones = selected.map(n => ({
+          ...JSON.parse(JSON.stringify(n)),
+          id: `node_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          position: { x: n.position.x + maxX * 0.1 + 30, y: n.position.y + 30 },
+          selected: false,
+        }))
+        pushHistory()
+        setLocalNodes(nds => [...nds, ...clones])
+        return
+      }
+
+      // Arrow keys: nudge
+      const step = e.shiftKey ? 10 : 1
+      if (e.key === 'ArrowUp') { e.preventDefault(); setLocalNodes(nds => nds.map(n => n.selected ? { ...n, position: { x: n.position.x, y: n.position.y - step } } : n)) }
+      if (e.key === 'ArrowDown') { e.preventDefault(); setLocalNodes(nds => nds.map(n => n.selected ? { ...n, position: { x: n.position.x, y: n.position.y + step } } : n)) }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); setLocalNodes(nds => nds.map(n => n.selected ? { ...n, position: { x: n.position.x - step, y: n.position.y } } : n)) }
+      if (e.key === 'ArrowRight') { e.preventDefault(); setLocalNodes(nds => nds.map(n => n.selected ? { ...n, position: { x: n.position.x + step, y: n.position.y } } : n)) }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [nodes, setLocalNodes, pushHistory])
+
   return (
     <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden', background: '#fcfcfb' }}>
       {toast && (
@@ -818,6 +879,10 @@ function InteractionPanel({ interaction, onResolve, onMinimize }: { interaction:
     interaction.resolve({ value: inputValue })
     onResolve()
   }
+  const handleBreakpointResume = () => {
+    interaction.resolve(null)
+    onResolve()
+  }
 
   return (
     <div className="interaction-panel" style={{
@@ -834,11 +899,11 @@ function InteractionPanel({ interaction, onResolve, onMinimize }: { interaction:
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{
             width: 8, height: 8, borderRadius: '50%',
-            background: interaction.type === 'approval' ? '#faad14' : '#1890ff',
+            background: interaction.type === 'approval' ? '#faad14' : interaction.type === 'breakpoint' ? '#722ed1' : '#1890ff',
             display: 'inline-block',
           }} />
           <span style={{ fontSize: 13, fontWeight: 600, color: '#37352f' }}>
-            {interaction.type === 'approval' ? '人工审批' : '用户输入'}
+            {interaction.type === 'approval' ? '人工审批' : interaction.type === 'breakpoint' ? '断点暂停' : '用户输入'}
           </span>
         </div>
         <div style={{ display: 'flex', gap: 4 }}>
@@ -852,7 +917,16 @@ function InteractionPanel({ interaction, onResolve, onMinimize }: { interaction:
         {interaction.nodeName}
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
-        {interaction.type === 'approval' ? (
+        {interaction.type === 'breakpoint' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, paddingTop: 40 }}>
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="#722ed1" stroke="none"><circle cx="12" cy="12" r="10"/><rect x="9" y="6" width="2" height="12" rx="1" fill="#fff"/><rect x="13" y="6" width="2" height="12" rx="1" fill="#fff"/></svg>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#37352f' }}>已暂停于断点</div>
+            <div style={{ fontSize: 11, color: '#9b9a97' }}>点击继续执行下一个节点</div>
+            <button className="notion-btn primary" onClick={handleBreakpointResume} style={{ marginTop: 8, fontSize: 13, padding: '6px 24px' }}>
+              继续执行
+            </button>
+          </div>
+        ) : interaction.type === 'approval' ? (
           <>
             {interaction.config.message && (
               <div style={{ fontSize: 12, color: '#333', marginBottom: 10, padding: 8, background: '#f5f5f5', borderRadius: 6, lineHeight: 1.5 }}>
