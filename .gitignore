@@ -36,3 +36,5 @@ backend/data/*.db
 # Electron build output
 frontend/release/
 *.exe
+
+vite.log

@@ -12,6 +12,7 @@ import BottomPanel from './BottomPanel'
 import SaveHistory from './SaveHistory'
 import SettingsPanel from './SettingsPanel'
 import { store } from '../store'
+import { useAppSelector } from '../store/hooks'
 import { toggleSettings, fetchSettings } from '../store/settingsSlice'
 import { openFlowConfig } from '../store/flowSlice'
 import { toggleHistory, saveFlowApi, fetchAllProjects, createProjectApi } from '../store/saveSlice'
@@ -52,6 +53,12 @@ export default function App() {
   const [exportNodes, setExportNodes] = useState<any[]>([])
   const [exportEdges, setExportEdges] = useState<any[]>([])
   const [view, setView] = useState<'flow' | 'agent'>('flow')
+  const [dark, setDark] = useState(() => localStorage.getItem('theme-dark') === 'true')
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : '')
+    localStorage.setItem('theme-dark', String(dark))
+  }, [dark])
 
   const handleExportCode = useCallback(() => {
     const handle = flowCanvasRef.current
@@ -446,6 +453,7 @@ export default function App() {
       return
     }
     await saveFlowApi(project.id, name.trim(), data as unknown as Record<string, unknown>, store.dispatch)
+    store.dispatch({ type: 'flow/markClean' })
   }, [])
 
   const handleShowHistory = useCallback(() => {
@@ -555,22 +563,26 @@ export default function App() {
     <ErrorBoundary>
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)' }}>
       {/* 导航栏 */}
-      <div style={{ display: 'flex', background: '#f5f5f5', borderBottom: '1px solid #ddd', padding: '0 16px', alignItems: 'center', height: 32 }}>
-        <span style={{ fontSize: 12, color: '#888', marginRight: 16 }}>AI Flow Canvas</span>
+      <div style={{ display: 'flex', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)', padding: '0 16px', alignItems: 'center', height: 32 }}>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)', marginRight: 16 }}>AI Flow Canvas</span>
         <button onClick={() => setView('flow')} style={{
           padding: '3px 12px', border: 'none', borderRadius: '4px 4px 0 0',
-          background: view === 'flow' ? '#fff' : 'transparent',
-          color: view === 'flow' ? '#333' : '#888', fontWeight: view === 'flow' ? 600 : 400,
+          background: view === 'flow' ? 'var(--bg-primary)' : 'transparent',
+          color: view === 'flow' ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: view === 'flow' ? 600 : 400,
           cursor: 'pointer', fontSize: 12, marginRight: 1,
-        }}>Flow 画布</button>
+        }}>Flow 画布{useAppSelector(s => s.flow.dirty) ? ' ●' : ''}</button>
         <button onClick={() => setView('agent')} style={{
           padding: '3px 12px', border: 'none', borderRadius: '4px 4px 0 0',
-          background: view === 'agent' ? '#fff' : 'transparent',
-          color: view === 'agent' ? '#333' : '#888', fontWeight: view === 'agent' ? 600 : 400,
+          background: view === 'agent' ? 'var(--bg-primary)' : 'transparent',
+          color: view === 'agent' ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: view === 'agent' ? 600 : 400,
           cursor: 'pointer', fontSize: 12,
         }}>Agent 编排</button>
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 11, color: '#aaa' }}>v2.0</span>
+        <button onClick={() => setDark(d => !d)} style={{
+          padding: '3px 10px', border: 'none', borderRadius: 4, cursor: 'pointer',
+          background: 'transparent', color: '#888', fontSize: 14,
+        }} title={dark ? '切换浅色模式' : '切换深色模式'}>{dark ? '☀' : '☾'}</button>
+        <span style={{ fontSize: 11, color: '#aaa', marginLeft: 8 }}>v2.0</span>
       </div>
       {/* 两个画布始终挂载，通过 display 切换 */}
       <div style={{ display: view === 'flow' ? 'flex' : 'none', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>

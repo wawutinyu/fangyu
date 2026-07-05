@@ -1,14 +1,17 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useAppSelector, useAppDispatch } from '../store/hooks'
-import { updateAgentCard, updateAgentNode, updateRoutingRules } from '../store/agentSlice'
+import { updateAgentCard, updateAgentNode, updateAgentEdge, updateRoutingRules } from '../store/agentSlice'
 import type { AgentSkill, RoutingRule } from '../utils/a2aProtocol'
 
 export default function AgentConfigPanel() {
   const dispatch = useAppDispatch()
   const nodes = useAppSelector(s => s.agent.nodes)
-  const selectedId = useAppSelector(s => s.agent.selectedNodeId)
+  const edges = useAppSelector(s => s.agent.edges)
+  const selectedNodeId = useAppSelector(s => s.agent.selectedNodeId)
+  const selectedEdgeId = useAppSelector(s => s.agent.selectedEdgeId)
 
-  const node = useMemo(() => nodes.find(n => n.id === selectedId), [nodes, selectedId])
+  const node = useMemo(() => nodes.find(n => n.id === selectedNodeId), [nodes, selectedNodeId])
+  const edge = useMemo(() => edges.find(e => e.id === selectedEdgeId), [edges, selectedEdgeId])
   const isRouter = node?.type === 'a2a-router'
   const [tab, setTab] = useState<'card' | 'trust' | 'transport' | 'task' | 'ext' | 'router'>('card')
 
@@ -20,10 +23,28 @@ export default function AgentConfigPanel() {
   const [newRuleCondition, setNewRuleCondition] = useState('')
   const [newRulePriority, setNewRulePriority] = useState(0)
 
+  // 如果选中了连线，显示连线配置
+  if (edge) {
+    const srcNode = nodes.find(n => n.id === edge.source)
+    const tgtNode = nodes.find(n => n.id === edge.target)
+    return (
+      <div style={{ width: 320, borderLeft: '1px solid var(--border-color)', padding: 16, fontSize: 13, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ fontWeight: 600, fontSize: 14 }}>连线配置</div>
+        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+          {srcNode?.label || edge.source} → {tgtNode?.label || edge.target}
+        </div>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12 }}>
+          <span style={{ color: 'var(--text-secondary)' }}>订阅标签</span>
+          <input className="notion-input" value={edge.label || 'subscribe'} onChange={e => dispatch(updateAgentEdge({ id: edge.id, data: { label: e.target.value || undefined } }))} />
+        </label>
+      </div>
+    )
+  }
+
   if (!node) {
     return (
-      <div style={{ width: 320, borderLeft: '1px solid #eee', padding: 16, fontSize: 13, color: '#999' }}>
-        选中一个节点以查看配置
+      <div style={{ width: 320, borderLeft: '1px solid var(--border-color)', padding: 16, fontSize: 13, color: 'var(--text-muted)' }}>
+        选中一个节点或连线以查看配置
       </div>
     )
   }

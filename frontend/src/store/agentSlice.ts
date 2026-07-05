@@ -20,7 +20,7 @@ export interface AgentCanvasNode {
 
 export interface AgentCanvasEdge {
   id: string; source: string; target: string
-  sourceSkill?: string; targetSkill?: string
+  sourceSkill?: string; targetSkill?: string; label?: string
 }
 
 interface AgentState {
@@ -56,6 +56,10 @@ const agentSlice = createSlice({
     removeAgentEdge(state, action: PayloadAction<string>) {
       state.edges = state.edges.filter(e => e.id !== action.payload)
     },
+    updateAgentEdge(state, action: PayloadAction<{ id: string; data: Partial<AgentCanvasEdge> }>) {
+      const e = state.edges.find(e => e.id === action.payload.id)
+      if (e) Object.assign(e, action.payload.data)
+    },
     selectAgentNode(state, action: PayloadAction<string | null>) {
       state.selectedNodeId = action.payload; state.selectedEdgeId = null
     },
@@ -84,7 +88,7 @@ const agentSlice = createSlice({
 
 export const {
   addAgentNode, updateAgentNode, removeAgentNode, moveAgentNode,
-  addAgentEdge, removeAgentEdge, selectAgentNode, selectAgentEdge,
+  addAgentEdge, removeAgentEdge, updateAgentEdge, selectAgentNode, selectAgentEdge,
   clearAgentSelection, updateAgentCard, updateAgentTrust,
   updateRoutingRules, loadAgents, clearAgents,
 } = agentSlice.actions

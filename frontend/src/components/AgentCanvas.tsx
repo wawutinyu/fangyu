@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useRef, useEffect } from 'react'
 import ReactFlow, {
   Background, Controls,
   useNodesState, useEdgesState,
@@ -9,7 +9,7 @@ import AgentNode from './AgentNode'
 import RouterNode from './RouterNode'
 import GroupNode from './GroupNode'
 import { useAppSelector, useAppDispatch } from '../store/hooks'
-import { addAgentNode, addAgentEdge, selectAgentNode, moveAgentNode } from '../store/agentSlice'
+import { addAgentNode, addAgentEdge, selectAgentNode, selectAgentEdge, moveAgentNode, removeAgentNode, removeAgentEdge, updateAgentEdge } from '../store/agentSlice'
 import type { AgentCanvasNode } from '../store/agentSlice'
 import type { AgentCard, TrustConfig } from '../utils/a2aProtocol'
 
@@ -49,7 +49,7 @@ export default function AgentCanvas() {
     id: e.id, source: e.source, target: e.target,
     type: 'smoothstep', animated: true,
     style: { stroke: '#722ed1', strokeDasharray: '6 3' },
-    label: 'subscribe',
+    label: e.label || 'subscribe',
   })))
 
   const prevStore = useRef('')
@@ -67,6 +67,10 @@ export default function AgentCanvas() {
 
   const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     dispatch(selectAgentNode(node.id))
+  }, [dispatch])
+
+  const onEdgeClick = useCallback((_: React.MouseEvent, edge: { id: string }) => {
+    dispatch(selectAgentEdge(edge.id))
   }, [dispatch])
 
   const onPaneClick = useCallback(() => {
@@ -114,6 +118,29 @@ export default function AgentCanvas() {
   }, [dispatch, setNodes])
 
   const selectedNodeId = useAppSelector(s => s.agent.selectedNodeId)
+  const selectedEdgeId = useAppSelector(s => s.agent.selectedEdgeId)
+
+  const deleteSelected = useCallback(() => {
+    if (selectedNodeId) {
+      dispatch(removeAgentNode(selectedNodeId))
+      setNodes(nds => nds.filter(n => n.id !== selectedNodeId))
+      setEdges(eds => eds.filter(e => e.source !== selectedNodeId && e.target !== selectedNodeId))
+    } else if (selectedEdgeId) {
+      dispatch(removeAgentEdge(selectedEdgeId))
+      setEdges(eds => eds.filter(e => e.id !== selectedEdgeId))
+    }
+  }, [dispatch, selectedNodeId, selectedEdgeId, setNodes, setEdges])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && (selectedNodeId || selectedEdgeId)) {
+        e.preventDefault()
+        deleteSelected()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [deleteSelected, selectedNodeId, selectedEdgeId])
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -132,6 +159,12 @@ export default function AgentCanvas() {
           border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12,
         }}>+ 编组</button>
         {selectedNodeId && <span style={{ fontSize: 12, color: '#888' }}>已选: {selectedNodeId}</span>}
+        {(selectedNodeId || selectedEdgeId) && (
+          <button onClick={deleteSelected} style={{
+            padding: '4px 14px', background: '#e53e3e', color: '#fff',
+            border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12,
+          }}>删除</button>
+        )}
       </div>
       <div style={{ flex: 1 }}>
         <ReactFlow
@@ -141,6 +174,7 @@ export default function AgentCanvas() {
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onNodeClick={onNodeClick}
+          onEdgeClick={onEdgeClick}
           onPaneClick={onPaneClick}
           onNodeDragStop={onNodeDragStop}
           nodeTypes={nodeTypes}

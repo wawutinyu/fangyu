@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useRef, useState, useEffect } from 'react'
 import { getReactFlowInstance } from './FlowCanvas'
 import { Executor } from '../utils/executor'
 import type { ExecutorLog } from '../utils/executor'
@@ -6,17 +6,29 @@ import { convertToExportFormat } from '../utils/flowHelper'
 import { useAppSelector } from '../store/hooks'
 import { AgentBus } from '../utils/agentBus'
 
+interface ChatMessage { role: string; content: string; logs?: ExecutorLog[]; _showLogs?: boolean; _pendingSkill?: string; _pendingSkillDesc?: string }
+
+const STORAGE_KEY = 'ai-flow-chat-messages'
+
+function loadMessages(): ChatMessage[] {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]') } catch { return [] }
+}
+
 interface ChatInterfaceProps { headerless?: boolean }
 
 export default function ChatInterface({ headerless }: ChatInterfaceProps) {
   const [expanded, setExpanded] = useState(true)
   const [inputText, setInputText] = useState('')
-  const [messages, setMessages] = useState<{ role: string; content: string; logs?: ExecutorLog[]; _showLogs?: boolean; _pendingSkill?: string; _pendingSkillDesc?: string }[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>(loadMessages)
   const [running, setRunning] = useState(false)
   const [chatMode, setChatMode] = useState<'flow' | 'agent'>('flow')
   const msgListRef = useRef<HTMLDivElement>(null)
   const agentNodes = useAppSelector(s => s.agent.nodes)
   const [selectedAgent, setSelectedAgent] = useState('')
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(messages))
+  }, [messages])
 
   const agents = agentNodes.filter(n => n.type === 'a2a-agent')
 

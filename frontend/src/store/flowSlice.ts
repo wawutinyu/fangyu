@@ -28,6 +28,7 @@ export interface FlowState {
   editingConfig: EditingConfig | null
   simulationRunning: boolean
   saveTimestamp: number
+  dirty: boolean
   draggedNode: DragInfo | null
   showLogPanel: boolean
   simLogs: SimLog[]
@@ -53,6 +54,7 @@ const initialState: FlowState = {
   editingConfig: null,
   simulationRunning: false,
   saveTimestamp: 0,
+  dirty: false,
   draggedNode: null,
   showLogPanel: false,
   simLogs: [],
@@ -65,9 +67,11 @@ export const flowSlice = createSlice({
   reducers: {
     setNodes(state, action: PayloadAction<Node[]>) {
       state.nodes = action.payload
+      state.dirty = true
     },
     setEdges(state, action: PayloadAction<Edge[]>) {
       state.edges = action.payload
+      state.dirty = true
     },
     selectNode(state, action: PayloadAction<string | null>) {
       state.selectedNodeId = action.payload
@@ -112,6 +116,7 @@ export const flowSlice = createSlice({
         if (label !== undefined) node.data.label = label
         if (desc !== undefined) node.data.desc = desc
         state.editingConfig = { ...config }
+        state.dirty = true
         state.saveTimestamp++
       }
     },
@@ -144,12 +149,14 @@ export const flowSlice = createSlice({
       state.selectedEdgeId = null
       state.configPanelVisible = false
       state.edgeConfigPanelVisible = false
+      state.dirty = true
     },
     updateEdgeConfig(state, action: PayloadAction<{ linkType: string; mappings: Record<string, string> }>) {
       const { linkType, mappings } = action.payload
       const edge = state.edges.find(e => e.id === state.selectedEdgeId)
       if (edge) {
         edge.data = { ...edge.data, linkType, mappings }
+        state.dirty = true
         state.saveTimestamp++
       }
     },
@@ -168,6 +175,10 @@ export const flowSlice = createSlice({
       state.edgeConfigPanelVisible = false
       state.flowConfigVisible = false
       state.globalPrompts = { system_prompt: '', user_prompt_template: '', context: '' }
+      state.dirty = false
+    },
+    markClean(state) {
+      state.dirty = false
     },
   },
 })
@@ -177,6 +188,6 @@ export const {
   openConfigPanel, closeConfig, openFlowConfig, updateNodeConfig, updateEdgeConfig, setEdgeData,
   openEdgeConfigPanel,
   setSimulationRunning, addSimLog, clearSimLogs, setShowLogPanel,
-  setDraggedNode, importFlow, newFlow, setGlobalPrompts,
+  setDraggedNode, importFlow, newFlow, setGlobalPrompts, markClean,
 } = flowSlice.actions
 export default flowSlice.reducer
