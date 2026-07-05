@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { generateA2AModules, generateMainPy } from '../agentCodeGenerator'
+import { generateA2AModules, generateMainPy, generateRouterAgentFile } from '../agentCodeGenerator'
 
 describe('generateA2AModules', () => {
   it('当 a2aEnabled=false 返回 10 个模块文件（不含 main.py）', () => {
@@ -65,13 +65,39 @@ describe('generateA2AModules', () => {
     expect(bus).toContain('subscribe')
   })
 
+  it('identity.py 使用真实的 Ed25519 签名（cryptography 库）', () => {
+    const files = generateA2AModules(false)
+    const identity = files.find(f => f.filename === 'a2a/trust/identity.py')!.content
+    expect(identity).toContain('cryptography.hazmat.primitives.asymmetric.ed25519')
+    expect(identity).toContain('Ed25519PrivateKey')
+    expect(identity).toContain('Ed25519PublicKey')
+    expect(identity).not.toContain('import hashlib')
+    expect(identity).not.toContain('TODO: replace with real Ed25519')
+  })
+
+  it('transport_http.py 包含完整 JSON-RPC 2.0 实现', () => {
+    const files = generateA2AModules(false)
+    const http = files.find(f => f.filename === 'a2a/transport_http.py')!.content
+    expect(http).toContain('class HTTPTransport')
+    expect(http).toContain('class JSONRPCError')
+    expect(http).toContain('"jsonrpc": "2.0"')
+    expect(http).toContain('urllib.request')
+    expect(http).toContain('Bearer')
+    expect(http).toContain('def call')
+    expect(http).toContain('def send_message')
+    expect(http).toContain('def get_task')
+    expect(http).toContain('def list_tasks')
+    expect(http).toContain('def subscribe')
+    expect(http).not.toContain('print(f"[HTTP Transport]')
+    expect(http).not.toContain('"stub"')
+  })
+
   it('生成的 Python 代码语法有效', () => {
     const files = generateA2AModules(true)
     for (const f of files) {
       if (f.filename.endsWith('.py')) {
         try {
-          // We just check that imports and classes are well-formed
-          expect(f.content).toMatch(/^(class |def |"""|import|from|    )/m)
+          expect(f.content).toMatch(/^(class |def |"""|import |from |    )/m)
         } catch {
           throw new Error(`Syntax issue in ${f.filename}`)
         }
@@ -97,5 +123,59 @@ describe('generateMainPy', () => {
     expect(code).toContain('TrustAnchor')
     expect(code).toContain('TrustRegistry')
     expect(code).toContain('register_all')
+  })
+})
+
+describe('generateRouterAgentFile', () => {
+  it('空路由列表返回空数组', () => {
+    const files = generateRouterAgentFile([])
+    expect(files.length).toBe(0)
+  })
+
+  it('单个路由器生成 router_*.py 文件', () => {
+    const files = generateRouterAgentFile([
+      { id: 'r1', label: '主路由器', rules: [], defaultTarget: '' },
+    ])
+    expect(files.length).toBe(1)
+    expect(files[0].filename).toContain('router')
+    expect(files[0].filename).toContain('.py')
+    expect(files[0].content).toContain('class Router_')
+    expect(files[0].content).toContain('def route')
+    expect(files[0].content).toContain('def handle_task')
+    expect(files[0].content).toContain('def create_router')
+  })
+
+  it('路由规则正确生成', () => {
+    const files = generateRouterAgentFile([
+      {
+        id: 'r1',
+        label: '智能路由',
+        rules: [
+          { sourceSkill: 'web-search', targetAgentId: 'search_agent', condition: '', priority: 10 },
+          { sourceSkill: 'chat', targetAgentId: 'llm_agent', condition: 'urgent', priority: 5 },
+        ],
+        defaultTarget: 'fallback_agent',
+      },
+    ])
+    const content = files[0].content
+    expect(content).toContain('RoutingRule')
+    expect(content).toContain('web-search')
+    expect(content).toContain('search_agent')
+    expect(content).toContain('chat')
+    expect(content).toContain('llm_agent')
+    expect(content).toContain('fallback_agent')
+    expect(content).toContain('priority')
+    expect(content).toContain('sorted(self.rules, key=lambda r: -r.priority)')
+  })
+
+  it('多个路由器各自生成独立文件', () => {
+    const files = generateRouterAgentFile([
+      { id: 'r1', label: '主路由', rules: [{ sourceSkill: 's1', targetAgentId: 'a1', condition: '', priority: 0 }], defaultTarget: '' },
+      { id: 'r2', label: '备用路由', rules: [{ sourceSkill: 's2', targetAgentId: 'a2', condition: '', priority: 0 }], defaultTarget: '' },
+    ])
+    expect(files.length).toBe(2)
+    expect(files[0].filename).not.toBe(files[1].filename)
+    expect(files[0].content).toContain('主路由')
+    expect(files[1].content).toContain('备用路由')
   })
 })
