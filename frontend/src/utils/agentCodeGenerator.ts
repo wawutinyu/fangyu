@@ -476,6 +476,7 @@ function generateMainPy(a2aEnabled: boolean): string {
   if (!a2aEnabled) {
     return `"""AI Flow Canvas 入口"""
 import sys
+from flow_export import run_flow
 
 def main():
     print("AI Flow Canvas — 流程执行器")
@@ -488,6 +489,7 @@ if __name__ == "__main__":
   }
   return `"""AI Flow Canvas 入口 (A2A 模式)"""
 import sys
+from flow_export import run_flow
 
 A2A_ENABLED = "--disable-a2a" not in sys.argv
 

@@ -4,7 +4,7 @@ import type { AgentCard, TrustConfig, RoutingRule } from '../utils/a2aProtocol'
 export interface AgentCanvasNode {
   id: string
   label: string
-  type: 'a2a-agent' | 'a2a-router'
+  type: 'a2a-agent' | 'a2a-router' | 'a2a-group'
   position: { x: number; y: number }
   agentCard?: AgentCard
   trust?: TrustConfig

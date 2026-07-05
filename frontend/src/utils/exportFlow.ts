@@ -66,6 +66,29 @@ export async function downloadFlowExport(
   _downloadBlob(await res.blob(), 'flow_export_bundle.zip')
 }
 
+const BUILD_SH_TEMPLATE = `#!/usr/bin/env bash
+set -e
+echo "========================================"
+echo " AI Flow Canvas — Build Executable"
+echo "========================================"
+echo ""
+
+if ! command -v python3 &> /dev/null; then
+    echo "[ERROR] Python3 not found. Install Python 3.9+ first."
+    exit 1
+fi
+
+echo "[1/3] Installing dependencies..."
+pip3 install -r requirements.txt
+
+echo "[2/3] Compiling to executable..."
+pyinstaller --onefile --noconsole --name flow_export flow_export.py
+
+echo "[3/3] Done!"
+echo "Executable: dist/flow_export"
+echo "Run: ./dist/flow_export"
+`
+
 const BUILD_BAT_TEMPLATE = `@echo off
 chcp 65001 >nul
 echo ========================================
@@ -105,32 +128,6 @@ echo.
 echo 可执行文件位于: dist\\flow_export.exe
 echo 双击 dist\\flow_export.exe 即可运行。
 pause
-`
-
-const _BUILD_SH_TEMPLATE = `#!/usr/bin/env bash
-set -e
-echo "========================================"
-echo " AI Flow Canvas — Build Executable"
-echo "========================================"
-echo ""
-
-# Check Python
-if ! command -v python3 &> /dev/null; then
-    echo "[ERROR] Python3 not found. Install Python 3.9+ first."
-    exit 1
-fi
-
-# Install deps
-echo "[1/3] Installing dependencies..."
-pip3 install -r requirements.txt
-
-# Build
-echo "[2/3] Compiling to executable..."
-pyinstaller --onefile --noconsole --name flow_export flow_export.py
-
-echo "[3/3] Done!"
-echo "Executable: dist/flow_export"
-echo "Run: ./dist/flow_export"
 `
 
 const REQUIREMENTS_TEMPLATE = `# AI Flow Canvas — 导出流程运行时依赖
@@ -191,6 +188,9 @@ export function getFlowExportBundle(
     // Override main.py
     extraFiles.push({ filename: 'main.py', content: generateMainPy(true) })
   }
+
+  // Add build.sh for Linux/macOS
+  extraFiles.push({ filename: 'build.sh', content: BUILD_SH_TEMPLATE })
 
   return { pyFile: pyCode, buildBat: BUILD_BAT_TEMPLATE, requirementsTxt: REQUIREMENTS_TEMPLATE, extraFiles }
 }

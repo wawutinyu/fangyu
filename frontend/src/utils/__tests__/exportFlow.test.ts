@@ -32,7 +32,8 @@ describe('getFlowExportBundle', () => {
     expect(bundle).toHaveProperty('buildBat')
     expect(bundle).toHaveProperty('requirementsTxt')
     expect(bundle).toHaveProperty('extraFiles')
-    expect(bundle.extraFiles).toEqual([])
+    expect(bundle.extraFiles.length).toBe(1)
+    expect(bundle.extraFiles[0].filename).toBe('build.sh')
   })
 
   it('pyFile 包含 desktopGUI 所需的 tkinter 代码', () => {
@@ -96,8 +97,9 @@ describe('getFlowExportBundle', () => {
   })
 
   it('enableA2A=false 时不包含 a2a 模块', () => {
-    const agents = [makeAgent('a1', '测试')]
+    const agents = [makeAgent('a1', 'Test')]
     const bundle = getFlowExportBundle([], [], { enableA2A: false }, agents)
-    expect(bundle.extraFiles).toEqual([])
+    expect(bundle.extraFiles.length).toBe(1)
+    expect(bundle.extraFiles[0].filename).toBe('build.sh')
   })
 })

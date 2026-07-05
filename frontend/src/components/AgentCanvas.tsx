@@ -7,12 +7,13 @@ import ReactFlow, {
 import 'reactflow/dist/style.css'
 import AgentNode from './AgentNode'
 import RouterNode from './RouterNode'
+import GroupNode from './GroupNode'
 import { useAppSelector, useAppDispatch } from '../store/hooks'
 import { addAgentNode, addAgentEdge, selectAgentNode, moveAgentNode } from '../store/agentSlice'
 import type { AgentCanvasNode } from '../store/agentSlice'
 import type { AgentCard, TrustConfig } from '../utils/a2aProtocol'
 
-const nodeTypes = { 'a2a-agent': AgentNode, 'a2a-router': RouterNode }
+const nodeTypes = { 'a2a-agent': AgentNode, 'a2a-router': RouterNode, 'a2a-group': GroupNode }
 
 const defaultAgentCard: AgentCard = {
   name: '新智能体', version: '1.0.0',
@@ -30,6 +31,8 @@ function genAgentId() { return `agent_${++_agentIdCounter}` }
 
 let _routerIdCounter = 0
 function genRouterId() { return `router_${++_routerIdCounter}` }
+let _groupIdCounter = 0
+function genGroupId() { return `group_${++_groupIdCounter}` }
 
 export default function AgentCanvas() {
   const dispatch = useAppDispatch()
@@ -100,6 +103,16 @@ export default function AgentCanvas() {
     setNodes(nds => [...nds, { id: node.id, type: 'a2a-router', position: node.position, data: node }])
   }, [dispatch, setNodes])
 
+  const addNewGroup = useCallback(() => {
+    const id = genGroupId()
+    const node: AgentCanvasNode = {
+      id, label: `编组 ${_groupIdCounter}`, type: 'a2a-group',
+      position: { x: 150 + Math.random() * 200, y: 150 + Math.random() * 200 },
+    }
+    dispatch(addAgentNode(node))
+    setNodes(nds => [...nds, { id: node.id, type: 'a2a-group', position: node.position, data: { ...node, childIds: [] } }])
+  }, [dispatch, setNodes])
+
   const selectedNodeId = useAppSelector(s => s.agent.selectedNodeId)
 
   return (
@@ -114,6 +127,10 @@ export default function AgentCanvas() {
           padding: '4px 14px', background: '#fa8c16', color: '#fff',
           border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12,
         }}>+ 路由器</button>
+        <button onClick={addNewGroup} style={{
+          padding: '4px 14px', background: '#d3adf7', color: '#722ed1',
+          border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12,
+        }}>+ 编组</button>
         {selectedNodeId && <span style={{ fontSize: 12, color: '#888' }}>已选: {selectedNodeId}</span>}
       </div>
       <div style={{ flex: 1 }}>
