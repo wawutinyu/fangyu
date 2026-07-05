@@ -1,0 +1,52 @@
+﻿{
+  "nodes": [
+    {
+      "id": "n1",
+      "data": {
+        "originType": "input",
+        "config": { "default_value": "AI 代理是什么" },
+        "label": "Input"
+      },
+      "position": { "x": 60, "y": 220 }
+    },
+    {
+      "id": "n2",
+      "data": {
+        "originType": "knowledge",
+        "config": { "knowledge_base": "默认知识库", "top_k": 3 },
+        "label": "Knowledge"
+      },
+      "position": { "x": 340, "y": 220 }
+    },
+    {
+      "id": "n3",
+      "data": {
+        "originType": "llm",
+        "config": {
+          "model": "deepseek-v4-flash",
+          "system_prompt": "基于知识库结果回答",
+          "temperature": 0.5,
+          "max_tokens": 1024
+        },
+        "label": "LLM"
+      },
+      "position": { "x": 620, "y": 220 }
+    },
+    {
+      "id": "n4",
+      "data": {
+        "originType": "output",
+        "config": {},
+        "label": "Output"
+      },
+      "position": { "x": 900, "y": 220 }
+    }
+  ],
+  "edges": [
+    { "id": "e12", "source": "n1", "target": "n2", "type": "flow-edge", "data": { "linkType": "serial", "mappings": {} } },
+    { "id": "e23", "source": "n2", "target": "n3", "type": "flow-edge", "data": { "linkType": "serial", "mappings": {} } },
+    { "id": "e34", "source": "n3", "target": "n4", "type": "flow-edge", "data": { "linkType": "serial", "mappings": {} } }
+  ],
+  "external_inputs": {},
+  "global_vars": {}
+}

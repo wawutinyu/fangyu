@@ -11,6 +11,12 @@ export interface EditingConfig {
   [key: string]: unknown
 }
 
+export interface GlobalPrompts {
+  system_prompt: string
+  user_prompt_template: string
+  context: string
+}
+
 export interface FlowState {
   nodes: Node[]
   edges: Edge[]
@@ -18,12 +24,14 @@ export interface FlowState {
   selectedEdgeId: string | null
   configPanelVisible: boolean
   edgeConfigPanelVisible: boolean
+  flowConfigVisible: boolean
   editingConfig: EditingConfig | null
   simulationRunning: boolean
   saveTimestamp: number
   draggedNode: DragInfo | null
   showLogPanel: boolean
   simLogs: SimLog[]
+  globalPrompts: GlobalPrompts
 }
 
 export interface SimLog {
@@ -41,12 +49,14 @@ const initialState: FlowState = {
   selectedEdgeId: null,
   configPanelVisible: false,
   edgeConfigPanelVisible: false,
+  flowConfigVisible: false,
   editingConfig: null,
   simulationRunning: false,
   saveTimestamp: 0,
   draggedNode: null,
   showLogPanel: false,
   simLogs: [],
+  globalPrompts: { system_prompt: '', user_prompt_template: '', context: '' },
 }
 
 export const flowSlice = createSlice({
@@ -81,9 +91,17 @@ export const flowSlice = createSlice({
     closeConfig(state) {
       state.configPanelVisible = false
       state.edgeConfigPanelVisible = false
+      state.flowConfigVisible = false
       state.selectedNodeId = null
       state.selectedEdgeId = null
       state.editingConfig = null
+    },
+    openFlowConfig(state) {
+      state.flowConfigVisible = true
+      state.configPanelVisible = false
+      state.edgeConfigPanelVisible = false
+      state.selectedNodeId = null
+      state.selectedEdgeId = null
     },
     updateNodeConfig(state, action: PayloadAction<{ config: Record<string, unknown>; mappings?: Record<string, string>; label?: string; desc?: string }>) {
       const { config, mappings, label, desc } = action.payload
@@ -112,6 +130,9 @@ export const flowSlice = createSlice({
     },
     setShowLogPanel(state, action: PayloadAction<boolean>) {
       state.showLogPanel = action.payload
+    },
+    setGlobalPrompts(state, action: PayloadAction<GlobalPrompts>) {
+      state.globalPrompts = action.payload
     },
     setDraggedNode(state, action: PayloadAction<DragInfo | null>) {
       state.draggedNode = action.payload
@@ -145,15 +166,17 @@ export const flowSlice = createSlice({
       state.selectedEdgeId = null
       state.configPanelVisible = false
       state.edgeConfigPanelVisible = false
+      state.flowConfigVisible = false
+      state.globalPrompts = { system_prompt: '', user_prompt_template: '', context: '' }
     },
   },
 })
 
 export const {
   setNodes, setEdges, selectNode, selectEdge,
-  openConfigPanel, closeConfig, updateNodeConfig, updateEdgeConfig, setEdgeData,
+  openConfigPanel, closeConfig, openFlowConfig, updateNodeConfig, updateEdgeConfig, setEdgeData,
   openEdgeConfigPanel,
   setSimulationRunning, addSimLog, clearSimLogs, setShowLogPanel,
-  setDraggedNode, importFlow, newFlow,
+  setDraggedNode, importFlow, newFlow, setGlobalPrompts,
 } = flowSlice.actions
 export default flowSlice.reducer

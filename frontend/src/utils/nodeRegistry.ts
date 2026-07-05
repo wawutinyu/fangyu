@@ -62,20 +62,6 @@ export const NODE_CATEGORIES: Category[] = [
     borderColor: '#91d5ff',
     nodes: [
       {
-        type: 'start', name: '开始', desc: '流程入口，有且仅有一个',
-        defaultConfig: {},
-        inputSchema: [],
-        outputSchema: [{ name: 'trigger', type: 'any', label: '触发信号' }],
-        configSchema: [],
-      },
-      {
-        type: 'end', name: '结束', desc: '流程出口',
-        defaultConfig: {},
-        inputSchema: [{ name: 'input', type: 'any', label: '输入', required: true }],
-        outputSchema: [],
-        configSchema: [],
-      },
-      {
         type: 'condition', name: '条件分支', desc: '根据条件路由到不同分支',
         defaultConfig: { expression: '', branch_count: 2 },
         inputSchema: [{ name: 'input', type: 'any', label: '输入值', required: true }],
@@ -118,18 +104,30 @@ export const NODE_CATEGORIES: Category[] = [
           { name: 'message', type: 'string', label: '消息内容', required: false },
         ],
         outputSchema: [
-          { name: 'message', type: 'string', label: '消息内容' },
-          { name: 'triggered', type: 'boolean', label: '触发信号' },
+          { name: 'result', type: 'any', label: '输出' },
         ],
         configSchema: [],
       },
       {
-        type: 'input', name: '输入', desc: '注入外部输入值',
+        type: 'input', name: '输入', desc: '暂停流程，等待用户输入',
         defaultConfig: { default_value: '' },
         inputSchema: [],
         outputSchema: [{ name: 'input', type: 'any', label: '输出值' }],
         configSchema: [
           { key: 'default_value', label: '默认值', type: 'input', default: '', placeholder: '外部输入为空时的默认值' },
+        ],
+      },
+      {
+        type: 'approval', name: '人工审批', desc: '暂停流程，等待用户审批',
+        defaultConfig: { timeout: 3600, message: '' },
+        inputSchema: [{ name: 'input', type: 'any', label: '待审数据', required: true }],
+        outputSchema: [
+          { name: 'approved', type: 'any', label: '已通过' },
+          { name: 'rejected', type: 'string', label: '拒绝原因' },
+        ],
+        configSchema: [
+          { key: 'message', label: '审批说明', type: 'textarea', default: '', placeholder: '向用户展示的审批说明', rows: 4 },
+          { key: 'timeout', label: '超时(秒)', type: 'number', default: 3600, min: 10, max: 86400 },
         ],
       },
       {
@@ -160,8 +158,7 @@ export const NODE_CATEGORIES: Category[] = [
           { name: 'context', type: 'array', label: '上下文消息', required: false },
         ],
         outputSchema: [
-          { name: 'result', type: 'string', label: '生成结果' },
-          { name: 'usage', type: 'object', label: 'Token 用量' },
+          { name: 'result', type: 'any', label: '输出' },
         ],
         configSchema: [
           { key: 'model', label: '模型', type: 'select', default: 'deepseek-v4-flash',
@@ -186,8 +183,7 @@ export const NODE_CATEGORIES: Category[] = [
           { name: 'params', type: 'object', label: '额外参数', required: false },
         ],
         outputSchema: [
-          { name: 'result', type: 'any', label: '执行结果' },
-          { name: 'error', type: 'string', label: '错误信息' },
+          { name: 'result', type: 'any', label: '输出' },
         ],
         configSchema: [
           { key: 'code', label: '代码', type: 'code', default: '', placeholder: '# 使用 input 变量访问输入\n# return 输出结果', rows: 10 },
@@ -202,8 +198,7 @@ export const NODE_CATEGORIES: Category[] = [
           { name: 'filter', type: 'object', label: '过滤条件', required: false },
         ],
         outputSchema: [
-          { name: 'results', type: 'array', label: '检索结果列表' },
-          { name: 'context', type: 'string', label: '拼接上下文' },
+          { name: 'results', type: 'any', label: '输出' },
         ],
         configSchema: [
           { key: 'knowledge_base', label: '知识库', type: 'select', default: '', options: ['默认知识库', '产品文档', '技术文档', '客户问答'] },
@@ -244,9 +239,7 @@ export const NODE_CATEGORIES: Category[] = [
           { name: 'headers', type: 'object', label: '请求头', required: false },
         ],
         outputSchema: [
-          { name: 'status', type: 'number', label: '状态码' },
-          { name: 'data', type: 'any', label: '响应数据' },
-          { name: 'headers', type: 'object', label: '响应头' },
+          { name: 'result', type: 'any', label: '输出' },
         ],
         configSchema: [
           { key: 'url', label: 'URL', type: 'input', default: '', placeholder: 'https://api.example.com/endpoint' },
@@ -263,8 +256,7 @@ export const NODE_CATEGORIES: Category[] = [
           { name: 'source', type: 'string', label: 'JSON 字符串', required: true },
         ],
         outputSchema: [
-          { name: 'result', type: 'object', label: '解析结果' },
-          { name: 'error', type: 'string', label: '解析错误' },
+          { name: 'result', type: 'any', label: '输出' },
         ],
         configSchema: [
           { key: 'strict', label: '严格模式', type: 'select', default: true, options: [true, false] },
@@ -277,8 +269,7 @@ export const NODE_CATEGORIES: Category[] = [
           { name: 'query', type: 'string', label: '搜索关键词', required: true },
         ],
         outputSchema: [
-          { name: 'results', type: 'array', label: '搜索结果' },
-          { name: 'summary', type: 'string', label: '摘要' },
+          { name: 'results', type: 'any', label: '输出' },
         ],
         configSchema: [
           { key: 'top_k', label: '返回条数', type: 'number', default: 5, min: 1, max: 20 },
@@ -293,8 +284,7 @@ export const NODE_CATEGORIES: Category[] = [
           { name: 'args', type: 'object', label: '参数', required: false },
         ],
         outputSchema: [
-          { name: 'result', type: 'any', label: '工具结果' },
-          { name: 'success', type: 'boolean', label: '是否成功' },
+          { name: 'result', type: 'any', label: '输出' },
         ],
         configSchema: [
           { key: 'tool_name', label: '工具名', type: 'input', default: '', placeholder: '例如: web_search' },
@@ -308,8 +298,7 @@ export const NODE_CATEGORIES: Category[] = [
           { name: 'llm_output', type: 'string', label: 'LLM 输出', required: false },
         ],
         outputSchema: [
-          { name: 'tools', type: 'array', label: '已注册工具' },
-          { name: 'count', type: 'number', label: '注册数量' },
+          { name: 'result', type: 'any', label: '输出' },
         ],
         configSchema: [],
       },
@@ -321,8 +310,7 @@ export const NODE_CATEGORIES: Category[] = [
           { name: 'params', type: 'object', label: '参数', required: false },
         ],
         outputSchema: [
-          { name: 'result', type: 'any', label: '执行结果' },
-          { name: 'success', type: 'boolean', label: '是否成功' },
+          { name: 'result', type: 'any', label: '输出' },
         ],
         configSchema: [
           { key: 'skill_name', label: '技能名', type: 'input', default: '', placeholder: '例如: my_skill' },
@@ -336,8 +324,7 @@ export const NODE_CATEGORIES: Category[] = [
           { name: 'llm_output', type: 'string', label: 'LLM 输出', required: false },
         ],
         outputSchema: [
-          { name: 'skills', type: 'array', label: '已学习技能' },
-          { name: 'count', type: 'number', label: '学习数量' },
+          { name: 'result', type: 'any', label: '输出' },
         ],
         configSchema: [],
       },
@@ -447,8 +434,7 @@ export const NODE_CATEGORIES: Category[] = [
           { name: 'text', type: 'string', label: '源文本', required: true },
         ],
         outputSchema: [
-          { name: 'facts', type: 'array', label: '提取的事实' },
-          { name: 'count', type: 'number', label: '事实数量' },
+          { name: 'result', type: 'any', label: '输出' },
         ],
         configSchema: [
           { key: 'max_facts', label: '最大提取数', type: 'number', default: 3, min: 1, max: 20 },
@@ -463,8 +449,7 @@ export const NODE_CATEGORIES: Category[] = [
           { name: 'session_id', type: 'string', label: '会话 ID', required: false },
         ],
         outputSchema: [
-          { name: 'results', type: 'array', label: '搜索结果' },
-          { name: 'count', type: 'number', label: '结果数量' },
+          { name: 'results', type: 'any', label: '输出' },
         ],
         configSchema: [
           { key: 'limit', label: '返回条数', type: 'number', default: 10, min: 1, max: 100 },
@@ -566,4 +551,40 @@ export function getInputSchema(type: string): PortSchema[] {
 
 export function getOutputSchema(type: string): PortSchema[] {
   return getNodeMeta(type).outputSchema
+}
+
+const NO_INPUT_TYPES = new Set(['input', 'variable-get'])
+export const UNIQUE_NODE_TYPES = new Set<string>()
+
+export function filterUniqueTypes(types: string[], existingNodeTypes: string[]): string[] {
+  const existing = new Set(existingNodeTypes)
+  return types.filter(t => !UNIQUE_NODE_TYPES.has(t) || !existing.has(t))
+}
+const NO_OUTPUT_TYPES = new Set(['output'])
+
+/**
+ * 给定源节点类型，返回所有可兼容的目标节点类型列表（用于 + 按钮菜单过滤）
+ */
+export function getCompatibleTargets(sourceType: string): string[] {
+  if (NO_OUTPUT_TYPES.has(sourceType)) return []
+
+  const sourceMeta = getNodeMeta(sourceType)
+  if (sourceMeta.outputSchema.length === 0) return []
+
+  const allTypes = getAllNodeTypes()
+
+  return allTypes.filter(targetType => {
+    if (targetType === sourceType) return false
+    if (NO_INPUT_TYPES.has(targetType)) return false
+
+    const targetMeta = getNodeMeta(targetType)
+    if (targetMeta.inputSchema.length === 0) return false
+
+    const sourcePortTypes = sourceMeta.outputSchema.map(p => p.type)
+    const targetPortTypes = targetMeta.inputSchema.map(p => p.type)
+
+    return sourcePortTypes.some(st =>
+      st === 'any' || targetPortTypes.some(tt => tt === 'any' || tt === st),
+    )
+  })
 }

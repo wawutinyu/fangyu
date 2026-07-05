@@ -91,7 +91,7 @@ export default function SubFlowEditor({ visible, innerNodes, innerLinks, onSave,
     const cy = rfNodes.reduce((s, n) => s + n.position.y, 0) / (rfNodes.length || 1)
     const savedNodes = rfNodes.map(n => ({
       id: n.id,
-      originType: n.data.originType || 'start',
+      originType: n.data.originType || '',
       name: (n.data.label as string) || '',
       config: (n.data.config as Record<string, unknown>) || {},
       mappings: (n.data.mappings as Record<string, string>) || {},
@@ -123,7 +123,7 @@ export default function SubFlowEditor({ visible, innerNodes, innerLinks, onSave,
             <select className="notion-select" style={{ fontSize: 12, height: 28 }}
               value={selectedType} onChange={e => setSelectedType(e.target.value)}
             >
-              {['start', 'end', 'llm', 'code', 'http', 'json-parse', 'search', 'tool-call', 'variable-set', 'variable-get', 'transform', 'text-process', 'memory-read', 'memory-write', 'condition', 'switch', 'prompt-assembly'].map(t => (
+              {['llm', 'code', 'http', 'json-parse', 'search', 'tool-call', 'variable-set', 'variable-get', 'transform', 'text-process', 'memory-read', 'memory-write', 'condition', 'switch', 'prompt-assembly'].map(t => (
                 <option key={t} value={t}>{getNodeMeta(t).name} ({t})</option>
               ))}
             </select>

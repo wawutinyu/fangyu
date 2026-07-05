@@ -54,6 +54,7 @@ from .routers import tools as tools_router            # /api/v1/tools/*
 from .routers import skills as skills_router          # /api/v1/skills/*
 from .routers import variables as variables_router    # /api/v1/variables/*
 from .routers import monitor as monitor_router        # /api/v1/monitor/*
+from .routers import export_compile as export_router  # /api/v1/export/*
 
 
 # ---------------------------------------------------------------------------
@@ -134,6 +135,7 @@ app.include_router(tools_router.router)
 app.include_router(skills_router.router)
 app.include_router(variables_router.router)
 app.include_router(monitor_router.router)
+app.include_router(export_router.router)
 
 
 # ---------------------------------------------------------------------------

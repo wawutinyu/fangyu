@@ -2,25 +2,19 @@ import { useMemo, useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { NODE_CATEGORIES } from '../utils/nodeRegistry'
 
 interface NodePickerProps {
-  sourceType: string
+  compatibleTypes: string[]
   anchorRect: DOMRect
   onSelect: (nodeType: string) => void
   onClose: () => void
 }
 
-const NO_INPUT = new Set(['start', 'input', 'variable-get'])
+const compatibleSet = (types: string[]) => new Set(types)
 
-function getValidTargets(sourceType: string, allNodes: { type: string }[]): Set<string> {
-  if (sourceType === 'start') {
-    return new Set(['input'])
-  }
-  return new Set(allNodes.filter(n => !NO_INPUT.has(n.type)).map(n => n.type))
-}
-
-export default function NodePicker({ sourceType, anchorRect, onSelect, onClose }: NodePickerProps) {
+export default function NodePicker({ compatibleTypes, anchorRect, onSelect, onClose }: NodePickerProps) {
   const [search, setSearch] = useState('')
   const popupRef = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState({ x: 0, y: 0 })
+  const [popupHeight, setPopupHeight] = useState(480)
 
   useLayoutEffect(() => {
     const popupW = 320
@@ -34,6 +28,7 @@ export default function NodePicker({ sourceType, anchorRect, onSelect, onClose }
       y = Math.max(8, window.innerHeight - 316)
     }
     setPos({ x, y })
+    setPopupHeight(Math.min(480, window.innerHeight - y - 16))
   }, [anchorRect])
 
   useEffect(() => {
@@ -53,37 +48,33 @@ export default function NodePicker({ sourceType, anchorRect, onSelect, onClose }
   }, [onClose])
 
   useEffect(() => {
-    const handler = () => onClose()
-    window.addEventListener('scroll', handler, true)
-    return () => window.removeEventListener('scroll', handler, true)
-  }, [onClose])
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
+
+  const validTypes = useMemo(() => compatibleSet(compatibleTypes), [compatibleTypes])
 
   const categories = useMemo(() => {
-    const validTargets = getValidTargets(sourceType, NODE_CATEGORIES.flatMap(c => c.nodes))
     const q = search.toLowerCase().trim()
     return NODE_CATEGORIES
       .map(cat => ({
         ...cat,
         nodes: cat.nodes.filter(n =>
-          validTargets.has(n.type) &&
+          validTypes.has(n.type) &&
           (!q || n.name.toLowerCase().includes(q) || n.type.toLowerCase().includes(q) || n.desc.toLowerCase().includes(q))
         ),
       }))
       .filter(cat => cat.nodes.length > 0)
-  }, [sourceType, search])
+  }, [validTypes, search])
 
-  const allCount = useMemo(() => {
-    const validTargets = getValidTargets(sourceType, NODE_CATEGORIES.flatMap(c => c.nodes))
-    return NODE_CATEGORIES.flatMap(c => c.nodes).filter(n => validTargets.has(n.type)).length
-  }, [sourceType])
+  const allCount = compatibleTypes.length
 
   return (
     <div ref={popupRef} style={{
       position: 'fixed', left: pos.x, top: pos.y, zIndex: 9999, width: 320,
       background: '#fff', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-      maxHeight: Math.min(480, window.innerHeight - pos.y - 16),
-      display: 'flex', flexDirection: 'column',
-      border: '1px solid #e8e8e8',
+      height: popupHeight, border: '1px solid #e8e8e8',
+      display: 'flex', flexDirection: 'column', overflow: 'hidden',
     }}>
       <div style={{ padding: '10px 12px 6px', borderBottom: '1px solid #f0f0f0', flexShrink: 0 }}>
         <div style={{
@@ -97,7 +88,8 @@ export default function NodePicker({ sourceType, anchorRect, onSelect, onClose }
           />
         </div>
       </div>
-      <div style={{ flex: 1, overflowY: 'auto', padding: '4px' }}>
+      <div style={{ overflowY: 'auto', padding: '4px', flex: 1, minHeight: 0 }}
+        onWheel={e => e.stopPropagation()}>
         {categories.map(cat => (
           <div key={cat.name}>
             <div style={{

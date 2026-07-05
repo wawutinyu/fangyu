@@ -6,3 +6,4 @@ aiosqlite==0.20.0
 python-multipart==0.0.17
 python-dotenv==1.0.1
 httpx==0.28.0
+pyinstaller>=6.0.0

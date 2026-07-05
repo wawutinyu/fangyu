@@ -184,6 +184,48 @@ cd backend && py -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - 容器内（Iteration/Loop）：额外排除 `Iteration`/`Loop`/`End`/`DataSource`/`KnowledgeBase`/`HumanInput`
 - 我们的 `getValidTargets` 实现更简单：`NO_INPUT` 集 + 按 sourceType 过滤
 
+## Add Button + Mode Toggle（2025-06-30 修复记录）
+
+### 问题
+- `+` 按钮与 Handle 共享 DOM 区域，事件竞争导致点击无反应或选中节点
+- 之前的修复尝试（覆盖层、native stopPropagation）均因 React Flow 事件系统拦截而失败
+
+### 最终方案：Dify 式独立 `+` 按钮
+
+**结构**：
+```
+AtomNode root div
+├── 顶部色条
+├── 节点内容
+├── 输入端口 (Handle type="target")
+├── 输出端口 (Handle type="source")
+└── + 按钮 ← 独立 div，渲染在 root div 最底部，与 Handle 零重叠
+```
+
+**仅在 `portMode === 'add'` 渲染 `+` 按钮**：
+- 条件：`outPorts.length > 0`（有输出端口的节点才显示）
+- 默认 `opacity: 0; pointer-events: none`
+- 父节点 hover → `opacity: 1; pointer-events: auto`
+- 点击 → `e.stopPropagation()` + `openPicker()` → NodePicker
+
+**连线模式**：Handle 正常工作，`+` 不渲染
+
+### 节点兼容过滤（NodePicker.tsx）
+- 接收 `compatibleTypes: string[]` 替代粗糙的 `getValidTargets`
+- 规则：
+  1. 排除自身
+  2. 目标节点 inputSchema required 端口未满（已有入边数 < required 端口数）
+  3. 端口类型匹配：当前 outputSchema type ∈ 目标 inputSchema type（any 通配）
+  4. 排除 start
+- 此逻辑复用 FlowCanvas.tsx 的 `isValidConnection`
+
+### 关键文件
+- `AtomNode.tsx` — SourceHandle 简化（不加覆盖层），底部加独立 `+` 按钮
+- `NodePicker.tsx` — 改为接收 `compatibleTypes` 过滤
+- `flowSlice.ts` — portMode state（已有）
+- `TopToolbar.tsx` — 切换按钮（已有）
+- `utils/nodeRegistry.ts` — 新增 `getCompatibleTargets(sourceType, allNodes, edges)` 工具函数
+
 ## 节点连接兼容规则
 
 **画布交互**（Dify 风格 + 拖拽并存）：

@@ -1,0 +1,52 @@
+﻿{
+  "nodes": [
+    {
+      "id": "n1",
+      "data": {
+        "originType": "input",
+        "config": { "default_value": "3" },
+        "label": "Input"
+      },
+      "position": { "x": 60, "y": 220 }
+    },
+    {
+      "id": "n2",
+      "data": {
+        "originType": "llm",
+        "config": {
+          "model": "deepseek-v4-flash",
+          "system_prompt": "只输出一个 1-5 的数字",
+          "temperature": 0.3,
+          "max_tokens": 16
+        },
+        "label": "LLM"
+      },
+      "position": { "x": 340, "y": 220 }
+    },
+    {
+      "id": "n3",
+      "data": {
+        "originType": "switch",
+        "config": { "expression": "int(input[\"result\"])" },
+        "label": "Switch"
+      },
+      "position": { "x": 620, "y": 220 }
+    },
+    {
+      "id": "n4",
+      "data": {
+        "originType": "output",
+        "config": {},
+        "label": "Output"
+      },
+      "position": { "x": 900, "y": 220 }
+    }
+  ],
+  "edges": [
+    { "id": "e12", "source": "n1", "target": "n2", "type": "flow-edge", "data": { "linkType": "serial", "mappings": {} } },
+    { "id": "e23", "source": "n2", "target": "n3", "type": "flow-edge", "data": { "linkType": "serial", "mappings": {} } },
+    { "id": "e34", "source": "n3", "target": "n4", "type": "flow-edge", "data": { "linkType": "serial", "mappings": {} } }
+  ],
+  "external_inputs": {},
+  "global_vars": {}
+}

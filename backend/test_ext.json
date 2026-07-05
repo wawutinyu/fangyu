@@ -1,0 +1,62 @@
+﻿{
+  "nodes": [
+    {
+      "id": "n1",
+      "data": {
+        "originType": "input",
+        "config": { "default_value": "最新 AI 新闻" },
+        "label": "Input"
+      },
+      "position": { "x": 60, "y": 220 }
+    },
+    {
+      "id": "n2",
+      "data": {
+        "originType": "search",
+        "config": { "top_k": 3 },
+        "label": "Search"
+      },
+      "position": { "x": 340, "y": 220 }
+    },
+    {
+      "id": "n3",
+      "data": {
+        "originType": "http",
+        "config": { "url": "https://jsonplaceholder.typicode.com/posts/1", "method": "GET" },
+        "label": "HTTP"
+      },
+      "position": { "x": 620, "y": 220 }
+    },
+    {
+      "id": "n4",
+      "data": {
+        "originType": "llm",
+        "config": {
+          "model": "deepseek-v4-flash",
+          "system_prompt": "总结搜索结果",
+          "temperature": 0.5,
+          "max_tokens": 1024
+        },
+        "label": "LLM"
+      },
+      "position": { "x": 900, "y": 220 }
+    },
+    {
+      "id": "n5",
+      "data": {
+        "originType": "output",
+        "config": {},
+        "label": "Output"
+      },
+      "position": { "x": 1180, "y": 220 }
+    }
+  ],
+  "edges": [
+    { "id": "e12", "source": "n1", "target": "n2", "type": "flow-edge", "data": { "linkType": "serial", "mappings": {} } },
+    { "id": "e23", "source": "n2", "target": "n3", "type": "flow-edge", "data": { "linkType": "serial", "mappings": {} } },
+    { "id": "e34", "source": "n3", "target": "n4", "type": "flow-edge", "data": { "linkType": "serial", "mappings": {} } },
+    { "id": "e45", "source": "n4", "target": "n5", "type": "flow-edge", "data": { "linkType": "serial", "mappings": {} } }
+  ],
+  "external_inputs": {},
+  "global_vars": {}
+}

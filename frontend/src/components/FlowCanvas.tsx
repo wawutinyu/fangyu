@@ -1,4 +1,5 @@
-import React, { forwardRef, useImperativeHandle } from 'react'
+import React, { forwardRef, useImperativeHandle, useState } from 'react'
+import { createPortal } from 'react-dom'
 import ReactFlow, {
   Background,
   Controls,
@@ -15,12 +16,16 @@ import 'reactflow/dist/style.css'
 import AtomNode from './AtomNode'
 import CompositeNode from './CompositeNode'
 import FlowEdge from './FlowEdge'
+import NodePicker from './NodePicker'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
+import { store } from '../store'
 import { setNodes, setEdges, setEdgeData, selectEdge, openEdgeConfigPanel } from '../store/flowSlice'
 import { selectNode, openConfigPanel } from '../store/flowSlice'
-import { getNodeMeta, getDefaultConfig } from '../utils/nodeRegistry'
+import { getNodeMeta, getCompatibleTargets, getDefaultConfig, getAllNodeTypes, filterUniqueTypes } from '../utils/nodeRegistry'
 import { generateId, convertFromExportFormat, convertToExportFormat } from '../utils/flowHelper'
 import { Executor } from '../utils/executor'
+import { runLocalFlow, type PendingInteraction } from '../utils/localExecutor'
+import { generatePythonCode } from '../utils/codeGenerator'
 
 const nodeTypes = {
   'atom-node': AtomNode,
@@ -31,13 +36,42 @@ const edgeTypes = {
   'flow-edge': FlowEdge,
 }
 
+function createAtomNode(nodeType: string, position: { x: number; y: number }): Node {
+  const meta = getNodeMeta(nodeType)
+  return {
+    id: generateId('node'),
+    type: 'atom-node',
+    position,
+    data: {
+      originType: nodeType,
+      name: meta.name,
+      category: meta.category,
+      label: meta.name,
+      config: getDefaultConfig(nodeType),
+    },
+  }
+}
+
+function createFlowEdge(source: string, target: string, sourceHandle?: string, targetHandle?: string): Edge {
+  return {
+    id: generateId('edge'),
+    source,
+    sourceHandle,
+    target,
+    targetHandle,
+    type: 'flow-edge',
+    data: { linkType: 'serial', mappings: {} },
+  }
+}
+
 export interface FlowCanvasHandle {
   newFlow: () => void
   importFlow: (data: unknown) => void
   exportFlow: () => unknown
   restoreFromSave: (data: unknown) => void
-  runSimulation: () => void
+  runSimulation: (autoResolveInput?: boolean) => void
   getNodesAndEdges: () => { nodes: Node[]; edges: Edge[] }
+  exportCode: () => string
   groupSelected: () => void
   ungroupSelected: () => void
   updateEdgeData: (edgeId: string, data: Record<string, unknown>) => void
@@ -47,6 +81,7 @@ export interface FlowCanvasHandle {
   deleteSelected: () => void
   deleteNodeById: (id: string) => void
   deleteEdgeById: (id: string) => void
+  showResults: (results: Array<{ nodeId: string; nodeName: string; output: Record<string, unknown> }>) => void
 }
 
 let rfInstance: ReactFlowInstance | null = null
@@ -61,7 +96,22 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
   const [edges, setLocalEdges, onEdgesChange] = useEdgesState([] as Edge[])
   const [, setSimProgress] = React.useState(0)
   const [toast, setToast] = React.useState<{ msg: string; type: string } | null>(null)
+  const [simResults, setSimResults] = React.useState<{ nodeName: string; output: Record<string, unknown> }[] | null>(null)
   const rfInstanceRef = React.useRef<ReactFlowInstance | null>(null)
+  const existingNodeTypes = useAppSelector(s => s.flow.nodes.map(n => n.data?.originType as string))
+  const edgeInsertableTypes = React.useMemo(() => {
+    return filterUniqueTypes(getAllNodeTypes().filter(type => {
+      const meta = getNodeMeta(type)
+      return meta.inputSchema.length > 0 && meta.outputSchema.length > 0
+    }), existingNodeTypes)
+  }, [existingNodeTypes])
+
+  const [edgeInsert, setEdgeInsert] = React.useState<{
+    visible: boolean; edge: Edge | null; clientX: number; clientY: number
+  }>({ visible: false, edge: null, clientX: 0, clientY: 0 })
+
+  const [pendingInteraction, setPendingInteraction] = React.useState<PendingInteraction | null>(null)
+  const [interactionMinimized, setInteractionMinimized] = React.useState(false)
 
   const historyRef = React.useRef<{ nodes: Node[]; edges: Edge[] }[]>([])
   const historyIdxRef = React.useRef(-1)
@@ -83,6 +133,11 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
     setTimeout(() => setToast(null), 2500)
   }, [])
 
+  const nodesRef = React.useRef(nodes)
+  nodesRef.current = nodes
+  const edgesRef = React.useRef(edges)
+  edgesRef.current = edges
+
   useImperativeHandle(ref, () => ({
     newFlow() {
       pushHistory()
@@ -103,7 +158,7 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
       }
     },
     exportFlow() {
-      return convertToExportFormat(nodes, edges)
+      return convertToExportFormat(nodesRef.current, edgesRef.current)
     },
     restoreFromSave(data: unknown) {
       pushHistory()
@@ -117,35 +172,53 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
       setLocalEdges(restoredEdges)
       showToast('已恢复', 'info')
     },
-    async runSimulation() {
-      if (nodes.length === 0) return
+    async runSimulation(autoResolveInput?: boolean) {
+      const curNodes = nodesRef.current
+      const curEdges = edgesRef.current
+      if (curNodes.length === 0) return
       setSimProgress(0)
-      setLocalNodes(nds => nds.map(n => ({ ...n, data: { ...n.data, _simulating: false } })))
-      const flowData = convertToExportFormat(nodes, edges)
-      const executor = new Executor(flowData.nodes, flowData.links)
-      executor.setExternalInputs({})
-      executor.onNodeProgress((nodeId, status) => {
-        setLocalNodes(prev => prev.map(n => ({
-          ...n,
-          data: { ...n.data, _simulating: n.id === nodeId && status === 'running' },
-        })))
+      setPendingInteraction(null)
+      setLocalNodes(nds => nds.map(n => ({ ...n, data: { ...n.data, _simulating: false, _output: null, _status: null } })))
+      const result = await runLocalFlow(curNodes, curEdges, {
+        autoResolveInput,
+        onProgress: (nodeId, status) => {
+          setLocalNodes(prev => prev.map(n => ({
+            ...n,
+            data: { ...n.data, _simulating: n.id === nodeId && status === 'running' },
+          })))
+        },
+        onPending: (interaction) => {
+          setPendingInteraction(interaction)
+        },
       })
-      executor.run().then(result => {
-        setSimProgress(100)
-        setLocalNodes(nds => nds.map(n => ({ ...n, data: { ...n.data, _simulating: false } })))
-        if (result.success) {
-          showToast(`运行完成，${result.results.length} 个节点已执行`, 'success')
-        } else {
-          showToast(result.error || '运行中止', 'warn')
-        }
-      })
+      setSimProgress(100)
+      setPendingInteraction(null)
+      showResults(result.results.map(r => ({ nodeId: r.nodeId, nodeName: r.nodeName, output: r.output || {} })))
+      if (result.success) {
+        showToast(`运行完成，${result.results.length} 个节点已执行`, 'success')
+      } else {
+        showToast(result.error || '运行中止', 'warn')
+      }
+    },
+    showResults(results) {
+      setSimResults(results.map(r => ({ nodeName: r.nodeName, output: r.output })))
+      setLocalNodes(nds => nds.map(n => {
+        const res = results.find(r => r.nodeId === n.id)
+        return { ...n, data: { ...n.data, _simulating: false, _output: res?.output || null, _status: 'done' as const } }
+      }))
     },
     getNodesAndEdges() {
-      return { nodes, edges }
+      return { nodes: nodesRef.current, edges: edgesRef.current }
+    },
+    exportCode() {
+      const state = store.getState().flow
+      return generatePythonCode(nodesRef.current, edgesRef.current, { globalPrompts: state.globalPrompts })
     },
     groupSelected() {
       pushHistory()
-      const selected = nodes.filter(n => n.selected)
+      const curNodes = nodesRef.current
+      const curEdges = edgesRef.current
+      const selected = curNodes.filter(n => n.selected)
       if (selected.length < 2) {
         showToast('请选中至少 2 个节点', 'warn')
         return
@@ -177,7 +250,7 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
         relativeY: n.position.y - cy,
       }))
 
-      const innerEdges = edges.filter(e => selectedIds.has(e.source) && selectedIds.has(e.target))
+      const innerEdges = curEdges.filter(e => selectedIds.has(e.source) && selectedIds.has(e.target))
       const innerLinks = innerEdges.map(e => ({
         sourceNodeId: e.source,
         targetNodeId: e.target,
@@ -203,7 +276,7 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
         },
       }
 
-      setLocalEdges(edges
+      setLocalEdges(curEdges
         .filter(e => !selectedIds.has(e.source) || !selectedIds.has(e.target))
         .map(e => {
           if (selectedIds.has(e.target) && !selectedIds.has(e.source)) return { ...e, target: compositeId }
@@ -211,20 +284,7 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
           return e
         }),
       )
-      setLocalNodes(nds => nds.filter(n => !selectedIds.has(n.id)).concat(newNode))
-      showToast(`已组合 ${selected.length} 个节点`, 'success')
-    },
-    updateEdgeData(edgeId: string, data: Record<string, unknown>) {
-      pushHistory()
-      setLocalEdges(prev => prev.map(e =>
-        e.id === edgeId ? { ...e, data: { ...e.data, ...data } } : e,
-      ))
-    },
-    updateNodeData(nodeId: string, data: Record<string, unknown>) {
-      pushHistory()
-      setLocalNodes(prev => prev.map(n =>
-        n.id === nodeId ? { ...n, data: { ...n.data, ...data } } : n,
-      ))
+      setLocalNodes(nds => [...nds.filter(n => !selectedIds.has(n.id)), newNode])
     },
     ungroupSelected() {
       pushHistory()
@@ -250,11 +310,7 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
           name: n.name as string,
           category: n.category as string,
           label: n.label as string,
-          is_group: false,
-          inner_nodes: [],
-          inner_links: [],
           config: n.config as Record<string, unknown>,
-          mappings: (n.mappings as Record<string, string>) || {},
         },
       }))
 
@@ -342,8 +398,8 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
     const targetNode = nodes.find(n => n.id === connection.target)
     if (!sourceNode || !targetNode) return false
 
-    const sourceMeta = getNodeMeta((sourceNode.data?.originType as string) || 'start')
-    const targetMeta = getNodeMeta((targetNode.data?.originType as string) || 'start')
+    const sourceMeta = getNodeMeta((sourceNode.data?.originType as string) || '')
+    const targetMeta = getNodeMeta((targetNode.data?.originType as string) || '')
 
     const sourcePorts = sourceMeta.outputSchema
     const targetPorts = targetMeta.inputSchema
@@ -379,7 +435,30 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
     setSelectedEdgeIdLocal(null)
   }, [dispatch])
 
-  const onEdgeClick = React.useCallback((_: React.MouseEvent, edge: Edge) => {
+  const handleEdgeInsert = React.useCallback((edge: Edge, nodeType: string) => {
+    const sourceNode = nodes.find(n => n.id === edge.source)
+    const targetNode = nodes.find(n => n.id === edge.target)
+    if (!sourceNode || !targetNode) return
+
+    const meta = getNodeMeta(nodeType)
+    const newNode = createAtomNode(nodeType, {
+      x: (sourceNode.position.x + targetNode.position.x) / 2,
+      y: (sourceNode.position.y + targetNode.position.y) / 2,
+    })
+    const targetFirstInput = meta.inputSchema[0]?.name || '__default'
+    const sourceFirstOutput = meta.outputSchema[0]?.name || '__default'
+
+    pushHistory()
+    setLocalEdges(eds => eds.filter(e => e.id !== edge.id).concat([
+      createFlowEdge(edge.source, newNode.id, edge.sourceHandle, targetFirstInput),
+      createFlowEdge(newNode.id, edge.target, sourceFirstOutput, edge.targetHandle),
+    ]))
+    setLocalNodes(nds => nds.concat(newNode))
+    setEdgeInsert({ visible: false, edge: null, clientX: 0, clientY: 0 })
+  }, [nodes, setLocalNodes, setLocalEdges, pushHistory])
+
+  const onEdgeClick = React.useCallback((event: React.MouseEvent, edge: Edge) => {
+    setEdgeInsert({ visible: true, edge, clientX: event.clientX, clientY: event.clientY })
     dispatch(selectEdge(edge.id))
     setSelectedEdgeIdLocal(edge.id)
   }, [dispatch])
@@ -410,26 +489,9 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
     const typeStr = event.dataTransfer.getData('application/reactflow')
     if (!typeStr || !rfInstanceRef.current) return
 
-    const { type, name, category } = JSON.parse(typeStr)
-    const meta = getNodeMeta(type)
+    const { type } = JSON.parse(typeStr)
     const position = rfInstanceRef.current.screenToFlowPosition({ x: event.clientX, y: event.clientY })
-    const id = generateId('node')
-    const newNode: Node = {
-      id,
-      type: 'atom-node',
-      position,
-      data: {
-        originType: type,
-        name: meta.name,
-        category,
-        label: name,
-        is_group: false,
-        config: getDefaultConfig(type),
-        mappings: {},
-        inner_nodes: [],
-        inner_links: [],
-      },
-    }
+    const newNode = createAtomNode(type, position)
     pushHistory()
     setLocalNodes(nds => nds.concat(newNode))
   }, [setLocalNodes, pushHistory])
@@ -458,47 +520,122 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as { afterNodeId: string; sourcePort: string; nodeType: string }
       if (!detail || !rfInstanceRef.current) return
-
       const sourceNode = nodes.find(n => n.id === detail.afterNodeId)
       if (!sourceNode) return
 
-      const meta = getNodeMeta(detail.nodeType)
-      const id = generateId('node')
-      const newNode: Node = {
-        id,
-        type: 'atom-node',
-        position: { x: sourceNode.position.x, y: sourceNode.position.y + 140 },
-        data: {
-          originType: detail.nodeType,
-          name: meta.name,
-          category: meta.category,
-          label: meta.name,
-          is_group: false,
-          config: getDefaultConfig(detail.nodeType),
-          mappings: {},
-          inner_nodes: [],
-          inner_links: [],
-        },
-      }
-
-      const targetFirstInput = meta.inputSchema[0]?.name || '__default'
-      const newEdge: Edge = {
-        id: generateId('edge'),
-        source: detail.afterNodeId,
-        sourceHandle: detail.sourcePort,
-        target: id,
-        targetHandle: targetFirstInput,
-        type: 'flow-edge',
-        data: { linkType: 'serial', mappings: {} },
-      }
+      const existingFromNode = edges.filter(e => e.source === detail.afterNodeId).length
+      const newNode = createAtomNode(detail.nodeType, {
+        x: sourceNode.position.x + existingFromNode * 220 - existingFromNode * Math.min(existingFromNode, 3) * 10,
+        y: sourceNode.position.y + 140 + existingFromNode * 20,
+      })
 
       pushHistory()
       setLocalNodes(nds => nds.concat(newNode))
-      setLocalEdges(eds => eds.concat(newEdge))
+      const meta = getNodeMeta(detail.nodeType)
+      if (meta.inputSchema.length > 0) {
+        const targetFirstInput = meta.inputSchema[0]?.name || '__default'
+        setLocalEdges(eds => eds.concat(createFlowEdge(detail.afterNodeId, newNode.id, detail.sourcePort, targetFirstInput)))
+      }
     }
     window.addEventListener('flow:add-node', handler)
     return () => window.removeEventListener('flow:add-node', handler)
-  }, [nodes, setLocalNodes, setLocalEdges, pushHistory])
+  }, [nodes, edges, setLocalNodes, setLocalEdges, pushHistory])
+
+  React.useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { targetNodeId: string; targetPort: string; nodeType: string }
+      if (!detail || !rfInstanceRef.current) return
+
+      const targetNode = nodes.find(n => n.id === detail.targetNodeId)
+      if (!targetNode) return
+
+      const existingToNode = edges.filter(e => e.target === detail.targetNodeId).length
+      const newNode = createAtomNode(detail.nodeType, {
+        x: targetNode.position.x + existingToNode * 220 - existingToNode * Math.min(existingToNode, 3) * 10,
+        y: targetNode.position.y - 140 + existingToNode * 20,
+      })
+
+      pushHistory()
+      setLocalNodes(nds => nds.concat(newNode))
+      const meta = getNodeMeta(detail.nodeType)
+      if (meta.outputSchema.length > 0) {
+        const sourceFirstOutput = meta.outputSchema[0]?.name || '__default'
+        setLocalEdges(eds => eds.concat(createFlowEdge(newNode.id, detail.targetNodeId, sourceFirstOutput, detail.targetPort)))
+      }
+    }
+    window.addEventListener('flow:add-parent', handler)
+    return () => window.removeEventListener('flow:add-parent', handler)
+  }, [nodes, edges, setLocalNodes, setLocalEdges, pushHistory])
+
+  const [connectTarget, setConnectTarget] = React.useState<{
+    nodeId: string; port: string; clientX: number; clientY: number
+  } | null>(null)
+
+  React.useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { targetNodeId: string; targetPort: string }
+      if (!detail) return
+      setConnectTarget({ nodeId: detail.targetNodeId, port: detail.targetPort, clientX: 0, clientY: 0 })
+    }
+    window.addEventListener('flow:connect-to-input', handler)
+    return () => window.removeEventListener('flow:connect-to-input', handler)
+  }, [])
+
+  const compatibleExistingNodes = React.useMemo(() => {
+    if (!connectTarget) return []
+    const targetNode = nodes.find(n => n.id === connectTarget.nodeId)
+    if (!targetNode) return []
+    const targetOriginType = targetNode.data?.originType as string
+    return nodes.filter(n => {
+      if (n.id === connectTarget.nodeId) return false
+      const sourceOriginType = n.data?.originType as string
+      if (!sourceOriginType) return false
+
+      if (getCompatibleTargets(sourceOriginType).includes(targetOriginType)) return true
+
+      const sourceMeta = getNodeMeta(sourceOriginType)
+      const targetMeta = getNodeMeta(targetOriginType)
+      if (!sourceMeta || !targetMeta) return false
+      if (sourceMeta.outputSchema.length === 0 || targetMeta.inputSchema.length === 0) return false
+      const srcTypes = sourceMeta.outputSchema.map(p => p.type)
+      const tgtTypes = targetMeta.inputSchema.map(p => p.type)
+      return srcTypes.some(st => st === 'any' || tgtTypes.some(tt => tt === 'any' || tt === st))
+    })
+  }, [connectTarget, nodes])
+
+  const handleConnectExistingSelect = React.useCallback((sourceNodeId: string) => {
+    if (!connectTarget) return
+    const sourceNode = nodes.find(n => n.id === sourceNodeId)
+    if (!sourceNode) return
+    const sourceOriginType = sourceNode.data?.originType as string
+    const sourceMeta = getNodeMeta(sourceOriginType)
+    const sourceFirstOutput = sourceMeta.outputSchema[0]?.name || '__default'
+    const newEdge: Edge = {
+      id: generateId('edge'),
+      source: sourceNodeId,
+      sourceHandle: sourceFirstOutput,
+      target: connectTarget.nodeId,
+      targetHandle: connectTarget.port,
+      type: 'flow-edge',
+      data: { linkType: 'serial', mappings: {} },
+    }
+    pushHistory()
+    setLocalEdges(eds => eds.concat(newEdge))
+    setConnectTarget(null)
+  }, [connectTarget, nodes, setLocalEdges, pushHistory])
+
+  const connectTargetNode = connectTarget ? nodes.find(n => n.id === connectTarget.nodeId) : null
+  const [connectPickerRect, setConnectPickerRect] = React.useState<{ left: number; top: number } | null>(null)
+  React.useEffect(() => {
+    if (!connectTarget || !connectTargetNode || !rfInstanceRef.current) {
+      setConnectPickerRect(null)
+      return
+    }
+    const vp = rfInstanceRef.current.getViewport()
+    const screenX = connectTargetNode.position.x * vp.zoom + vp.x
+    const screenY = connectTargetNode.position.y * vp.zoom + vp.y
+    setConnectPickerRect({ left: screenX + 80, top: screenY })
+  }, [connectTarget, connectTargetNode])
 
   return (
     <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden', background: '#fcfcfb' }}>
@@ -515,6 +652,27 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
           {toast.msg}
         </div>
       )}
+      {simResults && (
+        <div style={{
+          position: 'absolute', top: 50, left: '50%', transform: 'translateX(-50%)', zIndex: 100,
+          background: '#fff', borderRadius: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+          padding: 16, minWidth: 360, maxWidth: 500,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>模拟运行结果</span>
+            <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999', fontSize: 14 }}
+              onClick={() => setSimResults(null)}>✕</button>
+          </div>
+          {simResults.map((r, i) => (
+            <div key={i} style={{ marginBottom: 8, padding: 8, background: '#f8f8f6', borderRadius: 6 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#666', marginBottom: 4 }}>{r.nodeName}</div>
+              <pre style={{ margin: 0, fontSize: 11, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#333' }}>
+                {JSON.stringify(r.output, null, 2)}
+              </pre>
+            </div>
+          ))}
+        </div>
+      )}
       {nodes.length === 0 && (
         <div style={{
           position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
@@ -528,6 +686,80 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
           <div style={{ fontSize: 14, fontWeight: 500 }}>空画布</div>
           <div style={{ fontSize: 12 }}>从左侧面板拖拽节点到此处开始搭建流程</div>
         </div>
+      )}
+      {edgeInsert.visible && edgeInsert.edge && createPortal(
+        <NodePicker
+          compatibleTypes={edgeInsertableTypes}
+          anchorRect={{ left: edgeInsert.clientX, top: edgeInsert.clientY, right: edgeInsert.clientX, bottom: edgeInsert.clientY, width: 0, height: 0, x: edgeInsert.clientX, y: edgeInsert.clientY } as DOMRect}
+          onSelect={(nodeType) => edgeInsert.edge && handleEdgeInsert(edgeInsert.edge, nodeType)}
+          onClose={() => setEdgeInsert({ visible: false, edge: null, clientX: 0, clientY: 0 })}
+        />,
+        document.body
+      )}
+      {pendingInteraction && !interactionMinimized && (
+        <InteractionPanel
+          interaction={pendingInteraction}
+          onResolve={() => setPendingInteraction(null)}
+          onMinimize={() => setInteractionMinimized(true)}
+        />
+      )}
+      {pendingInteraction && interactionMinimized && (
+        <div onClick={() => setInteractionMinimized(false)}
+          style={{
+            position: 'absolute', right: 8, bottom: 8, zIndex: 50,
+            background: '#fff', borderRadius: 8, padding: '6px 12px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+            cursor: 'pointer', fontSize: 12, color: '#666',
+            border: '1px solid #e8e8e8', display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+          <span style={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: pendingInteraction.type === 'approval' ? '#faad14' : '#1890ff',
+            display: 'inline-block',
+          }} />
+          {pendingInteraction.type === 'approval' ? '待审批' : '待输入'}
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </div>
+      )}
+      {connectTarget && compatibleExistingNodes.length > 0 && connectPickerRect && createPortal(
+        <div style={{
+          position: 'fixed', left: connectPickerRect.left, top: connectPickerRect.top, zIndex: 9999,
+          background: '#fff', borderRadius: 8, padding: 4,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.15)', border: '1px solid #e8e8e8',
+          minWidth: 180, maxHeight: 240, overflowY: 'auto',
+        }}>
+          <div style={{ padding: '4px 8px', fontSize: 11, color: '#9b9a97', fontWeight: 600, borderBottom: '1px solid #f0f0ee', marginBottom: 2 }}>选择已有节点连接</div>
+          {compatibleExistingNodes.map(n => (
+            <div key={n.id}
+              onClick={() => handleConnectExistingSelect(n.id)}
+              style={{
+                padding: '6px 8px', fontSize: 12, borderRadius: 4, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6, color: '#333',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#f5f5f5')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#52c41a', flexShrink: 0 }} />
+              <span style={{ flex: 1 }}>{n.data?.label as string || n.id}</span>
+              <span style={{ fontSize: 10, color: '#b0b0ae', fontFamily: 'monospace' }}>{n.data?.originType as string}</span>
+            </div>
+          ))}
+        </div>,
+        document.body
+      )}
+      {connectTarget && compatibleExistingNodes.length === 0 && createPortal(
+        <div style={{
+          position: 'fixed', left: connectPickerRect?.left || 100, top: connectPickerRect?.top || 100, zIndex: 9999,
+          background: '#fff', borderRadius: 8, padding: '12px 16px',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.15)', border: '1px solid #e8e8e8',
+          fontSize: 12, color: '#9b9a97',
+        }}>
+          没有可连接的已有节点
+          <div style={{ marginTop: 8, display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+            <button className="notion-btn" onClick={() => setConnectTarget(null)} style={{ fontSize: 11 }}>关闭</button>
+          </div>
+        </div>,
+        document.body
       )}
       <ReactFlow
         nodes={nodes}
@@ -560,6 +792,114 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
           style={{ border: '1px solid #e9e9e7' }}
         />
       </ReactFlow>
+    </div>
+  )
+}
+
+function InteractionPanel({ interaction, onResolve, onMinimize }: { interaction: PendingInteraction; onResolve: () => void; onMinimize: () => void }) {
+  const [reason, setReason] = React.useState('')
+  const [inputValue, setInputValue] = React.useState('')
+
+  const handleApprove = () => {
+    interaction.resolve({ action: 'approved', reason, modifiedData: interaction.inputData })
+    onResolve()
+  }
+  const handleReject = () => {
+    interaction.resolve({ action: 'rejected', reason: reason || '用户拒绝' })
+    onResolve()
+  }
+  const handleInputSubmit = () => {
+    interaction.resolve({ value: inputValue })
+    onResolve()
+  }
+
+  return (
+    <div className="interaction-panel" style={{
+      position: 'absolute', right: 8, top: 8, bottom: 8, width: 300, zIndex: 50,
+      background: '#fff', borderRadius: 8,
+      boxShadow: '0 4px 16px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04)',
+      display: 'flex', flexDirection: 'column', overflow: 'hidden',
+      animation: 'slideInRight 0.2s ease-out',
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '10px 12px', borderBottom: '1px solid #f0f0ee',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: interaction.type === 'approval' ? '#faad14' : '#1890ff',
+            display: 'inline-block',
+          }} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#37352f' }}>
+            {interaction.type === 'approval' ? '人工审批' : '用户输入'}
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          <button onClick={onMinimize}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#9b9a97', display: 'flex' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+      </div>
+      <div style={{ padding: '8px 12px', fontSize: 11, color: '#9b9a97', borderBottom: '1px solid #f0f0ee' }}>
+        {interaction.nodeName}
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
+        {interaction.type === 'approval' ? (
+          <>
+            {interaction.config.message && (
+              <div style={{ fontSize: 12, color: '#333', marginBottom: 10, padding: 8, background: '#f5f5f5', borderRadius: 6, lineHeight: 1.5 }}>
+                {interaction.config.message as string}
+              </div>
+            )}
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#666', marginBottom: 4 }}>待审数据</div>
+            <pre style={{
+              fontSize: 11, background: '#fafafa', padding: 8, borderRadius: 6,
+              maxHeight: 200, overflow: 'auto', marginBottom: 10, whiteSpace: 'pre-wrap',
+              border: '1px solid #eee',
+            }}>
+              {JSON.stringify(interaction.inputData, null, 2)}
+            </pre>
+            <textarea
+              className="notion-input"
+              placeholder="拒绝原因（可选）"
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              rows={2}
+              style={{ width: '100%', marginBottom: 10, resize: 'vertical', fontSize: 12 }}
+            />
+            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+              <button className="notion-btn" onClick={handleReject}
+                style={{ borderColor: '#ff4d4f', color: '#ff4d4f', fontSize: 12 }}>
+                拒绝
+              </button>
+              <button className="notion-btn" onClick={handleApprove}
+                style={{ background: '#52c41a', borderColor: '#52c41a', color: '#fff', fontSize: 12 }}>
+                同意
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#666', marginBottom: 4 }}>请输入值</div>
+            <textarea
+              className="notion-input"
+              placeholder={(interaction.config.default_value as string) || '输入...'}
+              value={inputValue}
+              onChange={e => setInputValue(e.target.value)}
+              rows={4}
+              style={{ width: '100%', marginBottom: 10, resize: 'vertical', fontSize: 12 }}
+            />
+            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+              <button className="notion-btn" onClick={handleInputSubmit}
+                style={{ background: '#1890ff', borderColor: '#1890ff', color: '#fff', fontSize: 12 }}>
+                提交
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }

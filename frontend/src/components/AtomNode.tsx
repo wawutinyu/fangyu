@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useState, useRef, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { Handle, Position, type NodeProps } from 'reactflow'
-import { getNodeMeta } from '../utils/nodeRegistry'
+import { getNodeMeta, getCompatibleTargets, getAllNodeTypes, filterUniqueTypes } from '../utils/nodeRegistry'
 import NodePicker from './NodePicker'
+import { useAppSelector } from '../store/hooks'
 
 const CATEGORY_COLORS: Record<string, string> = {
   '流程控制': '#1890ff',
@@ -25,39 +27,83 @@ function buildPorts(schema: { name: string; label?: string }[], branchCount?: nu
 }
 
 export default function AtomNode({ data, selected, id }: NodeProps) {
-  const originType = (data.originType as string) || 'start'
+  const originType = (data.originType as string) || ''
   const config = (data.config as Record<string, unknown>) || {}
   const meta = getNodeMeta(originType)
   const catColor = CATEGORY_COLORS[meta.category] || '#999'
   const label = (data.label as string) || meta.name
   const desc = (data.desc as string) || ''
   const [pickerVisible, setPickerVisible] = useState(false)
-  const [pickerSourcePort, setPickerSourcePort] = useState('__default')
   const [pickerAnchor, setPickerAnchor] = useState<DOMRect | null>(null)
-
   const inPorts = meta.inputSchema
   const outPorts = buildPorts(
     meta.outputSchema,
     originType === 'condition' ? (config.branch_count as number) || 2 : undefined,
   )
-  const hasOutput = outPorts.length > 0
 
-  const openPicker = useCallback((port: string, rect: DOMRect) => {
-    setPickerSourcePort(port)
+  const existingNodeTypes = useAppSelector(s => s.flow.nodes.map(n => n.data?.originType as string))
+  const compatibleTypes = useMemo(() => filterUniqueTypes(getCompatibleTargets(originType), existingNodeTypes), [originType, existingNodeTypes])
+  const sourcePortRef = useRef(outPorts[0]?.name || '__default')
+
+  const openPicker = useCallback((rect: DOMRect, portName?: string) => {
+    if (portName) sourcePortRef.current = portName
     setPickerAnchor(rect)
     setPickerVisible(true)
   }, [])
 
   const handleAddNode = useCallback((nodeType: string) => {
     const event = new CustomEvent('flow:add-node', {
-      detail: { afterNodeId: id, sourcePort: pickerSourcePort, nodeType },
+      detail: { afterNodeId: id, sourcePort: sourcePortRef.current, nodeType },
     })
     window.dispatchEvent(event)
     setPickerVisible(false)
-  }, [id, pickerSourcePort])
+  }, [id])
+
+  const inputPickerVisibleRef = useRef(false)
+  const [inputPickerAnchor, setInputPickerAnchor] = useState<DOMRect | null>(null)
+  const [inputPickerTypes, setInputPickerTypes] = useState<string[]>([])
+  const [inputMenuAnchor, setInputMenuAnchor] = useState<DOMRect | null>(null)
+  const targetPortRef = useRef('')
+
+  const compatibleSources = useMemo(() => {
+    return filterUniqueTypes(getAllNodeTypes().filter(t => getCompatibleTargets(t).includes(originType)), existingNodeTypes)
+  }, [originType, existingNodeTypes])
+
+  const handleInputPortClick = useCallback((portName: string, el?: HTMLElement) => {
+    targetPortRef.current = portName
+    if (el) setInputMenuAnchor(el.getBoundingClientRect())
+  }, [])
+
+  const handleAddParent = useCallback((nodeType: string) => {
+    const event = new CustomEvent('flow:add-parent', {
+      detail: { targetNodeId: id, targetPort: targetPortRef.current, nodeType },
+    })
+    window.dispatchEvent(event)
+    setInputPickerAnchor(null)
+    setInputMenuAnchor(null)
+  }, [id])
+
+  const handleConnectExisting = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('flow:connect-to-input', {
+      detail: { targetNodeId: id, targetPort: targetPortRef.current },
+    }))
+    setInputMenuAnchor(null)
+  }, [id])
+
+  const handlePortClick = useCallback((e: React.MouseEvent, portName: string) => {
+    e.stopPropagation()
+    e.preventDefault()
+    sourcePortRef.current = portName
+    if (compatibleTypes.length === 1) {
+      handleAddNode(compatibleTypes[0])
+    } else {
+      setPickerAnchor((e.currentTarget as HTMLElement).getBoundingClientRect())
+      setPickerVisible(true)
+    }
+  }, [compatibleTypes, handleAddNode])
 
   return (
-    <div style={{
+    <div className="atom-node" style={{
       width: 160,
       border: `1.5px solid ${selected ? '#37352f' : data._simulating ? '#52c41a' : catColor}`,
       borderRadius: 8,
@@ -102,38 +148,62 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
           {desc}
         </div>
       )}
-      {inPorts.length <= 1 ? (
-        <Handle type="target" position={Position.Top} id="__default" style={{ background: '#b0b0ae', width: 8, height: 8, border: '2px solid #fff' }} />
-      ) : (
-        inPorts.map((port, i) => (
-          <Handle key={port.name} type="target" position={Position.Top} id={port.name}
-            style={{
-              background: '#1890ff', width: 8, height: 8, border: '2px solid #fff',
-              left: `${((i + 1) / (inPorts.length + 1)) * 100}%`,
-              transform: 'translateX(-50%)',
-            }}
-          />
-        ))
+      {data._output && (
+        <div style={{
+          margin: '0 8px 6px', padding: '4px 6px', background: '#f5f5f3', borderRadius: 4,
+          fontSize: 10, color: '#37352f', lineHeight: 1.4, wordBreak: 'break-word',
+          maxHeight: 48, overflow: 'hidden',
+          fontFamily: 'monospace',
+        }}>
+          {JSON.stringify(data._output).slice(0, 120)}
+          {JSON.stringify(data._output).length > 120 ? '…' : ''}
+        </div>
       )}
-      {outPorts.length <= 1 ? (
-        <div style={{ position: 'relative' }}>
-          <SourceArea port="__default" hasOutput={hasOutput} onOpen={openPicker}
-            handleStyle={{ background: '#b0b0ae', width: 8, height: 8, border: '2px solid #fff' }}
+      {inPorts.length === 0 ? null : (
+        <div style={{ position: 'relative', height: 18 }}
+          onClick={(e) => handleInputPortClick('__default', e.currentTarget as HTMLElement)}
+          className="port-row-add-input">
+          <Handle type="target" position={Position.Top} id="__default"
+            style={{ background: '#b0b0ae', width: 8, height: 8, border: '2px solid #fff' }}
+            isConnectable={true}
+          />
+        </div>
+      )}
+      {outPorts.length === 0 ? null : outPorts.length <= 1 ? (
+        <div style={{ position: 'relative', height: 18 }}
+          onClick={(e) => handlePortClick(e, '__default')}
+          className="port-row-add">
+          <Handle type="source" position={Position.Bottom} id="__default"
+            style={{ background: '#52c41a', width: 8, height: 8, border: '2px solid #fff' }}
+            isConnectable={true}
           />
         </div>
       ) : (
-        <div style={{ position: 'relative', height: outPorts.length > 2 ? outPorts.length * 18 : 0 }}>
+        <div>
           {outPorts.map((port, i) => (
-            <div key={port.name} style={{ position: 'relative', height: 18 }}>
-              <SourceArea port={port.name} hasOutput={true} onOpen={openPicker}
-                handleStyle={{
-                  background: '#52c41a', width: 8, height: 8, border: '2px solid #fff',
+            <div key={port.name}
+              onClick={(e) => handlePortClick(e, port.name)}
+              className="port-row-add"
+              style={{
+                position: 'relative', height: 18,
+                cursor: 'pointer',
+                borderRadius: 3, transition: 'background 0.12s',
+              }}>
+              <Handle type="source" position={Position.Bottom} id={port.name}
+                style={{
+                  background: '#52c41a',
+                  width: 8, height: 8, border: '2px solid #fff',
                   position: 'absolute', left: '50%', transform: 'translateX(-50%)', top: 0,
+                  transition: 'all 0.12s',
                 }}
+                isConnectable={true}
               />
               <div style={{
-                position: 'absolute', left: '55%', top: -1, fontSize: 9, color: '#52c41a',
+                position: 'absolute', left: '55%', top: -1, fontSize: 9,
+                color: '#389e0d',
                 whiteSpace: 'nowrap', userSelect: 'none', pointerEvents: 'none',
+                fontWeight: 600,
+                transition: 'color 0.12s',
               }}>
                 {port.label || port.name}
               </div>
@@ -142,44 +212,45 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
         </div>
       )}
 
-      {pickerVisible && pickerAnchor && (
+      {pickerVisible && pickerAnchor && createPortal(
         <NodePicker
-          sourceType={originType}
+          compatibleTypes={compatibleTypes}
           anchorRect={pickerAnchor}
           onSelect={handleAddNode}
           onClose={() => setPickerVisible(false)}
-        />
+        />,
+        document.body
       )}
-    </div>
-  )
-}
-
-function SourceArea({ port, hasOutput, onOpen, handleStyle }: {
-  port: string; hasOutput: boolean; onOpen: (port: string, rect: DOMRect) => void; handleStyle: React.CSSProperties
-}) {
-  const areaRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const el = areaRef.current
-    if (!el) return
-    const handler = (e: MouseEvent) => {
-      e.stopPropagation()
-      onOpen(port, el.getBoundingClientRect())
-    }
-    el.addEventListener('click', handler)
-    return () => el.removeEventListener('click', handler)
-  }, [port, onOpen])
-
-  return (
-    <div ref={areaRef} style={{ position: 'relative', display: 'flex', justifyContent: 'center', paddingBottom: 18, cursor: 'pointer' }}>
-      <Handle type="source" position={Position.Bottom} id={port} style={handleStyle} />
-      {hasOutput && (
+      {inputMenuAnchor && createPortal(
         <div style={{
-          position: 'absolute', bottom: 0, width: 18, height: 18, borderRadius: '50%',
-          background: '#37352f', color: '#fff', display: 'flex', alignItems: 'center',
-          justifyContent: 'center', fontSize: 14, lineHeight: 1,
-          boxShadow: '0 2px 6px rgba(0,0,0,0.15)', userSelect: 'none', pointerEvents: 'none',
-        }}>+</div>
+          position: 'fixed', left: inputMenuAnchor.left, top: inputMenuAnchor.bottom + 4,
+          zIndex: 10000, background: '#fff', borderRadius: 8,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.15)', border: '1px solid #e8e8e8',
+          padding: 4, width: 160,
+        }}>
+          <div onClick={() => { setInputPickerTypes(compatibleSources); setInputPickerAnchor(inputMenuAnchor); setInputMenuAnchor(null) }}
+            style={{ padding: '6px 10px', fontSize: 12, borderRadius: 4, cursor: 'pointer', color: '#333' }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#f5f5f5')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+            + 添加新节点
+          </div>
+          <div onClick={handleConnectExisting}
+            style={{ padding: '6px 10px', fontSize: 12, borderRadius: 4, cursor: 'pointer', color: '#333' }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#f5f5f5')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+            ↕ 连接已有节点
+          </div>
+        </div>,
+        document.body
+      )}
+      {inputPickerAnchor && createPortal(
+        <NodePicker
+          compatibleTypes={inputPickerTypes}
+          anchorRect={inputPickerAnchor}
+          onSelect={handleAddParent}
+          onClose={() => setInputPickerAnchor(null)}
+        />,
+        document.body
       )}
     </div>
   )

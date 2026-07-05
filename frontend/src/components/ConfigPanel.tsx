@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useAppSelector, useAppDispatch } from '../store/hooks'
-import { updateNodeConfig, updateEdgeConfig, closeConfig } from '../store/flowSlice'
+import { updateNodeConfig, updateEdgeConfig, closeConfig, setGlobalPrompts } from '../store/flowSlice'
 import { getNodeMeta } from '../utils/nodeRegistry'
 import CodeEditor from './CodeEditor'
 import SubFlowEditor from './SubFlowEditor'
+
 
 interface Props {
   onUpdateEdge?: (edgeId: string, data: Record<string, unknown>) => void
@@ -14,11 +15,10 @@ interface Props {
 
 export default function ConfigPanel({ onUpdateEdge, onUpdateNode, onDeleteNode, onDeleteEdge }: Props) {
   const dispatch = useAppDispatch()
-  const { selectedNodeId, selectedEdgeId, configPanelVisible, edgeConfigPanelVisible, nodes, edges } = useAppSelector(s => s.flow)
+  const { selectedNodeId, selectedEdgeId, configPanelVisible, edgeConfigPanelVisible, flowConfigVisible, nodes, edges, globalPrompts } = useAppSelector(s => s.flow)
   const [localConfig, setLocalConfig] = useState<Record<string, unknown>>({})
   const [nodeLabel, setNodeLabel] = useState('')
   const [nodeDesc, setNodeDesc] = useState('')
-  const [mappings, setMappings] = useState<Record<string, string>>({})
   const [edgeMappings, setEdgeMappings] = useState<Record<string, string>>({})
   const [edgeLinkType, setEdgeLinkType] = useState('serial')
   const [subFlowOpen, setSubFlowOpen] = useState(false)
@@ -32,7 +32,7 @@ export default function ConfigPanel({ onUpdateEdge, onUpdateNode, onDeleteNode, 
     return getNodeMeta(originType)
   }, [selectedNode])
 
-  const visible = configPanelVisible || edgeConfigPanelVisible
+  const visible = configPanelVisible || edgeConfigPanelVisible || flowConfigVisible
 
   useEffect(() => {
     if (!selectedNode) return
@@ -46,7 +46,6 @@ export default function ConfigPanel({ onUpdateEdge, onUpdateNode, onDeleteNode, 
     setLocalConfig(defaults)
     setNodeLabel((selectedNode.data?.label as string) || (selectedNode.data?.name as string) || meta?.name || '')
     setNodeDesc((selectedNode.data?.desc as string) || '')
-    setMappings((selectedNode.data?.mappings as Record<string, string>) || {})
   }, [selectedNode, meta])
 
   useEffect(() => {
@@ -54,21 +53,6 @@ export default function ConfigPanel({ onUpdateEdge, onUpdateNode, onDeleteNode, 
     setEdgeMappings((selectedEdge.data?.mappings as Record<string, string>) || {})
     setEdgeLinkType((selectedEdge.data?.linkType as string) || 'serial')
   }, [selectedEdge])
-
-  const upstreamOutputs = useMemo(() => {
-    if (!selectedNode) return []
-    const upstreamIds = edges.filter(e => e.target === selectedNode.id).map(e => e.source)
-    const outputs: string[] = []
-    for (const uid of upstreamIds) {
-      const upNode = nodes.find(n => n.id === uid)
-      if (!upNode) continue
-      const upMeta = getNodeMeta((upNode.data?.originType as string) || upNode.type || 'atom-node')
-      for (const port of upMeta.outputSchema) {
-        outputs.push(`${(upNode.data?.label as string) || uid}.${port.name}`)
-      }
-    }
-    return outputs
-  }, [selectedNode, nodes, edges])
 
   const edgeSourceOutputs = useMemo(() => {
     if (!selectedEdge) return []
@@ -93,7 +77,7 @@ export default function ConfigPanel({ onUpdateEdge, onUpdateNode, onDeleteNode, 
   const handleSave = () => {
     const label = nodeLabel.trim() || undefined
     const desc = nodeDesc.trim() || undefined
-    dispatch(updateNodeConfig({ config: { ...localConfig }, mappings: { ...mappings }, label, desc }))
+    dispatch(updateNodeConfig({ config: { ...localConfig }, label, desc }))
     if (selectedNode && onUpdateNode) {
       const data: Record<string, unknown> = {}
       if (label) data.label = label
@@ -114,13 +98,44 @@ export default function ConfigPanel({ onUpdateEdge, onUpdateNode, onDeleteNode, 
   return (
     <div style={{ width: 'var(--panel-width)', borderLeft: '1px solid var(--border-color)', background: 'var(--bg-secondary)', display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px 4px', borderBottom: '1px solid var(--border-light)' }}>
-        <span className="section-title">节点配置</span>
+        <span className="section-title">{flowConfigVisible ? '画布配置' : '节点配置'}</span>
         <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 'var(--radius-sm)', color: 'var(--text-secondary)', display: 'flex' }}
           onClick={() => dispatch(closeConfig())}
         ><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
 
-      {edgeConfigPanelVisible && selectedEdge ? (
+      {flowConfigVisible ? (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 12 }}>全局提示词</div>
+
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>系统提示词</label>
+            <textarea className="notion-textarea"
+              value={globalPrompts.system_prompt}
+              onChange={e => dispatch(setGlobalPrompts({ ...globalPrompts, system_prompt: e.target.value }))}
+              placeholder="全局系统提示词，自动注入到所有 LLM 节点"
+              rows={4} />
+          </div>
+
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>用户提示词模板</label>
+            <textarea className="notion-textarea"
+              value={globalPrompts.user_prompt_template}
+              onChange={e => dispatch(setGlobalPrompts({ ...globalPrompts, user_prompt_template: e.target.value }))}
+              placeholder="用户消息模板，可用 {{input}} 引用节点输入"
+              rows={3} />
+          </div>
+
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>上下文</label>
+            <textarea className="notion-textarea"
+              value={globalPrompts.context}
+              onChange={e => dispatch(setGlobalPrompts({ ...globalPrompts, context: e.target.value }))}
+              placeholder="全局上下文信息，如背景知识、角色设定"
+              rows={3} />
+          </div>
+        </div>
+      ) : edgeConfigPanelVisible && selectedEdge ? (
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
           <div style={{ marginBottom: 4 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
@@ -263,23 +278,7 @@ export default function ConfigPanel({ onUpdateEdge, onUpdateNode, onDeleteNode, 
             </div>
           ))}
 
-          {upstreamOutputs.length > 0 && <div style={{ height: 1, background: 'var(--border-color)', margin: '14px 0' }} />}
-          {upstreamOutputs.length > 0 && (
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 4 }}>变量映射</label>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>上游节点输出映射到当前节点输入</div>
-              {meta.inputSchema.map(port => (
-                <div key={port.name} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', minWidth: 60, fontFamily: 'monospace' }}>{port.name}</span>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--text-muted)' }}><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-                  <select className="notion-select" style={{ flex: 1 }} value={mappings[port.name] || ''} onChange={e => setMappings(prev => ({ ...prev, [port.name]: e.target.value }))}>
-                    <option value="">— 不映射 —</option>
-                    {upstreamOutputs.map(out => <option key={out} value={out}>{out}</option>)}
-                  </select>
-                </div>
-              ))}
-            </div>
-          )}
+          {meta.inputSchema.length > 0 && <div style={{ height: 1, background: 'var(--border-color)', margin: '14px 0' }} />}
 
           <div style={{ height: 1, background: 'var(--border-color)', margin: '14px 0' }} />
           <button className="notion-btn" style={{ width: '100%', justifyContent: 'center' }} onClick={handleSave}>保存配置</button>

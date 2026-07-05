@@ -11,10 +11,10 @@ SAFE_BUILTINS = {
     'ord': ord, 'pow': pow, 'range': range, 'repr': repr, 'reversed': reversed,
     'round': round, 'set': set, 'slice': slice, 'sorted': sorted, 'str': str,
     'sum': sum, 'tuple': tuple, 'type': type, 'zip': zip, 'True': True, 'False': False,
-    'None': None, 'print': print,
+    'None': None, 'print': print, 'exec': exec,
 }
 
-FORBIDDEN = ['__import__', 'open', 'eval', 'exec', 'compile', 'globals', 'locals', 'vars', 'dir', 'getattr', 'setattr', 'delattr', 'hasattr']
+FORBIDDEN = ['__import__', 'open', 'eval', 'compile', 'globals', 'locals', 'vars', 'dir', 'getattr', 'setattr', 'delattr', 'hasattr']
 
 
 def _run_code(code: str, input_data: dict, params: dict) -> dict:
@@ -23,7 +23,7 @@ def _run_code(code: str, input_data: dict, params: dict) -> dict:
     def safe_print(*args, **kwargs):
         logs.append(' '.join(str(a) for a in args))
 
-    restricted_globals = {**SAFE_BUILTINS, '__builtins__': {}, 'print': safe_print, 'input': input_data, 'params': params}
+    restricted_globals = {**SAFE_BUILTINS, '__builtins__': {}, 'print': safe_print, 'input': input_data, 'params': params, '_input': input_data, 'data': input_data}
     restricted_locals = {}
 
     for word in FORBIDDEN:

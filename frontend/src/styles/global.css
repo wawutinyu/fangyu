@@ -127,6 +127,16 @@ button { font-family: inherit; }
   margin-bottom: 4px;
 }
 
+.port-row-add:hover {
+  background: #f0fff0;
+}
+.port-row-add-input {
+  z-index: 10;
+}
+.port-row-add-input:hover {
+  background: #e6f7ff;
+}
+
 @keyframes typingBounce {
   0%, 80%, 100% { transform: scale(0); }
   40% { transform: scale(1); }
@@ -140,4 +150,9 @@ button { font-family: inherit; }
 @keyframes simulatePulse {
   0%, 100% { box-shadow: 0 0 8px rgba(82, 196, 26, 0.3); }
   50% { box-shadow: 0 0 16px rgba(82, 196, 26, 0.6); }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }

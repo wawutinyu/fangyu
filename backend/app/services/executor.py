@@ -101,6 +101,9 @@ def _init_registry():
         "search-sessions": ("会话搜索", "记忆存储",
             [{"name": "query", "type": "string", "required": True}, {"name": "session_id", "type": "string"}],
             [{"name": "results", "type": "array"}, {"name": "count", "type": "number"}]),
+        "approval": ("审批", "流程控制",
+            [{"name": "input", "type": "string", "required": True}],
+            [{"name": "approval_id", "type": "string"}, {"name": "status", "type": "string"}, {"name": "message", "type": "string"}]),
         "input": ("输入", "流程控制",
             [], [{"name": "input", "type": "any"}]),
         "output": ("输出", "流程控制",
@@ -318,6 +321,17 @@ async def run_flow(
             results.append({"nodeId": node_id, "nodeName": node_name, "type": origin_type, "outputs": node_outputs})
         except Exception as e:
             msg = str(e)
+            if msg.startswith("APPROVAL_PENDING:"):
+                parts = msg.split(":", 2)
+                approval_id = parts[1] if len(parts) > 1 else ""
+                approval_msg = parts[2] if len(parts) > 2 else ""
+                approval_out = {"approval_id": approval_id, "message": approval_msg, "status": "pending"}
+                outputs[node_id] = approval_out
+                outputs[node_name] = approval_out
+                _add_log(node_id, node_name, "approval_pending", approval_out)
+                _emit("node_complete", {"nodeId": node_id, "nodeName": node_name, "outputs": approval_out})
+                results.append({"nodeId": node_id, "nodeName": node_name, "type": origin_type, "outputs": approval_out, "pending": True})
+                return
             _add_log(node_id, node_name, "error", {"error": msg})
             _emit("node_error", {"nodeId": node_id, "nodeName": node_name, "error": msg})
             results.append({"nodeId": node_id, "nodeName": node_name, "type": origin_type, "error": msg})
@@ -438,30 +452,37 @@ async def _execute_node(
     elif origin_type == "llm":
         return await _exec_llm(inputs, config, all_outputs, external_inputs, global_vars)
     elif origin_type == "code":
-        return await _exec_code(inputs, config)
+        return await _exec_code(inputs, config, all_outputs)
     elif origin_type == "http":
-        return await _exec_http(inputs, config)
+        return await _exec_http(inputs, config, all_outputs, external_inputs, global_vars)
     elif origin_type == "condition":
         expr = config.get("expression", "true")
         branch_count = int(config.get("branch_count", 2))
+        resolved = inputs.get("input")
+        eval_ctx = {"input": resolved, "inputs": inputs, "_outputs": all_outputs}
         if branch_count > 2:
             try:
-                idx = int(eval(expr, {"__builtins__": {}}, {"input": inputs.get("input")}))
+                idx = int(eval(expr, {"__builtins__": {}}, eval_ctx))
                 idx = max(0, min(idx, branch_count - 1))
             except Exception:
                 idx = 0
             return {"result": idx, "branch": f"branch_{idx}"}
         try:
-            result = bool(eval(expr, {"__builtins__": {}}, {"input": inputs.get("input")}))
+            result = bool(eval(expr, {"__builtins__": {}}, eval_ctx))
         except Exception:
-            result = True
+            result = True if resolved else False
         return {"result": result, "branch": "true" if result else "false"}
     elif origin_type == "switch":
         expr = config.get("expression", "input")
+        resolved = inputs.get("input")
         try:
-            value = eval(expr, {"__builtins__": {}}, {"input": inputs})
+            value = eval(expr, {"__builtins__": {}}, {
+                "input": resolved,
+                "inputs": inputs,
+                "_outputs": all_outputs,
+            })
         except Exception:
-            value = inputs.get("input")
+            value = resolved
         return {"result": value}
     elif origin_type == "loop":
         return await _exec_loop(inputs, config, all_outputs, external_inputs, global_vars, node_map, node_data)
@@ -497,6 +518,24 @@ async def _execute_node(
         return {"value": value}
     elif origin_type == "transform":
         mapping = config.get("mapping", {})
+        expr = config.get("expression", "")
+        if expr:
+            upstream_data = {}
+            for node_out in all_outputs.values():
+                if isinstance(node_out, dict) and "result" in node_out:
+                    upstream_data = node_out
+                    break
+            try:
+                result = eval(expr, {"__builtins__": {"len": len, "str": str, "int": int, "float": float, "list": list, "dict": dict, "range": range, "enumerate": enumerate, "zip": zip, "map": map, "filter": filter, "min": min, "max": max, "sum": sum, "sorted": sorted, "reversed": reversed, "True": True, "False": False, "None": None}}, {
+                    "data": upstream_data,
+                    "input": inputs.get("source", inputs),
+                    "_outputs": all_outputs,
+                })
+                if not isinstance(result, dict):
+                    result = {"result": result}
+                return {"result": result}
+            except Exception as e:
+                return {"result": None, "error": str(e)}
         source = inputs.get("source", {})
         if not isinstance(source, dict):
             source = {}
@@ -517,9 +556,9 @@ async def _execute_node(
             return {"result": re.sub(pattern, replacement, text)}
         elif op == "trim":
             return {"result": text.strip()}
-        elif op == "uppercase":
+        elif op in ("uppercase", "upper"):
             return {"result": text.upper()}
-        elif op == "lowercase":
+        elif op in ("lowercase", "lower"):
             return {"result": text.lower()}
         return {"result": text}
     elif origin_type == "memory-read":
@@ -552,7 +591,7 @@ async def _execute_node(
         results = search_messages(str(query), session_id, int(limit))
         return {"results": results, "count": len(results)}
     elif origin_type == "tool-call":
-        tool_name = inputs.get("tool_name", config.get("tool_name", ""))
+        tool_name = inputs.get("tool_name") or config.get("tool_name", "")
         args = inputs.get("args", config.get("args", {}))
         if not tool_name:
             candidates = [v for v in inputs.values() if isinstance(v, str)]
@@ -596,7 +635,7 @@ async def _execute_node(
         results = parse_tools(str(llm_output))
         return {"tools": results, "count": len(results)}
     elif origin_type == "execute-skill":
-        skill_name = inputs.get("skill_name", config.get("skill_name", ""))
+        skill_name = inputs.get("skill_name") or config.get("skill_name", "")
         params = inputs.get("params", config.get("params", {}))
         content = get_skill_content(str(skill_name))
         if content is None:
@@ -631,6 +670,15 @@ async def _execute_node(
         if volatile:
             assembled += "\n---\n" + volatile + "\n"
         return {"assembled": assembled.strip()}
+    elif origin_type == "approval":
+        message = inputs.get("input", config.get("message", ""))
+        approval_id = f"apr_{hash(str(config)) % 1000000:06d}"
+        global_vars["_pending_approval"] = {
+            "approval_id": approval_id,
+            "message": message,
+            "status": "pending",
+        }
+        raise ValueError(f"APPROVAL_PENDING:{approval_id}:{message}")
     elif origin_type == "trigger":
         user_message = external_inputs.get("message", inputs.get("message", ""))
         return {"message": user_message, "triggered": True}
@@ -672,7 +720,14 @@ async def _execute_node(
             inner_outputs[r["nodeId"]] = r.get("outputs", {})
         return {"outputs": inner_outputs, "success": inner_result.get("success", False)}
     elif origin_type == "input":
-        return {**external_inputs, **inputs}
+        for k, v in inputs.items():
+            if v is None and config.get(k):
+                inputs[k] = config[k]
+            elif v is None and config.get("default_value"):
+                inputs[k] = config["default_value"]
+        if not inputs and config.get("default_value"):
+            inputs["input"] = config["default_value"]
+        return {**inputs, **external_inputs}
     elif origin_type == "output":
         return {"result": inputs.get("input")}
     else:
@@ -772,12 +827,18 @@ async def _exec_llm(
     return {"result": content, "usage": result.get("usage", {})}
 
 
-async def _exec_code(inputs: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
+async def _exec_code(inputs: dict[str, Any], config: dict[str, Any], all_outputs: dict | None = None) -> dict[str, Any]:
     code = config.get("code", "")
     timeout = config.get("timeout", 10000)
+    input_val = inputs.get("input")
+    if input_val is None and all_outputs:
+        for node_out in all_outputs.values():
+            if isinstance(node_out, dict) and "result" in node_out:
+                input_val = node_out["result"]
+                break
     result = await run_code(
         code=code,
-        input_data=inputs,
+        input_data=input_val if input_val is not None else inputs,
         params=inputs.get("params", {}),
         timeout=max(1, min(30, timeout // 1000)),
     )
@@ -788,13 +849,28 @@ async def _exec_code(inputs: dict[str, Any], config: dict[str, Any]) -> dict[str
     }
 
 
-async def _exec_http(inputs: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
-    url = inputs.get("url", config.get("url", ""))
+async def _exec_http(
+    inputs: dict[str, Any],
+    config: dict[str, Any],
+    all_outputs: dict[str, dict[str, Any]] | None = None,
+    external_inputs: dict[str, Any] | None = None,
+    global_vars: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    url = inputs.get("url") or config.get("url", "")
     if not url:
         raise ValueError("URL 为空")
+    if all_outputs and external_inputs and global_vars:
+        url = _smart_template(url, all_outputs, inputs, external_inputs, global_vars)
     method = config.get("method", "GET")
     headers = config.get("headers", {})
     body = config.get("body", inputs.get("body"))
+    if isinstance(body, str):
+        if all_outputs and external_inputs and global_vars:
+            body = _smart_template(body, all_outputs, inputs, external_inputs, global_vars)
+        try:
+            body = json.loads(body)
+        except (json.JSONDecodeError, TypeError):
+            pass
     timeout = config.get("timeout", 10000)
 
     async with httpx.AsyncClient(timeout=timeout / 1000) as client:

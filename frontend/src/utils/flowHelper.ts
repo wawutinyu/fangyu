@@ -75,12 +75,9 @@ export function convertFromExportFormat(exportData: ExportFormat): { nodes: Node
       originType: n.type,
       name: n.name,
       category: n.category,
-      is_group: n.is_group,
-      inner_nodes: n.inner_nodes || [],
-      inner_links: n.inner_links || [],
-      config: n.config || {},
-      mappings: n.mappings || {},
       label: n.name || '',
+      config: n.config || {},
+      ...(n.is_group ? { is_group: true, inner_nodes: n.inner_nodes || [], inner_links: n.inner_links || [], mappings: n.mappings || {} } : {}),
     },
   }))
 

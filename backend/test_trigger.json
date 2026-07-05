@@ -1,0 +1,42 @@
+﻿{
+  "nodes": [
+    {
+      "id": "n1",
+      "data": {
+        "originType": "trigger",
+        "config": {},
+        "label": "Trigger"
+      },
+      "position": { "x": 60, "y": 220 }
+    },
+    {
+      "id": "n2",
+      "data": {
+        "originType": "llm",
+        "config": {
+          "model": "deepseek-v4-flash",
+          "system_prompt": "处理收到的消息",
+          "temperature": 0.5,
+          "max_tokens": 512
+        },
+        "label": "LLM"
+      },
+      "position": { "x": 340, "y": 220 }
+    },
+    {
+      "id": "n3",
+      "data": {
+        "originType": "output",
+        "config": {},
+        "label": "Output"
+      },
+      "position": { "x": 620, "y": 220 }
+    }
+  ],
+  "edges": [
+    { "id": "e12", "source": "n1", "target": "n2", "type": "flow-edge", "data": { "linkType": "serial", "mappings": {} } },
+    { "id": "e23", "source": "n2", "target": "n3", "type": "flow-edge", "data": { "linkType": "serial", "mappings": {} } }
+  ],
+  "external_inputs": {},
+  "global_vars": {}
+}
