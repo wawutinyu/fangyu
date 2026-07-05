@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useAppSelector, useAppDispatch } from '../store/hooks'
-import { updateAgentCard, updateAgentNode } from '../store/agentSlice'
-import type { AgentSkill, TrustPolicy } from '../utils/a2aProtocol'
+import { updateAgentCard, updateAgentNode, updateRoutingRules } from '../store/agentSlice'
+import type { AgentSkill, RoutingRule } from '../utils/a2aProtocol'
 
 export default function AgentConfigPanel() {
   const dispatch = useAppDispatch()
@@ -9,12 +9,17 @@ export default function AgentConfigPanel() {
   const selectedId = useAppSelector(s => s.agent.selectedNodeId)
 
   const node = useMemo(() => nodes.find(n => n.id === selectedId), [nodes, selectedId])
-  const [tab, setTab] = useState<'card' | 'trust' | 'transport' | 'task' | 'ext'>('card')
+  const isRouter = node?.type === 'a2a-router'
+  const [tab, setTab] = useState<'card' | 'trust' | 'transport' | 'task' | 'ext' | 'router'>('card')
+  const [newRuleSkill, setNewRuleSkill] = useState('')
+  const [newRuleTarget, setNewRuleTarget] = useState('')
+  const [newRuleCondition, setNewRuleCondition] = useState('')
+  const [newRulePriority, setNewRulePriority] = useState(0)
 
   if (!node) {
     return (
       <div style={{ width: 320, borderLeft: '1px solid #eee', padding: 16, fontSize: 13, color: '#999' }}>
-        选中一个智能体节点以查看配置
+        选中一个节点以查看配置
       </div>
     )
   }
@@ -46,29 +51,94 @@ export default function AgentConfigPanel() {
     const skills = [...card.skills]; skills[idx] = { ...skills[idx], ...patch }; updateCard({ skills })
   }
 
-  const tabs = [
-    { key: 'card' as const, label: 'AgentCard' },
-    { key: 'trust' as const, label: 'ATP 可信' },
-    { key: 'transport' as const, label: '传输' },
-    { key: 'task' as const, label: 'Task' },
-    { key: 'ext' as const, label: '扩展' },
-  ]
+  const addRoutingRule = () => {
+    if (!newRuleSkill || !newRuleTarget) return
+    const rule: RoutingRule = {
+      id: `rule_${Date.now()}`,
+      sourceSkill: newRuleSkill,
+      targetAgentId: newRuleTarget,
+      condition: newRuleCondition || undefined,
+      priority: newRulePriority,
+    }
+    dispatch(updateRoutingRules({
+      nodeId: node.id,
+      rules: [...(node.routingRules || []), rule],
+      defaultTarget: node.defaultTarget,
+    }))
+    setNewRuleSkill(''); setNewRuleTarget(''); setNewRuleCondition(''); setNewRulePriority(0)
+  }
+
+  const removeRoutingRule = (idx: number) => {
+    const rules = [...(node.routingRules || [])]; rules.splice(idx, 1)
+    dispatch(updateRoutingRules({ nodeId: node.id, rules, defaultTarget: node.defaultTarget }))
+  }
+
+  const getAgentOptions = () => {
+    return nodes.filter(n => n.type === 'a2a-agent' && n.id !== node.id)
+      .map(n => ({ id: n.id, label: n.label }))
+  }
+
+  const tabs = isRouter
+    ? [{ key: 'router' as const, label: '路由规则' }]
+    : [
+        { key: 'card' as const, label: 'AgentCard' },
+        { key: 'trust' as const, label: 'ATP 可信' },
+        { key: 'transport' as const, label: '传输' },
+        { key: 'task' as const, label: 'Task' },
+        { key: 'ext' as const, label: '扩展' },
+      ]
 
   return (
     <div style={{ width: 380, borderLeft: '1px solid #eee', display: 'flex', flexDirection: 'column', height: '100%', fontSize: 13 }}>
-      {/* Tab bar */}
       <div style={{ display: 'flex', borderBottom: '1px solid #eee' }}>
         {tabs.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)} style={{
-            flex: 1, padding: '8px 0', border: 'none', background: tab === t.key ? '#f0f0ff' : 'transparent',
-            color: tab === t.key ? '#722ed1' : '#888', fontWeight: tab === t.key ? 600 : 400,
-            cursor: 'pointer', fontSize: 11, borderBottom: tab === t.key ? '2px solid #722ed1' : '2px solid transparent',
+            flex: 1, padding: '8px 0', border: 'none', background: tab === t.key ? '#fff7e6' : 'transparent',
+            color: tab === t.key ? '#fa8c16' : '#888', fontWeight: tab === t.key ? 600 : 400,
+            cursor: 'pointer', fontSize: 11, borderBottom: tab === t.key ? '2px solid #fa8c16' : '2px solid transparent',
           }}>{t.label}</button>
         ))}
       </div>
 
-      {/* Content */}
       <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
+        {isRouter && tab === 'router' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <Field label="默认目标 Agent">
+              <select value={node.defaultTarget || ''} onChange={e => dispatch(updateRoutingRules({ nodeId: node.id, rules: node.routingRules || [], defaultTarget: e.target.value }))}>
+                <option value="">无（路由失败则报错）</option>
+                {getAgentOptions().map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+              </select>
+            </Field>
+
+            <div style={{ fontWeight: 600, fontSize: 12, marginTop: 8 }}>路由规则 ({node.routingRules?.length || 0})</div>
+            {(node.routingRules || []).map((r, i) => (
+              <div key={r.id} style={{ background: '#fff7e6', borderRadius: 6, padding: 8, position: 'relative' }}>
+                <button onClick={() => removeRoutingRule(i)} style={{ position: 'absolute', top: 4, right: 4, border: 'none', background: 'none', color: '#e00', cursor: 'pointer', fontSize: 12 }}>✕</button>
+                <Field label="来源技能">{r.sourceSkill}</Field>
+                <Field label="目标 Agent">
+                  {nodes.find(n => n.id === r.targetAgentId)?.label || r.targetAgentId}
+                </Field>
+                {r.condition && <Field label="条件">{r.condition}</Field>}
+                <Field label="优先级">{r.priority}</Field>
+              </div>
+            ))}
+
+            <div style={{ borderTop: '1px solid #eee', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ fontSize: 11, color: '#888' }}>添加规则</div>
+              <Field label="来源 Skill ID"><input value={newRuleSkill} onChange={e => setNewRuleSkill(e.target.value)} placeholder="如 web-search" /></Field>
+              <Field label="目标 Agent">
+                <select value={newRuleTarget} onChange={e => setNewRuleTarget(e.target.value)}>
+                  <option value="">选择...</option>
+                  {getAgentOptions().map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                </select>
+              </Field>
+              <Field label="条件（可选）"><input value={newRuleCondition} onChange={e => setNewRuleCondition(e.target.value)} placeholder="如 urgent" /></Field>
+              <Field label="优先级"><input type="number" value={newRulePriority} onChange={e => setNewRulePriority(parseInt(e.target.value) || 0)} /></Field>
+              <button onClick={addRoutingRule} style={{ padding: '4px 12px', border: '1px dashed #fa8c16', borderRadius: 6, background: 'transparent', color: '#fa8c16', cursor: 'pointer', fontSize: 12 }}>+ 添加规则</button>
+            </div>
+          </div>
+        )}
+
         {tab === 'card' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <Field label="名称"><input value={card.name} onChange={e => updateCard({ name: e.target.value })} /></Field>

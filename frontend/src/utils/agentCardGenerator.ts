@@ -17,7 +17,7 @@ export function generateAgentPythonFiles(agents: { id: string; card: AgentCard }
     'from a2a.registry import AgentRegistry',
     'from a2a.protocol import AgentCard, AgentCapabilities, AgentSkill, AgentInterface',
   ]
-  agents.forEach(({ id, card }, i) => {
+  agents.forEach(({ card }, i) => {
     const snake = toSnake(card.name, `agent_${i}`)
     initLines.push(`from .agent_${snake} import create_agent as create_${snake}`)
   })

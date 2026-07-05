@@ -7,6 +7,7 @@ import FlowCanvas, { type FlowCanvasHandle } from './FlowCanvas'
 import ConfigPanel from './ConfigPanel'
 import AgentCanvas from './AgentCanvas'
 import AgentConfigPanel from './AgentConfigPanel'
+import ExportDialog from './ExportDialog'
 import BottomPanel from './BottomPanel'
 import SaveHistory from './SaveHistory'
 import SettingsPanel from './SettingsPanel'
@@ -15,7 +16,6 @@ import { toggleSettings, fetchSettings } from '../store/settingsSlice'
 import { openFlowConfig } from '../store/flowSlice'
 import { toggleHistory, saveFlowApi, fetchAllProjects, createProjectApi } from '../store/saveSlice'
 import { convertToExportFormat } from '../utils/flowHelper'
-import { downloadFlowExport } from '../utils/exportFlow'
 
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -48,6 +48,9 @@ export default function App() {
   const [exportCodeVisible, setExportCodeVisible] = useState(false)
   const [exportedCode, setExportedCode] = useState('')
   const [compiling, setCompiling] = useState(false)
+  const [exportDialogVisible, setExportDialogVisible] = useState(false)
+  const [exportNodes, setExportNodes] = useState<any[]>([])
+  const [exportEdges, setExportEdges] = useState<any[]>([])
   const [view, setView] = useState<'flow' | 'agent'>('flow')
 
   const handleExportCode = useCallback(() => {
@@ -469,7 +472,7 @@ export default function App() {
     e.target.value = ''
   }, [])
 
-  const handleExportBundle = useCallback(async () => {
+  const handleExportBundle = useCallback(() => {
     const handle = flowCanvasRef.current
     if (!handle) return
     const { nodes, edges } = handle.getNodesAndEdges()
@@ -477,14 +480,9 @@ export default function App() {
       alert('Flow 画布为空，请先添加节点')
       return
     }
-    const agentNodes = store.getState().agent.nodes
-    try {
-      await downloadFlowExport(nodes, edges, { desktopGUI: true, enableA2A: agentNodes.length > 0 }, '', () => setCompiling(true), agentNodes.length > 0 ? agentNodes : undefined)
-    } catch (e: any) {
-      alert(`导出失败: ${e.message}`)
-    } finally {
-      setCompiling(false)
-    }
+    setExportNodes(nodes)
+    setExportEdges(edges)
+    setExportDialogVisible(true)
   }, [])
 
   const handleExportFlow = useCallback(() => {
@@ -640,6 +638,15 @@ export default function App() {
           <AgentCanvas />
           <AgentConfigPanel />
         </div>
+      )}
+      {exportDialogVisible && (
+        <ExportDialog
+          nodes={exportNodes}
+          edges={exportEdges}
+          onClose={() => setExportDialogVisible(false)}
+          onCompileStart={() => setCompiling(true)}
+          onCompileEnd={() => setCompiling(false)}
+        />
       )}
       {exportCodeVisible && createPortal(
         <div style={{

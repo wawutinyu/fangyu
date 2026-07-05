@@ -518,7 +518,7 @@ if __name__ == "__main__":
 }
 
 /** 生成完整 a2a/ 模块树 */
-export function generateA2AModules(a2aEnabled: boolean): A2AModuleFile[] {
+export function generateA2AModules(_a2aEnabled: boolean): A2AModuleFile[] {
   return [
     { filename: 'a2a/__init__.py', content: A2A_INIT },
     { filename: 'a2a/protocol.py', content: A2A_PROTOCOL },

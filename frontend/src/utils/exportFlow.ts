@@ -1,7 +1,7 @@
 import type { Node, Edge } from 'reactflow'
 import { generatePythonCode, type GenerateOptions } from './codeGenerator'
-import { generateA2AModules, generateMainPy, generateRouterAgentFile, type A2AModuleFile } from './agentCodeGenerator'
-import { generateAgentPythonFiles, type AgentPythonFile } from './agentCardGenerator'
+import { generateA2AModules, generateMainPy, generateRouterAgentFile } from './agentCodeGenerator'
+import { generateAgentPythonFiles } from './agentCardGenerator'
 import type { AgentCanvasNode } from '../store/agentSlice'
 
 export interface FlowExportBundle {
@@ -107,7 +107,7 @@ echo 双击 dist\\flow_export.exe 即可运行。
 pause
 `
 
-const BUILD_SH_TEMPLATE = `#!/usr/bin/env bash
+const _BUILD_SH_TEMPLATE = `#!/usr/bin/env bash
 set -e
 echo "========================================"
 echo " AI Flow Canvas — Build Executable"
