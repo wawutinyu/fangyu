@@ -42,8 +42,11 @@ jobs:
       - name: E2E tests
         run: npx playwright test
 
-  python:
+  python-a2a:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
 
     steps:
       - uses: actions/checkout@v4
@@ -56,3 +59,30 @@ jobs:
 
       - name: Python A2A/ATP runtime tests
         run: python -m pytest tests/ -v
+
+  backend-api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+
+      - name: Install backend dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install uvicorn httpx
+
+      - name: Start backend server
+        run: |
+          nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 &
+          sleep 3
+
+      - name: Run API integration tests
+        working-directory: ..
+        run: python tests/check_all_features_api.py
