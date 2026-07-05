@@ -385,6 +385,12 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
       setLocalEdges(entry.edges)
       showToast('已重做', 'info')
     },
+    updateNodeData(nodeId: string, data: Record<string, unknown>) {
+      pushHistory()
+      setLocalNodes(prev => prev.map(n =>
+        n.id === nodeId ? { ...n, data: { ...n.data, ...data } } : n,
+      ))
+    },
   }), [nodes, edges, dispatch, setLocalNodes, setLocalEdges, showToast])
 
   const onInit = React.useCallback((instance: ReactFlowInstance) => {

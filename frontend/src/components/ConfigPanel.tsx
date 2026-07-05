@@ -1,9 +1,10 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useAppSelector, useAppDispatch } from '../store/hooks'
 import { updateNodeConfig, updateEdgeConfig, closeConfig, setGlobalPrompts } from '../store/flowSlice'
 import { getNodeMeta } from '../utils/nodeRegistry'
 import CodeEditor from './CodeEditor'
 import SubFlowEditor from './SubFlowEditor'
+import VariableSelector from './VariableSelector'
 
 
 interface Props {
@@ -22,6 +23,7 @@ export default function ConfigPanel({ onUpdateEdge, onUpdateNode, onDeleteNode, 
   const [edgeMappings, setEdgeMappings] = useState<Record<string, string>>({})
   const [edgeLinkType, setEdgeLinkType] = useState('serial')
   const [subFlowOpen, setSubFlowOpen] = useState(false)
+  const cursorPosRef = useRef<Record<string, number>>({})
 
   const selectedNode = useMemo(() => nodes.find(n => n.id === selectedNodeId) || null, [nodes, selectedNodeId])
   const selectedEdge = useMemo(() => edges.find(e => e.id === selectedEdgeId) || null, [edges, selectedEdgeId])
@@ -233,7 +235,22 @@ export default function ConfigPanel({ onUpdateEdge, onUpdateNode, onDeleteNode, 
                 <input className="notion-input" type="number" value={localConfig[field.key] as number ?? ''} onChange={e => setLocalConfig(prev => ({ ...prev, [field.key]: Number(e.target.value) }))} min={field.min} max={field.max} step={field.step} />
               )}
               {(field.type === 'textarea') && (
-                <textarea className="notion-textarea" value={localConfig[field.key] as string || ''} onChange={e => setLocalConfig(prev => ({ ...prev, [field.key]: e.target.value }))} placeholder={field.placeholder as string} rows={field.rows || 3} />
+                <div style={{ display: 'flex', gap: 4, alignItems: 'flex-start' }}>
+                  <textarea className="notion-textarea" value={localConfig[field.key] as string || ''}
+                    onChange={e => setLocalConfig(prev => ({ ...prev, [field.key]: e.target.value }))}
+                    onClick={e => { cursorPosRef.current[field.key] = (e.target as HTMLTextAreaElement).selectionStart }}
+                    onKeyUp={e => { cursorPosRef.current[field.key] = (e.target as HTMLTextAreaElement).selectionStart }}
+                    placeholder={field.placeholder as string} rows={field.rows || 3} style={{ flex: 1 }} />
+                  <VariableSelector value={localConfig[field.key] as string || ''}
+                    onSelect={sel => {
+                      const pos = cursorPosRef.current[field.key]
+                      const val = localConfig[field.key] as string || ''
+                      const newVal = val.slice(0, pos) + sel + val.slice(pos)
+                      setLocalConfig(prev => ({ ...prev, [field.key]: newVal }))
+                      cursorPosRef.current[field.key] = pos! + sel.length
+                    }}
+                    nodeId={selectedNodeId} />
+                </div>
               )}
               {(field.type === 'code') && (
                 <CodeEditor

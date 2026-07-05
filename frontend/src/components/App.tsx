@@ -572,8 +572,8 @@ export default function App() {
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 11, color: '#aaa' }}>v2.0</span>
       </div>
-      {view === 'flow' && (
-        <>
+      {/* 两个画布始终挂载，通过 display 切换 */}
+      <div style={{ display: view === 'flow' ? 'flex' : 'none', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
       <TopToolbar
         onNewFlow={handleNewFlow}
         onSaveFlow={handleSaveFlow}
@@ -631,14 +631,11 @@ export default function App() {
         </div>,
         document.body
       )}
-        </>
-      )}
-      {view === 'agent' && (
-        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-          <AgentCanvas />
-          <AgentConfigPanel />
         </div>
-      )}
+      <div style={{ display: view === 'agent' ? 'flex' : 'none', flex: 1, overflow: 'hidden' }}>
+        <AgentCanvas />
+        <AgentConfigPanel />
+      </div>
       {exportDialogVisible && (
         <ExportDialog
           nodes={exportNodes}

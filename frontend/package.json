@@ -12,7 +12,10 @@
     "electron:build": "vite build && electron-builder",
     "electron:start": "electron .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint ."
   },
   "build": {
     "appId": "ai.fangyu.app",

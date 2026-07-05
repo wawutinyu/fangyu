@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useAppSelector, useAppDispatch } from '../store/hooks'
 import { updateAgentCard, updateAgentNode, updateRoutingRules } from '../store/agentSlice'
 import type { AgentSkill, RoutingRule } from '../utils/a2aProtocol'
@@ -11,6 +11,10 @@ export default function AgentConfigPanel() {
   const node = useMemo(() => nodes.find(n => n.id === selectedId), [nodes, selectedId])
   const isRouter = node?.type === 'a2a-router'
   const [tab, setTab] = useState<'card' | 'trust' | 'transport' | 'task' | 'ext' | 'router'>('card')
+
+  useEffect(() => {
+    if (isRouter) setTab('router')
+  }, [isRouter])
   const [newRuleSkill, setNewRuleSkill] = useState('')
   const [newRuleTarget, setNewRuleTarget] = useState('')
   const [newRuleCondition, setNewRuleCondition] = useState('')
@@ -139,7 +143,7 @@ export default function AgentConfigPanel() {
           </div>
         )}
 
-        {tab === 'card' && (
+        {!isRouter && tab === 'card' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <Field label="名称"><input value={card.name} onChange={e => updateCard({ name: e.target.value })} /></Field>
             <Field label="描述"><textarea value={card.description || ''} onChange={e => updateCard({ description: e.target.value })} rows={2} /></Field>
@@ -166,7 +170,7 @@ export default function AgentConfigPanel() {
           </div>
         )}
 
-        {tab === 'trust' && (
+        {!isRouter && tab === 'trust' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
               <input type="checkbox" checked={trust.enabled} onChange={e => updateNodeData({ trust: { ...trust, enabled: e.target.checked } })} />
@@ -210,7 +214,7 @@ export default function AgentConfigPanel() {
           </div>
         )}
 
-        {tab === 'transport' && (
+        {!isRouter && tab === 'transport' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <Field label="传输协议">
               <select value={card.defaultInterface.type} onChange={e => updateCard({ defaultInterface: { ...card.defaultInterface, type: e.target.value as any } })}>
@@ -228,7 +232,7 @@ export default function AgentConfigPanel() {
           </div>
         )}
 
-        {tab === 'task' && (
+        {!isRouter && tab === 'task' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <Field label="超时 (ms)"><input type="number" value={node.timeout} onChange={e => updateNodeData({ timeout: parseInt(e.target.value) || 30000 })} /></Field>
             <Field label="重试次数"><input type="number" value={node.retryCount} onChange={e => updateNodeData({ retryCount: parseInt(e.target.value) || 0 })} min={0} max={10} /></Field>
@@ -244,7 +248,7 @@ export default function AgentConfigPanel() {
           </div>
         )}
 
-        {tab === 'ext' && (
+        {!isRouter && tab === 'ext' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ fontSize: 12, color: '#888' }}>自定义扩展属性 (key=value)</div>
             {Object.entries(node.extensions).map(([k, v]) => (

@@ -138,8 +138,8 @@ test.describe('Expanded coverage', () => {
     // click save config button
     await page.getByText('保存配置').click()
 
-    // close config panel via X button
-    await page.locator('button[style*="background: none"]').first().click()
+    // close config panel via close button
+    await page.locator('.section-title + button').click()
     await expect(configPanel).not.toBeVisible({ timeout: 3000 })
 
     // verify label changed on node
