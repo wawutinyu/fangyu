@@ -13,6 +13,7 @@ interface Props {
   onUngroupSelected: () => void
   onDeleteSelected: () => void
   onSimulate: () => void
+  onBatchTest: () => void
   onFileSelected: (e: React.ChangeEvent<HTMLInputElement>) => void
   onOpenSettings: () => void
   onLoadDemo: (demoId: string) => void
@@ -105,6 +106,10 @@ export default function TopToolbar(props: Props) {
         <Btn onClick={props.onSimulate} primary title="模拟运行">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           模拟运行
+        </Btn>
+        <Btn onClick={props.onBatchTest} title="批量测试">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          批量测试
         </Btn>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 100, justifyContent: 'flex-end' }}>

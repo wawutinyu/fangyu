@@ -8,6 +8,7 @@ import ConfigPanel from './ConfigPanel'
 import AgentCanvas from './AgentCanvas'
 import AgentConfigPanel from './AgentConfigPanel'
 import ExportDialog from './ExportDialog'
+import BatchRunner from './BatchRunner'
 import BottomPanel from './BottomPanel'
 import SaveHistory from './SaveHistory'
 import SettingsPanel from './SettingsPanel'
@@ -54,6 +55,7 @@ export default function App() {
   const [exportEdges, setExportEdges] = useState<any[]>([])
   const [view, setView] = useState<'flow' | 'agent'>('flow')
   const [dark, setDark] = useState(() => localStorage.getItem('theme-dark') === 'true')
+  const [batchVisible, setBatchVisible] = useState(false)
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : '')
@@ -602,6 +604,7 @@ export default function App() {
         onExportCode={handleExportCode}
         onExportBundle={handleExportBundle}
         onLoadDemo={handleLoadDemo}
+        onBatchTest={() => setBatchVisible(true)}
       />
       <input ref={fileInputRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleFileSelected} />
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
@@ -657,6 +660,7 @@ export default function App() {
           onCompileEnd={() => setCompiling(false)}
         />
       )}
+      <>{batchVisible && <BatchRunner onClose={() => setBatchVisible(false)} />}</>
       {exportCodeVisible && createPortal(
         <div style={{
           position: 'fixed', inset: 0, zIndex: 10000,
