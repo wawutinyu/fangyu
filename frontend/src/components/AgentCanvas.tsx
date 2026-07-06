@@ -3,6 +3,7 @@ import ReactFlow, {
   Background, Controls,
   useNodesState, useEdgesState,
   addEdge, type Connection, type Node,
+  ConnectionMode,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 import AgentNode from './AgentNode'
@@ -178,6 +179,7 @@ export default function AgentCanvas() {
           onPaneClick={onPaneClick}
           onNodeDragStop={onNodeDragStop}
           nodeTypes={nodeTypes}
+          connectionMode={ConnectionMode.Loose}
           fitView
         >
           <Background />

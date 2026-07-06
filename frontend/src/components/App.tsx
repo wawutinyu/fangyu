@@ -54,6 +54,8 @@ export default function App() {
   const [exportNodes, setExportNodes] = useState<any[]>([])
   const [exportEdges, setExportEdges] = useState<any[]>([])
   const [view, setView] = useState<'flow' | 'agent'>('flow')
+  const [libraryCollapsed, setLibraryCollapsed] = useState(false)
+  const [simulating, setSimulating] = useState(false)
   const [dark, setDark] = useState(() => localStorage.getItem('theme-dark') === 'true')
   const [batchVisible, setBatchVisible] = useState(false)
 
@@ -530,8 +532,13 @@ export default function App() {
     flowCanvasRef.current?.deleteEdgeById(id)
   }, [])
 
-  const handleSimulate = useCallback(() => {
-    flowCanvasRef.current?.runSimulation()
+  const handleSimulate = useCallback(async () => {
+    setSimulating(true)
+    try {
+      await flowCanvasRef.current?.runSimulation()
+    } finally {
+      setSimulating(false)
+    }
   }, [])
 
   const handleRestore = useCallback((saveData: unknown) => {
@@ -593,7 +600,7 @@ export default function App() {
         onSaveFlow={handleSaveFlow}
         onShowHistory={handleShowHistory}
         onImportFlow={handleImportClick}
-        onExportFlow={handleExportFlow}
+        onExportFlow={handleExportBundle}
         onGroupSelected={handleGroupSelected}
         onUngroupSelected={handleUngroupSelected}
         onDeleteSelected={handleDeleteSelected}
@@ -601,23 +608,32 @@ export default function App() {
         onFileSelected={handleFileSelected}
         onOpenSettings={handleOpenSettings}
         onOpenFlowConfig={() => store.dispatch(openFlowConfig())}
-        onExportCode={handleExportCode}
-        onExportBundle={handleExportBundle}
         onLoadDemo={handleLoadDemo}
         onBatchTest={() => setBatchVisible(true)}
+        simulating={simulating}
       />
       <input ref={fileInputRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleFileSelected} />
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        <NodeLibrary />
-        <FlowCanvas ref={flowCanvasRef} />
-        <ConfigPanel
+        {libraryCollapsed ? (
+          <button onClick={() => setLibraryCollapsed(false)} style={{ width: 20, border: 'none', borderRight: '1px solid var(--border-color)', background: 'var(--bg-secondary)', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 10, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="展开组件">
+            ▶
+          </button>
+        ) : (
+          <NodeLibrary onCollapse={() => setLibraryCollapsed(true)} />
+        )}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+            <FlowCanvas ref={flowCanvasRef} />
+            <ConfigPanel
           onUpdateEdge={(edgeId, data) => flowCanvasRef.current?.updateEdgeData(edgeId, data)}
           onUpdateNode={(nodeId, data) => flowCanvasRef.current?.updateNodeData(nodeId, data)}
           onDeleteNode={handleDeleteNode}
           onDeleteEdge={handleDeleteEdge}
         />
+          </div>
+          <BottomPanel />
+        </div>
       </div>
-      <BottomPanel />
       <SaveHistory onRestore={handleRestore} />
       <SettingsPanel />
       {compiling && createPortal(

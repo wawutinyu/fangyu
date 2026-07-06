@@ -1,7 +1,11 @@
 import React, { useCallback, useState } from 'react'
 import { NODE_CATEGORIES } from '../utils/nodeRegistry'
 
-export default function NodeLibrary() {
+interface Props {
+  onCollapse?: () => void
+}
+
+export default function NodeLibrary({ onCollapse }: Props) {
   const [searchQuery, setSearchQuery] = useState('')
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
@@ -39,7 +43,15 @@ export default function NodeLibrary() {
       flexDirection: 'column',
       overflow: 'hidden',
     }}>
-      <div style={{ padding: '8px 10px 4px', borderBottom: '1px solid var(--border-light)' }}>
+      <div style={{ padding: '8px 10px 4px', borderBottom: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: 4 }}>
+        <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.3px' }}>组件</span>
+        {onCollapse && (
+          <button onClick={onCollapse} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, borderRadius: 4, color: 'var(--text-muted)', fontSize: 14, lineHeight: 1 }}>
+            ◀
+          </button>
+        )}
+      </div>
+      <div style={{ padding: '0 10px' }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',

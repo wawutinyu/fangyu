@@ -28,7 +28,7 @@ export default function AgentConfigPanel() {
     const srcNode = nodes.find(n => n.id === edge.source)
     const tgtNode = nodes.find(n => n.id === edge.target)
     return (
-      <div style={{ width: 320, borderLeft: '1px solid var(--border-color)', padding: 16, fontSize: 13, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ width: 260, borderLeft: '1px solid var(--border-color)', padding: 12, fontSize: 13, display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ fontWeight: 600, fontSize: 14 }}>连线配置</div>
         <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
           {srcNode?.label || edge.source} → {tgtNode?.label || edge.target}
@@ -43,7 +43,7 @@ export default function AgentConfigPanel() {
 
   if (!node) {
     return (
-      <div style={{ width: 320, borderLeft: '1px solid var(--border-color)', padding: 16, fontSize: 13, color: 'var(--text-muted)' }}>
+      <div style={{ width: 260, borderLeft: '1px solid var(--border-color)', padding: 12, fontSize: 13, color: 'var(--text-muted)' }}>
         选中一个节点或连线以查看配置
       </div>
     )
@@ -114,7 +114,7 @@ export default function AgentConfigPanel() {
       ]
 
   return (
-    <div style={{ width: 380, borderLeft: '1px solid #eee', display: 'flex', flexDirection: 'column', height: '100%', fontSize: 13 }}>
+    <div style={{ width: 300, borderLeft: '1px solid #eee', display: 'flex', flexDirection: 'column', height: '100%', fontSize: 13 }}>
       <div style={{ display: 'flex', borderBottom: '1px solid #eee' }}>
         {tabs.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)} style={{
