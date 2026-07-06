@@ -2,6 +2,10 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import ChatInterface from './ChatInterface'
 import RunHistory from './RunHistory'
 import TriggerPanel from './TriggerPanel'
+import MonitorPanel from './MonitorPanel'
+import KnowledgePanel from './KnowledgePanel'
+import ToolRegistry from './ToolRegistry'
+import SkillManager from './SkillManager'
 
 const TABS = [
   { key: 'chat', label: '运行预览', icon: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' },
@@ -15,6 +19,7 @@ const TABS = [
 
 export default function BottomPanel() {
   const [activeTab, setActiveTab] = useState('chat')
+  const [collapsed, setCollapsed] = useState(false)
   const [height, setHeight] = useState(300)
   const resizingRef = useRef(false)
   const startYRef = useRef(0)
@@ -85,7 +90,7 @@ export default function BottomPanel() {
         {TABS.map(tab => (
           <button
             key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => { setActiveTab(tab.key); if (collapsed) setCollapsed(false) }}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -109,18 +114,24 @@ export default function BottomPanel() {
             {tab.label}
           </button>
         ))}
+        <div style={{ flex: 1 }} />
+        <button onClick={() => setCollapsed(v => !v)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 10px', color: 'var(--text-muted)', fontSize: 11 }}>
+          {collapsed ? '▲ 展开' : '▼ 收起'}
+        </button>
       </div>
 
       {/* tab content */}
-      <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
-        {activeTab === 'chat' && <ChatInterface headerless />}
-        {activeTab === 'history' && <RunHistory />}
-        {activeTab === 'trigger' && <TriggerPanel />}
-        {activeTab === 'monitor' && <MonitorPanel headerless />}
-        {activeTab === 'knowledge' && <KnowledgePanel headerless />}
-        {activeTab === 'tools' && <ToolRegistry headerless />}
-        {activeTab === 'skills' && <SkillManager headerless />}
-      </div>
+      {!collapsed && (
+        <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
+          {activeTab === 'chat' && <ChatInterface headerless />}
+          {activeTab === 'history' && <RunHistory />}
+          {activeTab === 'trigger' && <TriggerPanel />}
+          {activeTab === 'monitor' && <MonitorPanel headerless />}
+          {activeTab === 'knowledge' && <KnowledgePanel headerless />}
+          {activeTab === 'tools' && <ToolRegistry headerless />}
+          {activeTab === 'skills' && <SkillManager headerless />}
+        </div>
+      )}
     </div>
   )
 }

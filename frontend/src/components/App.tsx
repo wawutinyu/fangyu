@@ -406,6 +406,20 @@ export default function App() {
   useEffect(() => {
     fetchSettings(store.dispatch)
     fetchAllProjects(store.dispatch)
+    // 首次加载时，如果画布为空则添加默认输入节点
+    setTimeout(() => {
+      const handle = flowCanvasRef.current
+      if (handle) {
+        const { nodes } = handle.getNodesAndEdges()
+        if (nodes.length === 0) {
+          handle.importFlow({
+            flow_id: '', flow_name: '',
+            nodes: [{ id: 'input_default', type: 'input', name: '输入', category: '流程控制', config: { default_value: '' }, position: { x: 300, y: 180 } }],
+            links: [], global_meta: { session_id: '', user_id: '' },
+          })
+        }
+      }
+    }, 100)
   }, [])
 
   const handleNewFlow = useCallback(() => {

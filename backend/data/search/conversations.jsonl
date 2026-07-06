@@ -71,3 +71,7 @@
 {"session_id": "default", "role": "user", "content": "你好", "timestamp": "2026-07-06T14:06:12.876831"}
 {"session_id": "default", "role": "user", "content": "你好", "timestamp": "2026-07-06T14:09:32.005378"}
 {"session_id": "default", "role": "assistant", "content": "[\n  {\n    \"name\": \"可视化拖拽编辑\",\n    \"desc\": \"支持通过拖拽方式快速添加、连接和配置AI处理节点，直观构建复杂流程逻辑，无需编写代码。\"\n  },\n  {\n    \"name\": \"AI模型集成与调用\",\n    \"desc\": \"内置主流大语言模型（如GPT、Claude）及多模态模型接口，支持一键配置参数、Prompt模板及输出解析，实现智能决策与内容生成。\"\n  },\n  {\n    \"name\": \"条件分支与循环控制\",\n    \"desc\": \"提供基于规则、变量或模型输出的条件分支节点，以及循环、并行等流程控制能力，灵活应对动态业务场景。\"\n  }\n]", "timestamp": "2026-07-06T14:09:32.037149"}
+{"session_id": "default", "role": "user", "content": "你好", "timestamp": "2026-07-06T15:50:56.316326"}
+{"session_id": "default", "role": "assistant", "content": "你好！我是 Hermes，一个能调用工具帮你干活的 AI 智能体。有什么需要我协助的吗？", "timestamp": "2026-07-06T15:50:56.318095"}
+{"session_id": "default", "role": "assistant", "content": "你好！我是 Hermes，一个能调用工具帮你干活的 AI 智能体。有什么需要我协助的吗？", "timestamp": "2026-07-06T15:50:57.539070"}
+{"session_id": "default", "role": "user", "content": "你好", "timestamp": "2026-07-06T15:50:57.553243"}
