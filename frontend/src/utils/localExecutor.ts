@@ -60,8 +60,15 @@ export async function runLocalFlow(
 
     const config = originType === 'input' ? rawConfig : pool.resolveInObject(rawConfig)
 
+    // Collect input data from upstream nodes
+    const upstreamEdges = edges.filter(e => e.target === nodeId)
+    const inputData: Record<string, unknown> = {}
+    for (const edge of upstreamEdges) {
+      const srcOutput = outputs.get(edge.source)
+      if (srcOutput) Object.assign(inputData, srcOutput)
+    }
+
     onProgress(nodeId, 'running')
-    await sleep(100)
 
     // Breakpoint pause
     if (breakpoints?.includes(nodeId)) {
@@ -112,7 +119,7 @@ export async function runLocalFlow(
         }
         outputs.set(nodeId, { input: response?.value ?? config.default_value ?? '' })
       } else {
-        const output = await simulateNode(originType, config)
+        const output = await simulateNode(originType, config, inputData)
         outputs.set(nodeId, output)
       }
 
@@ -141,18 +148,76 @@ export async function runLocalFlow(
 async function simulateNode(
   originType: string,
   config: Record<string, unknown>,
+  inputData: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  await sleep(50)
   switch (originType) {
-    case 'llm':
-      return { result: `[模拟] ${config.model || 'LLM'} 输出`, usage: { total_tokens: 50 } }
-    case 'condition':
-      return { true: true, false: false }
+    case 'condition': {
+      const expr = (config.expression as string) || 'true'
+      try {
+        const keys = Object.keys(inputData)
+        const vals = Object.values(inputData)
+        const fn = new Function(...keys, `return Boolean(${expr})`)
+        const result = fn(...vals)
+        return { result, true: result, false: !result }
+      } catch {
+        return { result: false, error: 'condition eval failed' }
+      }
+    }
+    case 'code': {
+      const code = (config.code as string) || 'return input'
+      try {
+        const fn = new Function('input', code)
+        const result = fn(inputData)
+        return { result }
+      } catch (err) {
+        return { error: String(err) }
+      }
+    }
+    case 'http': {
+      const url = (config.url as string) || ''
+      const method = (config.method as string) || 'GET'
+      const body = config.body ? JSON.parse(config.body as string) : undefined
+      try {
+        const opts: RequestInit = { method }
+        if (body) { opts.body = JSON.stringify(body); opts.headers = { 'Content-Type': 'application/json' } }
+        const res = await fetch(url, opts)
+        const text = await res.text()
+        return { status: res.status, body: text }
+      } catch (err) {
+        return { error: String(err) }
+      }
+    }
+    case 'llm': {
+      const prompt = (config.prompt as string) || (inputData as Record<string, unknown>)?.input || ''
+      const model = (config.model as string) || 'default'
+      const systemPrompt = (config.system_prompt as string) || ''
+      try {
+        const body = JSON.stringify({ model, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: String(prompt) }], temperature: config.temperature ?? 0.7, max_tokens: config.max_tokens ?? 1024 })
+        const res = await fetch('/api/v1/llm/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
+        if (res.ok) {
+          const data = await res.json()
+          return { result: data.content || data.message?.content || JSON.stringify(data), usage: data.usage || {} }
+        }
+      } catch { /* fallback to echo */ }
+      return { result: `[echo] ${prompt}`, usage: { total_tokens: 0 } }
+    }
+    case 'json-parse': {
+      const input = typeof inputData === 'string' ? inputData : JSON.stringify(inputData)
+      try { return { result: JSON.parse(input) } }
+      catch { return { result: inputData, error: 'invalid json' } }
+    }
+    case 'transform': {
+      const expr = (config.expression as string) || ''
+      if (!expr) return { result: inputData }
+      try {
+        const fn = new Function('data', `return (${expr})`)
+        const result = fn(inputData)
+        return { result }
+      } catch (err) {
+        return { error: String(err) }
+      }
+    }
     default:
-      return { result: `[模拟] ${originType} 已执行` }
+      return { result: `[${originType}] executed` }
   }
-}
-
-function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms))
 }

@@ -93,7 +93,7 @@ describe('runLocalFlow', () => {
     expect(result.success).toBe(true)
     const llmResult = result.results.find(r => r.nodeId === 'llm')
     expect(llmResult).toBeDefined()
-    expect(llmResult!.output?.result).toContain('[模拟]')
+    expect(llmResult!.output?.result).toContain('test')
   })
 
   it('resolves {{in.input}} in downstream config', async () => {
