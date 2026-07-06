@@ -26,6 +26,7 @@ import { generateId, convertFromExportFormat, convertToExportFormat } from '../u
 import { Executor } from '../utils/executor'
 import { runLocalFlow, type PendingInteraction } from '../utils/localExecutor'
 import { generatePythonCode } from '../utils/codeGenerator'
+import { saveRunRecord } from './RunHistory'
 
 const nodeTypes = {
   'atom-node': AtomNode,
@@ -194,7 +195,16 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
       })
       setSimProgress(100)
       setPendingInteraction(null)
-      showResults(result.results.map(r => ({ nodeId: r.nodeId, nodeName: r.nodeName, output: r.output || {} })))
+      const results = result.results.map(r => ({ nodeId: r.nodeId, nodeName: r.nodeName, output: r.output || {} }))
+      showResults(results)
+      saveRunRecord({
+        id: `run_${Date.now()}`,
+        time: Date.now(),
+        success: result.success,
+        nodeCount: result.results.length,
+        results: results.map(r => ({ nodeName: r.nodeName, output: r.output })),
+        error: result.error,
+      })
       if (result.success) {
         showToast(`运行完成，${result.results.length} 个节点已执行`, 'success')
       } else {
