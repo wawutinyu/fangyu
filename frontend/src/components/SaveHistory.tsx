@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { store } from '../store'
 import { useAppSelector } from '../store/hooks'
 import { switchProject, toggleHistory, saveFlowApi, deleteSaveApi, createProjectApi } from '../store/saveSlice'
@@ -13,6 +13,7 @@ interface SaveHistoryProps {
 export default function SaveHistory({ onRestore }: SaveHistoryProps) {
   const { projects, currentProjectId, historyVisible } = useAppSelector(s => s.saves)
   const currentProject = useMemo(() => projects.find(p => p.id === currentProjectId), [projects, currentProjectId])
+  const [diffIds, setDiffIds] = useState<string[]>([])
 
   const savesByDate = useMemo(() => {
     if (!currentProject) return []
@@ -24,6 +25,25 @@ export default function SaveHistory({ onRestore }: SaveHistoryProps) {
     }
     return Object.entries(map).map(([date, items]) => ({ date, items }))
   }, [currentProject])
+
+  const toggleDiff = (id: string) => {
+    setDiffIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : (prev.length < 2 ? [...prev, id] : [id])
+    )
+  }
+
+  const diffResult = useMemo(() => {
+    if (diffIds.length < 2 || !currentProject) return null
+    const a = currentProject.saves.find(s => s.id === diffIds[0])
+    const b = currentProject.saves.find(s => s.id === diffIds[1])
+    if (!a || !b) return null
+    const aNodes = new Set(((a.data as any)?.nodes || []).map((n: any) => n.id))
+    const bNodes = new Set(((b.data as any)?.nodes || []).map((n: any) => n.id))
+    const added = ((b.data as any)?.nodes || []).filter((n: any) => !aNodes.has(n.id))
+    const removed = ((a.data as any)?.nodes || []).filter((n: any) => !bNodes.has(n.id))
+    const common = ((a.data as any)?.nodes || []).filter((n: any) => bNodes.has(n.id))
+    return { aName: a.name, bName: b.name, added, removed, totalA: aNodes.size, totalB: bNodes.size, common: common.length }
+  }, [diffIds, currentProject])
 
   if (!historyVisible) return null
 
@@ -66,13 +86,36 @@ export default function SaveHistory({ onRestore }: SaveHistoryProps) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.2)', zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}
       onClick={e => { if (e.target === e.currentTarget) store.dispatch(toggleHistory()) }}>
-      <div style={{ width: 340, height: '100%', background: 'var(--bg-primary)', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ width: 380, height: '100%', background: 'var(--bg-primary)', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid var(--border-color)' }}>
           <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>项目与保存历史</span>
           <button style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', borderRadius: 4, cursor: 'pointer', color: 'var(--text-muted)' }}
             onClick={() => store.dispatch(toggleHistory())}
           ><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
         </div>
+
+        {diffResult && (
+          <div style={{ padding: '10px 16px', borderBottom: '1px solid #eee', background: '#f9f9ff', fontSize: 12 }}>
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>版本对比</div>
+            <div style={{ color: '#888', marginBottom: 4 }}>
+              {diffResult.aName} → {diffResult.bName}
+            </div>
+            <div style={{ display: 'flex', gap: 12, marginBottom: 6 }}>
+              <span style={{ color: '#52c41a' }}>+{diffResult.added.length} 新增</span>
+              <span style={{ color: '#ff4d4f' }}>-{diffResult.removed.length} 删除</span>
+              <span style={{ color: '#888' }}>={diffResult.common} 不变</span>
+            </div>
+            {diffResult.added.length > 0 && (
+              <div style={{ marginBottom: 4 }}><span style={{ color: '#52c41a' }}>新增:</span> {diffResult.added.map((n: any) => n.name || n.id).join(', ')}</div>
+            )}
+            {diffResult.removed.length > 0 && (
+              <div><span style={{ color: '#ff4d4f' }}>删除:</span> {diffResult.removed.map((n: any) => n.name || n.id).join(', ')}</div>
+            )}
+            <button style={{ marginTop: 6, fontSize: 11, color: '#666', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+              onClick={() => setDiffIds([])}>关闭对比</button>
+          </div>
+        )}
+
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>项目</span>
@@ -97,6 +140,7 @@ export default function SaveHistory({ onRestore }: SaveHistoryProps) {
             <button className="notion-btn" style={{ fontSize: 11, padding: '2px 8px', background: '#37352f', color: '#fff', borderColor: '#37352f', fontWeight: 500 }}
               onClick={handleSaveNow}>保存当前</button>
           </div>
+          {diffIds.length > 0 && <div style={{ fontSize: 11, color: '#722ed1', marginBottom: 4 }}>选择两个版本进行对比（已选 {diffIds.length}/2）</div>}
           {!currentProject && <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, padding: '30px 0' }}>请先创建一个项目</div>}
           {currentProject && savesByDate.length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, padding: '30px 0' }}>暂无保存记录</div>}
           {savesByDate.map(g => (
@@ -104,6 +148,8 @@ export default function SaveHistory({ onRestore }: SaveHistoryProps) {
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', padding: '4px 0' }}>{g.date}</div>
               {g.items.map(s => (
                 <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: 8, borderRadius: 6, marginBottom: 4 }}>
+                  <input type="checkbox" checked={diffIds.includes(s.id)} onChange={() => toggleDiff(s.id)}
+                    style={{ cursor: 'pointer' }} />
                   <div style={{ flex: 1, cursor: 'pointer', minWidth: 0 }} onClick={() => handleRestoreSave(s.data)}>
                     <span style={{ display: 'block', fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</span>
                     <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(s.time).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>

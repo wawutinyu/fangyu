@@ -1,10 +1,12 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import ChatInterface from './ChatInterface'
 import RunHistory from './RunHistory'
+import TriggerPanel from './TriggerPanel'
 
 const TABS = [
   { key: 'chat', label: '运行预览', icon: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' },
   { key: 'history', label: '运行历史', icon: 'M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z' },
+  { key: 'trigger', label: '调度', icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-2-3.5l6-4.5-6-4.5v9z' },
   { key: 'monitor', label: '执行日志', icon: 'M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z' },
   { key: 'knowledge', label: '知识库', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M12 18v-6M9 15h6' },
   { key: 'tools', label: '工具', icon: 'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z' },
@@ -113,6 +115,7 @@ export default function BottomPanel() {
       <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
         {activeTab === 'chat' && <ChatInterface headerless />}
         {activeTab === 'history' && <RunHistory />}
+        {activeTab === 'trigger' && <TriggerPanel />}
         {activeTab === 'monitor' && <MonitorPanel headerless />}
         {activeTab === 'knowledge' && <KnowledgePanel headerless />}
         {activeTab === 'tools' && <ToolRegistry headerless />}

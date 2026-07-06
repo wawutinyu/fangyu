@@ -16,7 +16,7 @@ interface Props {
 
 export default function ConfigPanel({ onUpdateEdge, onUpdateNode, onDeleteNode, onDeleteEdge }: Props) {
   const dispatch = useAppDispatch()
-  const { selectedNodeId, selectedEdgeId, configPanelVisible, edgeConfigPanelVisible, flowConfigVisible, nodes, edges, globalPrompts } = useAppSelector(s => s.flow)
+  const { selectedNodeId, selectedEdgeId, configPanelVisible, edgeConfigPanelVisible, flowConfigVisible, nodes, edges, globalPrompts, breakpoints } = useAppSelector(s => s.flow)
   const [localConfig, setLocalConfig] = useState<Record<string, unknown>>({})
   const [nodeLabel, setNodeLabel] = useState('')
   const [nodeDesc, setNodeDesc] = useState('')
@@ -310,9 +310,9 @@ export default function ConfigPanel({ onUpdateEdge, onUpdateNode, onDeleteNode, 
           <button style={{ marginTop: 6, width: '100%', justifyContent: 'center', fontSize: 12, color: '#ff4d4f', border: '1px solid #ffccc7', borderRadius: 6, padding: '6px 12px', background: '#fff2f0', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
             onClick={() => { dispatch(closeConfig()); onDeleteNode?.(selectedNode.id) }}
           ><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>删除此节点</button>
-          <button style={{ marginTop: 4, width: '100%', justifyContent: 'center', fontSize: 12, color: useAppSelector(s => s.flow.breakpoints).includes(selectedNode.id) ? '#722ed1' : '#888', border: useAppSelector(s => s.flow.breakpoints).includes(selectedNode.id) ? '1px solid #d3adf7' : '1px solid #e8e8e8', borderRadius: 6, padding: '6px 12px', background: useAppSelector(s => s.flow.breakpoints).includes(selectedNode.id) ? '#f9f0ff' : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+          <button style={{ marginTop: 4, width: '100%', justifyContent: 'center', fontSize: 12, color: breakpoints.includes(selectedNode.id) ? '#722ed1' : '#888', border: breakpoints.includes(selectedNode.id) ? '1px solid #d3adf7' : '1px solid #e8e8e8', borderRadius: 6, padding: '6px 12px', background: breakpoints.includes(selectedNode.id) ? '#f9f0ff' : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
             onClick={() => dispatch(toggleBreakpoint(selectedNode.id))}
-          ><svg width="12" height="12" viewBox="0 0 24 24" fill={useAppSelector(s => s.flow.breakpoints).includes(selectedNode.id) ? '#722ed1' : 'none'} stroke="#722ed1" strokeWidth="2"><circle cx="12" cy="12" r="10"/><rect x="9" y="6" width="2" height="12" rx="1"/><rect x="13" y="6" width="2" height="12" rx="1"/></svg>{useAppSelector(s => s.flow.breakpoints).includes(selectedNode.id) ? '移除断点' : '添加断点'}</button>
+          ><svg width="12" height="12" viewBox="0 0 24 24" fill={breakpoints.includes(selectedNode.id) ? '#722ed1' : 'none'} stroke="#722ed1" strokeWidth="2"><circle cx="12" cy="12" r="10"/><rect x="9" y="6" width="2" height="12" rx="1"/><rect x="13" y="6" width="2" height="12" rx="1"/></svg>{breakpoints.includes(selectedNode.id) ? '移除断点' : '添加断点'}</button>
         </div>
       ) : (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)' }}>

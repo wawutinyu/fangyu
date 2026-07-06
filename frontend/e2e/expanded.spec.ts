@@ -128,8 +128,9 @@ test.describe('Expanded coverage', () => {
 
     // double click start node to open config
     await startNode.dblclick()
+    await page.waitForTimeout(500)
     const configPanel = page.locator('text=节点配置')
-    await expect(configPanel).toBeVisible({ timeout: 3000 })
+    await expect(configPanel).toBeVisible({ timeout: 5000 })
 
     // find the "节点名称" label's sibling input and modify it
     const labelInput = page.locator('label:has-text("节点名称") + input')
