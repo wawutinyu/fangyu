@@ -2,6 +2,13 @@ import { test, expect } from '@playwright/test'
 
 test.describe('Agent Canvas', () => {
 
+  // 两个画布始终挂载（display:none 切换），用 data-testid 作用域限定到 Agent 画布
+  let agentContainer: ReturnType<import('@playwright/test').Locator['locator']>
+
+  test.beforeEach(({ page }) => {
+    agentContainer = page.locator('[data-testid="agent-canvas"]')
+  })
+
   test('切换 Agent 画布 Tab', async ({ page }) => {
     await page.goto('/')
     await page.waitForSelector('.react-flow__renderer', { timeout: 15000 })
@@ -13,43 +20,43 @@ test.describe('Agent Canvas', () => {
     await page.goto('/')
     await page.waitForSelector('.react-flow__renderer', { timeout: 15000 })
     await page.getByRole('button', { name: 'Agent 编排' }).click()
-    await page.getByText('+ 智能体').click()
-    await expect(page.locator('.react-flow__node')).toHaveCount(1, { timeout: 3000 })
+    await agentContainer.getByText('+ 智能体').click()
+    await expect(agentContainer.locator('.react-flow__node')).toHaveCount(1, { timeout: 3000 })
   })
 
   test('添加路由器节点', async ({ page }) => {
     await page.goto('/')
     await page.waitForSelector('.react-flow__renderer', { timeout: 15000 })
     await page.getByRole('button', { name: 'Agent 编排' }).click()
-    await page.getByText('+ 路由器').click()
-    await expect(page.locator('.react-flow__node')).toHaveCount(1, { timeout: 3000 })
+    await agentContainer.getByText('+ 路由器').click()
+    await expect(agentContainer.locator('.react-flow__node')).toHaveCount(1, { timeout: 3000 })
   })
 
   test('添加编组节点', async ({ page }) => {
     await page.goto('/')
     await page.waitForSelector('.react-flow__renderer', { timeout: 15000 })
     await page.getByRole('button', { name: 'Agent 编排' }).click()
-    await page.getByText('+ 智能体').click()
-    await expect(page.locator('.react-flow__node')).toHaveCount(1, { timeout: 3000 })
+    await agentContainer.getByText('+ 智能体').click()
+    await expect(agentContainer.locator('.react-flow__node')).toHaveCount(1, { timeout: 3000 })
   })
 
   test('添加多个类型节点并存', async ({ page }) => {
     await page.goto('/')
     await page.waitForSelector('.react-flow__renderer', { timeout: 15000 })
     await page.getByRole('button', { name: 'Agent 编排' }).click()
-    await page.getByText('+ 智能体').click()
-    await page.getByText('+ 路由器').click()
-    await page.getByText('+ 编组').click()
-    await expect(page.locator('.react-flow__node')).toHaveCount(3, { timeout: 3000 })
+    await agentContainer.getByText('+ 智能体').click()
+    await agentContainer.getByText('+ 路由器').click()
+    await agentContainer.getByText('+ 编组').click()
+    await expect(agentContainer.locator('.react-flow__node')).toHaveCount(3, { timeout: 3000 })
   })
 
   test('点击智能体节点显示配置面板', async ({ page }) => {
     await page.goto('/')
     await page.waitForSelector('.react-flow__renderer', { timeout: 15000 })
     await page.getByRole('button', { name: 'Agent 编排' }).click()
-    await page.getByText('+ 智能体').click()
-    await expect(page.locator('.react-flow__node')).toHaveCount(1, { timeout: 3000 })
-    const node = page.locator('.react-flow__node').first()
+    await agentContainer.getByText('+ 智能体').click()
+    await expect(agentContainer.locator('.react-flow__node')).toHaveCount(1, { timeout: 3000 })
+    const node = agentContainer.locator('.react-flow__node').first()
     await node.click()
     await expect(page.getByText('AgentCard')).toBeVisible({ timeout: 3000 })
     await expect(page.getByText('ATP 可信')).toBeVisible()
@@ -62,9 +69,9 @@ test.describe('Agent Canvas', () => {
     await page.goto('/')
     await page.waitForSelector('.react-flow__renderer', { timeout: 15000 })
     await page.getByRole('button', { name: 'Agent 编排' }).click()
-    await page.getByText('+ 路由器').click()
-    await expect(page.locator('.react-flow__node')).toHaveCount(1, { timeout: 3000 })
-    const node = page.locator('.react-flow__node').first()
+    await agentContainer.getByText('+ 路由器').click()
+    await expect(agentContainer.locator('.react-flow__node')).toHaveCount(1, { timeout: 3000 })
+    const node = agentContainer.locator('.react-flow__node').first()
     await node.click()
     await expect(page.getByRole('button', { name: '路由规则', exact: true })).toBeVisible({ timeout: 5000 })
     await expect(page.getByText('AgentCard')).not.toBeVisible()
@@ -74,10 +81,10 @@ test.describe('Agent Canvas', () => {
     await page.goto('/')
     await page.waitForSelector('.react-flow__renderer', { timeout: 15000 })
     await page.getByRole('button', { name: 'Agent 编排' }).click()
-    await page.getByText('+ 智能体').click()
-    await page.getByText('+ 智能体').click()
+    await agentContainer.getByText('+ 智能体').click()
+    await agentContainer.getByText('+ 智能体').click()
     // agent nodes use Handle from reactflow
-    const handles = page.locator('.react-flow__handle')
+    const handles = agentContainer.locator('.react-flow__handle')
     await expect(handles.first()).toBeVisible({ timeout: 3000 })
     await expect(handles).toHaveCount(4) // 2 nodes × (1 target + 1 source)
   })
@@ -86,9 +93,9 @@ test.describe('Agent Canvas', () => {
     await page.goto('/')
     await page.waitForSelector('.react-flow__renderer', { timeout: 15000 })
     await page.getByRole('button', { name: 'Agent 编排' }).click()
-    await page.getByText('+ 路由器').click()
-    await page.getByText('+ 智能体').click()
-    const handles = page.locator('.react-flow__handle')
+    await agentContainer.getByText('+ 路由器').click()
+    await agentContainer.getByText('+ 智能体').click()
+    const handles = agentContainer.locator('.react-flow__handle')
     await expect(handles).toHaveCount(4, { timeout: 3000 }) // router: left+right, agent: top+bottom
   })
 
@@ -96,10 +103,10 @@ test.describe('Agent Canvas', () => {
     await page.goto('/')
     await page.waitForSelector('.react-flow__renderer', { timeout: 15000 })
     await page.getByRole('button', { name: 'Agent 编排' }).click()
-    await page.getByText('+ 智能体').click()
-    const node = page.locator('.react-flow__node').first()
+    await agentContainer.getByText('+ 智能体').click()
+    const node = agentContainer.locator('.react-flow__node').first()
     await node.click()
-    await page.locator('.react-flow__pane').last().click({ position: { x: 10, y: 10 } })
+    await page.locator('[data-testid="agent-canvas"] .react-flow__pane').last().click({ position: { x: 10, y: 10 } })
     await expect(page.getByText('选中一个节点或连线以查看配置')).toBeVisible({ timeout: 3000 })
   })
 

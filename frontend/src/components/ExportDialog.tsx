@@ -14,13 +14,14 @@ interface Props {
 
 export default function ExportDialog({ nodes, edges, onClose, onCompileStart, onCompileEnd }: Props) {
   const agentNodes = useAppSelector(s => s.agent.nodes)
+  const globalPrompts = useAppSelector(s => s.flow.globalPrompts)
   const [enableA2A, setEnableA2A] = useState(agentNodes.length > 0)
   const [includeDesktopGUI, setIncludeDesktopGUI] = useState(true)
 
   const handleExport = async () => {
     onCompileStart()
     try {
-      await downloadFlowExport(nodes, edges, { desktopGUI: includeDesktopGUI, enableA2A }, '', undefined, enableA2A ? agentNodes : undefined)
+      await downloadFlowExport(nodes, edges, { desktopGUI: includeDesktopGUI, enableA2A, globalPrompts }, '', undefined, enableA2A ? agentNodes : undefined)
     } catch (e: any) {
       alert(`导出失败: ${e.message}`)
     } finally {

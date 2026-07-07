@@ -43,14 +43,23 @@ test.describe('New Features', () => {
     page.on('dialog', dialog => dialog.accept())
     await page.getByText('新建').click()
 
-    await page.getByText('代码').first().click()
-    await expect(page.getByText('导出 Python 代码')).toBeVisible({ timeout: 3000 })
+    // 代码已合并到导出弹窗，通过拦截请求验证生成的 Python 代码
+    let requestBody: any = null
+    await page.route('**/api/v1/export/compile-bundle', async route => {
+      requestBody = route.request().postDataJSON()
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/octet-stream',
+        body: Buffer.from('mock-zip-content'),
+      })
+    })
+    await page.getByText('导出').click()
+    await expect(page.getByText('导出流程')).toBeVisible({ timeout: 3000 })
+    await page.getByText('确认导出').click()
 
-    const codeArea = page.locator('textarea[readonly]')
-    await expect(codeArea).toBeVisible({ timeout: 3000 })
-    const codeText = await codeArea.inputValue()
-    expect(codeText).toContain('async def run_flow')
-    expect(codeText).toContain('import asyncio')
+    await expect.poll(() => requestBody, '请求应已被拦截').toBeTruthy()
+    expect(requestBody.pyCode).toContain('def run_flow')
+    expect(requestBody.pyCode).toContain('import tkinter')
   })
 
   test('exported code includes approval node handler', async ({ page }) => {
@@ -69,13 +78,23 @@ test.describe('New Features', () => {
     await picker2.getByText('人工审批', { exact: true }).click()
     await expect(page.locator('.atom-node')).toHaveCount(2, { timeout: 3000 })
 
-    await page.getByText('代码').first().click()
-    const codeArea = page.locator('textarea[readonly]')
-    await expect(codeArea).toBeVisible({ timeout: 3000 })
-    const codeText = await codeArea.inputValue()
-    expect(codeText).toContain('handle_approval')
-    expect(codeText).toContain('approved')
-    expect(codeText).toContain('rejected')
+    let requestBody: any = null
+    await page.route('**/api/v1/export/compile-bundle', async route => {
+      requestBody = route.request().postDataJSON()
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/octet-stream',
+        body: Buffer.from('mock-zip-content'),
+      })
+    })
+    await page.getByText('导出').click()
+    await expect(page.getByText('导出流程')).toBeVisible({ timeout: 3000 })
+    await page.getByText('确认导出').click()
+
+    await expect.poll(() => requestBody, '请求应已被拦截').toBeTruthy()
+    expect(requestBody.pyCode).toContain('handle_approval')
+    expect(requestBody.pyCode).toContain('approved')
+    expect(requestBody.pyCode).toContain('rejected')
   })
 
   test('export code includes global prompts when set', async ({ page }) => {
@@ -84,16 +103,38 @@ test.describe('New Features', () => {
     page.on('dialog', dialog => dialog.accept())
     await page.getByText('新建').click()
 
+    // set global prompt
     await page.getByText('提示词').first().click()
     await page.locator('textarea').first().fill('You are a coding expert')
     await page.locator('button[style*="background: none"]').first().click()
 
-    await page.getByText('代码').first().click()
-    const codeArea = page.locator('textarea[readonly]')
-    await expect(codeArea).toBeVisible({ timeout: 3000 })
-    const codeText = await codeArea.inputValue()
-    expect(codeText).toContain('GLOBAL_SYSTEM_PROMPT')
-    expect(codeText).toContain('You are a coding expert')
+    // add LLM node so that GLOBAL_SYSTEM_PROMPT is included in generated code
+    const inputNode = page.locator('.atom-node').first()
+    await inputNode.hover()
+    await page.waitForTimeout(200)
+    await inputNode.locator('.port-row-add').click()
+    const searchInput2 = page.locator('input[placeholder*="搜索节点"]')
+    await searchInput2.waitFor({ timeout: 3000 })
+    const picker2 = page.locator('div[style*="z-index: 9999"]').filter({ has: searchInput2 })
+    await picker2.getByText('大模型调用', { exact: true }).click()
+    await expect(page.locator('.atom-node')).toHaveCount(2, { timeout: 3000 })
+
+    let requestBody: any = null
+    await page.route('**/api/v1/export/compile-bundle', async route => {
+      requestBody = route.request().postDataJSON()
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/octet-stream',
+        body: Buffer.from('mock-zip-content'),
+      })
+    })
+    await page.getByText('导出').click()
+    await expect(page.getByText('导出流程')).toBeVisible({ timeout: 3000 })
+    await page.getByText('确认导出').click()
+
+    await expect.poll(() => requestBody, '请求应已被拦截').toBeTruthy()
+    expect(requestBody.pyCode).toContain('GLOBAL_SYSTEM_PROMPT')
+    expect(requestBody.pyCode).toContain('You are a coding expert')
   })
 
   test('connect to existing node via input port menu', async ({ page }) => {

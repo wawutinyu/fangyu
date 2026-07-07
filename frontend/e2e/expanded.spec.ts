@@ -165,13 +165,23 @@ test.describe('Expanded coverage', () => {
     await page.waitForSelector('.react-flow__renderer', { timeout: 15000 })
     page.on('dialog', dialog => dialog.accept())
     await page.getByText('新建').click()
-    await page.getByText('代码').first().click()
-    await expect(page.getByText('导出 Python 代码')).toBeVisible({ timeout: 3000 })
-    await expect(page.locator('textarea[readonly]')).toBeVisible({ timeout: 3000 })
+    // 代码已合并到导出弹窗，通过拦截请求验证
+    let requestBody: any = null
+    await page.route('**/api/v1/export/compile-bundle', async route => {
+      requestBody = route.request().postDataJSON()
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/octet-stream',
+        body: Buffer.from('mock-zip-content'),
+      })
+    })
+    await page.getByText('导出').click()
+    await expect(page.getByText('导出流程')).toBeVisible({ timeout: 3000 })
+    await page.getByText('确认导出').click()
 
-    // copy and download buttons present
-    await expect(page.getByText('复制')).toBeVisible({ timeout: 2000 })
-    await expect(page.getByText('下载')).toBeVisible({ timeout: 2000 })
+    await expect.poll(() => requestBody, '请求应已被拦截').toBeTruthy()
+    expect(requestBody.pyCode).toContain('def run_flow')
+    expect(requestBody.pyCode).toContain('import tkinter')
   })
 
   test('node picker search filters correctly', async ({ page }) => {

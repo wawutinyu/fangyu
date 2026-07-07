@@ -2,12 +2,12 @@ import { test, expect } from '@playwright/test'
 
 test.describe('Export Flow', () => {
 
-  test('一键导出呼出对话框，可取消', async ({ page }) => {
+  test('导出呼出对话框，可取消', async ({ page }) => {
     await page.goto('/')
     await page.waitForSelector('.react-flow__renderer', { timeout: 15000 })
     page.on('dialog', dialog => dialog.accept())
     await page.getByText('新建').click()
-    await page.getByText('一键导出').click()
+    await page.getByText('导出').click()
     await expect(page.getByText('导出流程')).toBeVisible({ timeout: 3000 })
     await expect(page.getByText('取消')).toBeVisible()
     await page.getByText('取消').click()
@@ -30,7 +30,7 @@ test.describe('Export Flow', () => {
     page.on('dialog', dialog => dialog.accept())
     await page.getByText('新建').click()
 
-    await page.getByText('一键导出').click()
+    await page.getByText('导出').click()
     await expect(page.getByText('导出流程')).toBeVisible({ timeout: 3000 })
     await page.getByText('确认导出').click()
 
@@ -46,7 +46,7 @@ test.describe('Export Flow', () => {
     page.on('dialog', dialog => dialog.accept())
     await page.getByText('新建').click()
 
-    await page.getByText('一键导出').click()
+    await page.getByText('导出').click()
     await expect(page.getByText('导出流程')).toBeVisible({ timeout: 3000 })
     await expect(page.getByText('启用 A2A 智能体通讯')).toBeVisible()
     await expect(page.getByText('包含桌面 GUI（Tkinter 窗口）')).toBeVisible()

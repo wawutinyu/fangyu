@@ -636,7 +636,7 @@ export default function App() {
           <NodeLibrary onCollapse={() => setLibraryCollapsed(true)} />
         )}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+          <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }} data-testid="flow-canvas">
             <FlowCanvas ref={flowCanvasRef} />
             <ConfigPanel
           onUpdateEdge={(edgeId, data) => flowCanvasRef.current?.updateEdgeData(edgeId, data)}
@@ -677,7 +677,7 @@ export default function App() {
         document.body
       )}
         </div>
-      <div style={{ display: view === 'agent' ? 'flex' : 'none', flex: 1, overflow: 'hidden' }}>
+      <div style={{ display: view === 'agent' ? 'flex' : 'none', flex: 1, overflow: 'hidden' }} data-testid="agent-canvas">
         <AgentCanvas />
         <AgentConfigPanel />
       </div>
