@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { runLocalFlow, type PendingInteraction } from '../localExecutor'
 import type { Node, Edge } from 'reactflow'
 
@@ -80,6 +80,9 @@ describe('runLocalFlow', () => {
   })
 
   it('simulates LLM node without pending', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ content: 'Hello from LLM', usage: { total_tokens: 42 } }), { status: 200 })
+    )
     const nodes = [
       makeNode('in', 'input', '输入'),
       makeNode('llm', 'llm', 'LLM', { model: 'test' }),
@@ -93,7 +96,11 @@ describe('runLocalFlow', () => {
     expect(result.success).toBe(true)
     const llmResult = result.results.find(r => r.nodeId === 'llm')
     expect(llmResult).toBeDefined()
-    expect(llmResult!.output?.result).toContain('test')
+    expect(llmResult!.output?.result).toBe('Hello from LLM')
+    expect(llmResult!.output?.usage).toEqual({ total_tokens: 42 })
+    // 验证 executor 真的调了后端 API
+    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/llm/chat', expect.objectContaining({ method: 'POST' }))
+    fetchSpy.mockRestore()
   })
 
   it('resolves {{in.input}} in downstream config', async () => {
@@ -118,11 +125,14 @@ describe('runLocalFlow', () => {
     const edges = [makeEdge('e1', 'in', 'cond')]
 
     const result = await runFlowWithResolvers(nodes, edges, [
-      p => p.resolve({ value: 'test' }),
+      p => p.resolve({ value: '5' }),
     ])
 
     expect(result.success).toBe(true)
     expect(result.results.length).toBe(2)
+    const condResult = result.results.find(r => r.nodeId === 'cond')
+    // input value '5' => Number('5') > 0 = true
+    expect(condResult?.output?.result).toBe(true)
   })
 
   it('approval message is resolved from pool', async () => {
@@ -141,9 +151,12 @@ describe('runLocalFlow', () => {
   })
 
   it('executes http node', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response('{"ok":true}', { status: 200, headers: { 'Content-Type': 'application/json' } })
+    )
     const nodes = [
       makeNode('in', 'input', '输入'),
-      makeNode('http', 'http', 'HTTP', { url: 'https://example.com', method: 'GET' }),
+      makeNode('http', 'http', 'HTTP', { url: 'https://httpbin.org/get', method: 'GET' }),
     ]
     const edges = [makeEdge('e1', 'in', 'http')]
 
@@ -152,6 +165,10 @@ describe('runLocalFlow', () => {
     ])
 
     expect(result.success).toBe(true)
+    expect(fetchSpy).toHaveBeenCalledWith('https://httpbin.org/get', expect.objectContaining({ method: 'GET' }))
+    const httpResult = result.results.find(r => r.nodeId === 'http')
+    expect(httpResult?.output?.status).toBe(200)
+    fetchSpy.mockRestore()
   })
 
   it('executes code node', async () => {
