@@ -64,18 +64,28 @@ async def run_flow_endpoint(body: RunFlowBody, db: AsyncSession = Depends(get_se
     if isinstance(session_id, list):
         session_id = str(id(body))
 
+    node_timing: dict[str, int] = {}
     for log_entry in result.get("logs", []):
+        nid = log_entry.get("nodeId", "")
+        log_type = log_entry.get("type", "")
+        if log_type == "start":
+            node_timing[nid] = log_entry.get("time", 0)
+        lt_map = {"start": "start", "complete": "complete", "complete_with_error": "error",
+                  "approval_pending": "approval_pending", "error": "error"}
+        duration = 0
+        if log_type in ("complete", "complete_with_error", "error") and nid in node_timing:
+            duration = log_entry.get("time", 0) - node_timing.get(nid, 0)
         db.add(ExecutionLog(
             flow_id=str(flow_name),
             session_id=str(session_id),
-            node_id=log_entry.get("nodeId", ""),
+            node_id=nid,
             node_name=log_entry.get("nodeName", ""),
             node_type=log_entry.get("type", ""),
-            log_type="start" if log_entry.get("type") == "start" else "complete" if log_entry.get("type") == "complete" else "error",
+            log_type=lt_map.get(log_type, "error"),
             inputs_json=json.dumps(log_entry.get("data", {}).get("inputs", {}), ensure_ascii=False),
             outputs_json=json.dumps(log_entry.get("data", {}).get("outputs", {}), ensure_ascii=False),
             error=log_entry.get("data", {}).get("error", ""),
-            duration_ms=log_entry.get("time", 0),
+            duration_ms=duration,
         ))
 
     await db.commit()

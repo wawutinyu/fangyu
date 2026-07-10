@@ -57,6 +57,8 @@ from .routers import monitor as monitor_router        # /api/v1/monitor/*
 from .routers import export_compile as export_router  # /api/v1/export/*
 from .routers import trigger as trigger_router        # /api/v1/trigger/*
 from .routers import mcp as mcp_router                # /api/v1/mcp/*
+from .routers import a2a as a2a_router                # /api/v1/a2a/*
+from .routers import trust as trust_router            # /api/v1/trust/*
 
 
 # ---------------------------------------------------------------------------
@@ -142,6 +144,8 @@ app.include_router(monitor_router.router)
 app.include_router(export_router.router)
 app.include_router(trigger_router.router)
 app.include_router(mcp_router.router)
+app.include_router(a2a_router.router)
+app.include_router(trust_router.router)
 
 
 # ---------------------------------------------------------------------------

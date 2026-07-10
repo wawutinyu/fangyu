@@ -42,11 +42,9 @@ async def _exec_transform(ctx: NodeContext) -> dict[str, Any]:
     mapping = ctx.config.get("mapping", {})
     expr = ctx.config.get("expression", "")
     if expr:
-        upstream_data = {}
-        for node_out in ctx.all_outputs.values():
-            if isinstance(node_out, dict) and "result" in node_out:
-                upstream_data = node_out
-                break
+        upstream_data = ctx.inputs.get("source", ctx.inputs.get("input", {}))
+        if not isinstance(upstream_data, dict):
+            upstream_data = {"result": upstream_data}
         try:
             result = eval(expr, {"__builtins__": {"len": len, "str": str, "int": int, "float": float, "list": list, "dict": dict, "range": range, "enumerate": enumerate, "zip": zip, "map": map, "filter": filter, "min": min, "max": max, "sum": sum, "sorted": sorted, "reversed": reversed, "True": True, "False": False, "None": None}}, {
                 "data": upstream_data, "input": ctx.inputs.get("source", ctx.inputs), "_outputs": ctx.all_outputs,

@@ -68,20 +68,21 @@ def _is_parallel_edge(edge, edges):
     return link_type == "parallel"
 
 
-def _resolve_mapping(source_expr, all_outputs):
+def _resolve_mapping(source_expr, all_outputs, scope=None):
     if not source_expr:
         return None
     parts = source_expr.split(".")
+    search_in = {k: v for k, v in all_outputs.items() if not scope or k in scope} if scope else all_outputs
     if len(parts) >= 2:
         node_name_or_id = parts[0]
         output_key = ".".join(parts[1:])
         if node_name_or_id in all_outputs and output_key in all_outputs[node_name_or_id]:
             return all_outputs[node_name_or_id][output_key]
-        for node_outputs in all_outputs.values():
+        for node_outputs in search_in.values():
             if isinstance(node_outputs, dict) and output_key in node_outputs:
                 return node_outputs[output_key]
         return None
-    for node_outputs in all_outputs.values():
+    for node_outputs in search_in.values():
         if isinstance(node_outputs, dict) and parts[0] in node_outputs:
             return node_outputs[parts[0]]
     return None
@@ -162,15 +163,16 @@ async def run_flow(nodes, edges, external_inputs=None, global_vars=None, on_even
         for port in meta.get("inputSchema", []):
             inputs[port["name"]] = None
 
+        upstream_ids = {e["source"] for e in upstream_edges}
         for edge in upstream_edges:
             edge_mappings = edge.get("data", {}).get("mappings", {}) if isinstance(edge.get("data"), dict) else {}
             for tgt_port, src_expr in edge_mappings.items():
-                inputs[tgt_port] = _resolve_mapping(src_expr, outputs)
+                inputs[tgt_port] = _resolve_mapping(src_expr, outputs, upstream_ids)
 
         node_mappings = nd.get("mappings", {}) if isinstance(nd, dict) else {}
         for tgt_port, src_expr in node_mappings.items():
             if inputs.get(tgt_port) is None:
-                inputs[tgt_port] = _resolve_mapping(src_expr, outputs)
+                inputs[tgt_port] = _resolve_mapping(src_expr, outputs, upstream_ids)
 
         if upstream_edges:
             all_up_outputs = {}

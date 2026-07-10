@@ -3,7 +3,7 @@ from typing import Any
 
 
 def _resolve_path(obj, path):
-    if not obj or not path:
+    if obj is None or not path:
         return None
     parts = path.split(".")
     cur = obj

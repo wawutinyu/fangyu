@@ -1,5 +1,6 @@
 import json
 import asyncio
+import hashlib
 from typing import Any
 
 from .executor import register_executor, NodeContext
@@ -125,7 +126,7 @@ async def _exec_composite(ctx: NodeContext) -> dict[str, Any]:
 
 async def _exec_approval(ctx: NodeContext) -> dict[str, Any]:
     message = ctx.inputs.get("input", ctx.config.get("message", ""))
-    approval_id = f"apr_{hash(str(ctx.config)) % 1000000:06d}"
+    approval_id = f"apr_{hashlib.md5(str(ctx.config).encode()).hexdigest()[:6]}"
     ctx.global_vars["_pending_approval"] = {"approval_id": approval_id, "message": message, "status": "pending"}
     return {"_pending": True, "approval_id": approval_id, "message": message, "status": "pending"}
 

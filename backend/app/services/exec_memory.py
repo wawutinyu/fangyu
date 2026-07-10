@@ -1,3 +1,4 @@
+import hashlib
 from typing import Any
 
 from .executor import register_executor, NodeContext
@@ -28,7 +29,7 @@ async def _exec_extract_memory(ctx: NodeContext) -> dict[str, Any]:
     facts = memory_extract_facts(str(text), max_facts)
     written = []
     for fact in facts:
-        k = f"fact_{hash(fact) % 1000000:06d}"
+        k = f"fact_{hashlib.md5(fact.encode()).hexdigest()[:6]}"
         memory_write(scope, k, fact)
         written.append({"key": k, "value": fact})
     return {"facts": written, "count": len(written)}

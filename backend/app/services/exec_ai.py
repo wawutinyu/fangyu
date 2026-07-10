@@ -1,5 +1,6 @@
 import json
 import re as _re
+import hashlib
 from typing import Any
 
 from .executor import register_executor, _smart_template, _resolve_path, NodeContext
@@ -69,7 +70,7 @@ async def _exec_llm(ctx: NodeContext) -> dict[str, Any]:
         try:
             facts = memory_extract_facts(content, max_facts=3)
             for fact in facts:
-                k = f"fact_{hash(fact) % 1000000:06d}"
+                k = f"fact_{hashlib.md5(fact.encode()).hexdigest()[:6]}"
                 memory_write("user", k, fact)
         except Exception:
             pass
@@ -81,11 +82,6 @@ async def _exec_code(ctx: NodeContext) -> dict[str, Any]:
     code = ctx.config.get("code", "")
     timeout = ctx.config.get("timeout", 10000)
     input_val = ctx.inputs.get("input")
-    if input_val is None and ctx.all_outputs:
-        for node_out in ctx.all_outputs.values():
-            if isinstance(node_out, dict) and "result" in node_out:
-                input_val = node_out["result"]
-                break
     result = await run_code(
         code=code, input_data=input_val if input_val is not None else ctx.inputs,
         params=ctx.inputs.get("params", {}), timeout=max(1, min(30, timeout // 1000)),

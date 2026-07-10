@@ -4,7 +4,7 @@ import { Executor } from '../utils/executor'
 import type { ExecutorLog } from '../utils/executor'
 import { convertToExportFormat } from '../utils/flowHelper'
 import { useAppSelector } from '../store/hooks'
-import { AgentBus } from '../utils/agentBus'
+
 
 interface ChatMessage { role: string; content: string; logs?: ExecutorLog[]; _showLogs?: boolean; _pendingSkill?: string; _pendingSkillDesc?: string }
 
@@ -39,12 +39,24 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
   }, [])
 
   const sendToAgent = useCallback(async (text: string) => {
-    const bus = new AgentBus()
     const target = selectedAgent || agents[0]?.id
     if (!target) { setRunning(false); return }
-    const result = bus.sendMessage(target, { role: 'user', parts: [{ type: 'text', text }] })
-    const output = result.artifact?.parts?.[0]?.text || '(无输出)'
-    setMessages(prev => [...prev, { role: 'assistant', content: output }])
+    try {
+      const resp = await fetch('/api/v1/a2a/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target_agent: target,
+          message: { role: 'user', parts: [{ type: 'text', text }] },
+        }),
+      })
+      const task = await resp.json()
+      const lastAgentMsg = task.history?.filter((m: any) => m.role === 'agent').pop()
+      const output = lastAgentMsg?.parts?.[0]?.text || task.artifact?.parts?.[0]?.text || '(无输出)'
+      setMessages(prev => [...prev, { role: 'assistant', content: output }])
+    } catch {
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Agent 通信失败' }])
+    }
   }, [selectedAgent, agents])
 
   const sendMessage = useCallback(async () => {
@@ -97,9 +109,10 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
     try {
       const result = await executor.run()
       const logs = result.logs || []
-      const lastLLM = result.results?.find(r => r.type === 'llm' && r.outputs?.result)
-      const output = lastLLM?.outputs?.result as string || ''
       const allOutputs = result.results || []
+      const lastLLM = allOutputs.find(r => r.type === 'llm' && r.outputs?.result)
+      const lastNonLLM = [...allOutputs].reverse().find(r => !['start', 'end', 'output'].includes(r.type) && r.outputs?.result)
+      const output = lastLLM?.outputs?.result as string || lastNonLLM?.outputs?.result as string || ''
 
       addMsg(output || '(流程执行完成，无输出)', { logs, _showLogs: logs.length > 0 })
 
