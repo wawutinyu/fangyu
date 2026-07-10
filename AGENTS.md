@@ -97,15 +97,34 @@ cd backend && py -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ## 核心架构
 
-### 执行引擎（executor.py）
-- DAG 拓扑排序 → 按深度分批并行执行
-- 27 种节点类型全部实现 dispatch
-- **composite-node 递归**: `inner_nodes` + `inner_links` 作为子图递归调用 `run_flow`
-- **loop 循环体**: 支持 `inner_nodes` 子图每个迭代执行
+### 执行引擎（6 文件分层架构）
+
+```
+services/
+├── __init__.py      # 公共 API (run_flow, NodeContext...)
+├── context.py       # NodeContext dataclass
+├── utils.py         # _smart_template, _resolve_path
+├── registry.py      # NODE_REGISTRY, _EXECUTORS, register_executor, register_executors
+├── scheduler.py     # run_flow, topo sort, _run_single_node, _exec_unknown
+├── executor.py      # 门面 (facade) — pure re-export + register_executors()
+├── exec_core.py     # 10 个流程控制 handler
+├── exec_ai.py       # 5 个 AI handler
+├── exec_data.py     # 5 个数据操作 handler
+├── exec_memory.py   # 4 个记忆存储 handler
+└── exec_tools.py    # 5 个工具集成 handler
+```
+
+- DAG 拓扑排序 → 按深度分批并行执行（`scheduler.py`）
+- 28 种节点类型，注册模式：`register()` → `register_executor("type", fn)`（`registry.py`）
+- Handler 统一签名：`async def handler(ctx: NodeContext) -> dict[str, Any]`
+- **composite/loop 递归**: 调用 `scheduler.run_flow()` 执行子图（`exec_core.py`）
 - **condition 多分支**: `branch_count>2` 时 eval 返回整数索引 → `branch_{idx}`
 - **search**: Bing 爬取（web）+ freshness 过滤（news）+ arXiv API（academic）
 - **tool-call**: 自动解析 LLM JSON 输出（支持 OpenAI function-calling 格式）
 - **RAG**: 上传文档 → 分块 → n-gram 字符相似度 + 可选 sentence-transformers
+- **错误隔离**: 异常 → `{error: msg}`，非 dict 返回值兜底
+- **监控**: 每个节点结果含 `elapsed_ms` 执行耗时
+- **递归防护**: `_flow_depth` 上限 10 层
 
 ### 前端节点渲染（AtomNode.tsx）
 - 多端口渲染：outputSchema > 1 时渲染独立 Handle 并显示端口名
@@ -119,7 +138,16 @@ cd backend && py -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 | 文件 | 作用 |
 |------|------|
-| `backend/app/services/executor.py` | 核心执行引擎（~920 行） |
+| `backend/app/services/scheduler.py` | 调度引擎（run_flow、topo 排序、分批次执行） |
+| `backend/app/services/registry.py` | 执行器注册中心（_EXECUTORS、NODE_REGISTRY、register_executor） |
+| `backend/app/services/context.py` | NodeContext dataclass（handler 统一入参） |
+| `backend/app/services/utils.py` | 工具函数（_smart_template、_resolve_path） |
+| `backend/app/services/executor.py` | 门面（re-export + 启动 register_executors） |
+| `backend/app/services/exec_core.py` | 流程控制 handler（start/end/condition/switch/loop/composite/approval/trigger/input/output） |
+| `backend/app/services/exec_ai.py` | AI handler（llm/code/knowledge/search/prompt-assembly） |
+| `backend/app/services/exec_data.py` | 数据 handler（json-parse/variable-set/variable-get/transform/text-process） |
+| `backend/app/services/exec_memory.py` | 记忆 handler（memory-read/memory-write/extract-memory/search-sessions） |
+| `backend/app/services/exec_tools.py` | 工具 handler（http/tool-call/register-tool/execute-skill/learn-skill） |
 | `backend/app/services/tool_registry.py` | 24 个内置工具 + 动态注册 |
 | `backend/app/services/embedding.py` | n-gram 语义相似度 |
 | `backend/app/services/knowledge.py` | 文档分块 + 编码检测 |
@@ -138,8 +166,10 @@ cd backend && py -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - 后端重启用 `taskkill -f -fi "IMAGENAME eq python.exe"` 杀干净
 - 调试 curl: 用 Python `urllib.request` 而非 curl.exe（PowerShell 引号问题）
 - composite 和 loop 的 `inner_nodes` 格式：`[{id, originType, config, mappings, relativeX, relativeY}]`
-- 添加新节点类型需同时更新：后端 registry、前端 NODE_CATEGORIES、`getNodeMeta`、AtomNode 多端口、`NodePicker.tsx` 的兼容规则
-- 执行器 `_execute_node` 签名包含 `node_data` 参数（原 `nd` 对象），新节点类型如需要可访问
+- 添加新节点类型需同时更新：后端 `registry.py`（元数据）、`exec_*.py`（register() 注册 handler）、前端 NODE_CATEGORIES、`getNodeMeta`、AtomNode 多端口、`NodePicker.tsx` 的兼容规则
+- Handler 统一签名：`async def handler(ctx: NodeContext) -> dict[str, Any]`，通过 `ctx.config` 访问配置，`ctx.inputs` 访问输入，`ctx.node_data` 访问原始节点数据
+- 注册新 handler：在对应 `exec_*.py` 中定义函数，添加到该文件底部的 `register()` 函数中
+- 依赖图单向：context → utils → registry → scheduler → exec_* → executor (facade)
 
 ## Dify 设计模式（参考实现）
 
