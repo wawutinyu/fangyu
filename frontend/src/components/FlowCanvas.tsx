@@ -21,12 +21,14 @@ import { useAppDispatch, useAppSelector } from '../store/hooks'
 import { store } from '../store'
 import { setNodes, setEdges, setEdgeData, selectEdge, openEdgeConfigPanel } from '../store/flowSlice'
 import { selectNode, openConfigPanel } from '../store/flowSlice'
-import { getNodeMeta, getCompatibleTargets, getDefaultConfig, getAllNodeTypes, filterUniqueTypes } from '../utils/nodeRegistry'
+import { getNodeMeta, getCompatibleTargets, getAllNodeTypes, filterUniqueTypes } from '../utils/nodeRegistry'
 import { generateId, convertFromExportFormat, convertToExportFormat } from '../utils/flowHelper'
 import { Executor } from '../utils/executor'
-import { runLocalFlow, type PendingInteraction } from '../utils/localExecutor'
+import { type PendingInteraction } from '../utils/localExecutor'
 import { generatePythonCode } from '../utils/codeGenerator'
-import { saveRunRecord } from './RunHistory'
+import { useHistory } from '../hooks/useHistory'
+import { useSimulation } from '../hooks/useSimulation'
+import { useNodeOperations } from '../hooks/useNodeOperations'
 
 const nodeTypes = {
   'atom-node': AtomNode,
@@ -35,34 +37,6 @@ const nodeTypes = {
 
 const edgeTypes = {
   'flow-edge': FlowEdge,
-}
-
-function createAtomNode(nodeType: string, position: { x: number; y: number }): Node {
-  const meta = getNodeMeta(nodeType)
-  return {
-    id: generateId('node'),
-    type: 'atom-node',
-    position,
-    data: {
-      originType: nodeType,
-      name: meta.name,
-      category: meta.category,
-      label: meta.name,
-      config: getDefaultConfig(nodeType),
-    },
-  }
-}
-
-function createFlowEdge(source: string, target: string, sourceHandle?: string, targetHandle?: string): Edge {
-  return {
-    id: generateId('edge'),
-    source,
-    sourceHandle,
-    target,
-    targetHandle,
-    type: 'flow-edge',
-    data: { linkType: 'serial', mappings: {} },
-  }
 }
 
 export interface FlowCanvasHandle {
@@ -99,7 +73,7 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
   const [toast, setToast] = React.useState<{ msg: string; type: string } | null>(null)
   const [simResults, setSimResults] = React.useState<{ nodeName: string; output: Record<string, unknown> }[] | null>(null)
   const rfInstanceRef = React.useRef<ReactFlowInstance | null>(null)
-  const existingNodeTypes = useAppSelector(s => s.flow.nodes.map(n => n.data?.originType as string))
+  const existingNodeTypes = useAppSelector(s => s.flow.nodes.map(n => n.data?.originType || ''))
   const edgeInsertableTypes = React.useMemo(() => {
     return filterUniqueTypes(getAllNodeTypes().filter(type => {
       const meta = getNodeMeta(type)
@@ -114,25 +88,22 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
   const [pendingInteraction, setPendingInteraction] = React.useState<PendingInteraction | null>(null)
   const [interactionMinimized, setInteractionMinimized] = React.useState(false)
 
-  const historyRef = React.useRef<{ nodes: Node[]; edges: Edge[] }[]>([])
-  const historyIdxRef = React.useRef(-1)
-  const skipHistoryRef = React.useRef(false)
-
-  const pushHistory = React.useCallback(() => {
-    if (skipHistoryRef.current) { skipHistoryRef.current = false; return }
-    historyIdxRef.current++
-    historyRef.current = historyRef.current.slice(0, historyIdxRef.current)
-    historyRef.current.push({ nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) })
-    if (historyRef.current.length > 50) {
-      historyRef.current.shift()
-      historyIdxRef.current--
-    }
-  }, [nodes, edges])
+  const { pushHistory, undo: historyUndo, redo: historyRedo, skipHistoryRef } = useHistory(nodes, edges)
 
   const showToast = React.useCallback((msg: string, type: string) => {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 2500)
   }, [])
+
+  const { runSimulation, showResults } = useSimulation(
+    nodes, edges, setLocalNodes, showToast, setPendingInteraction, setSimResults,
+  )
+
+  const {
+    groupSelected, ungroupSelected, deleteSelected,
+    handleEdgeInsert, handleCopy, handlePaste,
+    handleDuplicateSelected, handleNudge, handleConnectExisting,
+  } = useNodeOperations(nodes, edges, setLocalNodes, setLocalEdges, pushHistory, showToast)
 
   const nodesRef = React.useRef(nodes)
   nodesRef.current = nodes
@@ -150,16 +121,15 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
       pushHistory()
       try {
         let { nodes: importedNodes, edges: importedEdges } = convertFromExportFormat(data as Parameters<typeof convertFromExportFormat>[0])
-        // Auto-fill missing sourceHandle/targetHandle
         importedEdges = importedEdges.map(e => {
           const src = importedNodes.find(n => n.id === e.source)
           const tgt = importedNodes.find(n => n.id === e.target)
           if (!e.sourceHandle && src) {
-            const srcMeta = getNodeMeta((src.data?.originType as string) || '')
+            const srcMeta = getNodeMeta(src.data?.originType || '')
             e = { ...e, sourceHandle: srcMeta.outputSchema[0]?.name }
           }
           if (!e.targetHandle && tgt) {
-            const tgtMeta = getNodeMeta((tgt.data?.originType as string) || '')
+            const tgtMeta = getNodeMeta(tgt.data?.originType || '')
             e = { ...e, targetHandle: tgtMeta.inputSchema[0]?.name }
           }
           return e
@@ -187,55 +157,11 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
       setLocalEdges(restoredEdges)
       showToast('已恢复', 'info')
     },
-        async runSimulation(autoResolveInput?: boolean) {
-      const curNodes = nodesRef.current
-      const curEdges = edgesRef.current
-      if (curNodes.length === 0) return
+    async runSimulation(autoResolveInput?: boolean) {
       setSimProgress(0)
-      setPendingInteraction(null)
-      setLocalNodes(nds => nds.map(n => ({ ...n, data: { ...n.data, _simulating: false, _output: null, _status: null } })))
-      const result = await runLocalFlow(curNodes, curEdges, {
-        autoResolveInput,
-        breakpoints: store.getState().flow.breakpoints,
-        onProgress: (nodeId, status) => {
-          setLocalNodes(prev => prev.map(n => ({
-            ...n,
-            data: { ...n.data, _simulating: n.id === nodeId && status === 'running' },
-          })))
-        },
-        onPending: (interaction) => {
-          setPendingInteraction(interaction)
-        },
-      })
-      setSimProgress(100)
-      setPendingInteraction(null)
-      const results = result.results.map(r => ({ nodeId: r.nodeId, nodeName: r.nodeName, output: r.output || {} }))
-      setSimResults(results.map(r => ({ nodeName: r.nodeName, output: r.output })))
-      setLocalNodes(nds => nds.map(n => {
-        const res = results.find(r => r.nodeId === n.id)
-        return { ...n, data: { ...n.data, _simulating: false, _output: res?.output || null, _status: 'done' as const } }
-      }))
-      saveRunRecord({
-        id: `run_${Date.now()}`,
-        time: Date.now(),
-        success: result.success,
-        nodeCount: result.results.length,
-        results: results.map(r => ({ nodeName: r.nodeName, output: r.output })),
-        error: result.error,
-      })
-      if (result.success) {
-        showToast(`运行完成，${result.results.length} 个节点已执行`, 'success')
-      } else {
-        showToast(result.error || '运行中止', 'warn')
-      }
+      await runSimulation(autoResolveInput)
     },
-    showResults(results) {
-      setSimResults(results.map(r => ({ nodeName: r.nodeName, output: r.output })))
-      setLocalNodes(nds => nds.map(n => {
-        const res = results.find(r => r.nodeId === n.id)
-        return { ...n, data: { ...n.data, _simulating: false, _output: res?.output || null, _status: 'done' as const } }
-      }))
-    },
+    showResults(results) { showResults(results) },
     getNodesAndEdges() {
       return { nodes: nodesRef.current, edges: edgesRef.current }
     },
@@ -245,143 +171,16 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
     },
     groupSelected() {
       pushHistory()
-      const curNodes = nodesRef.current
-      const curEdges = edgesRef.current
-      const selected = curNodes.filter(n => n.selected)
-      if (selected.length < 2) {
-        showToast('请选中至少 2 个节点', 'warn')
-        return
-      }
-      if (selected.some(n => n.type === 'composite-node')) {
-        showToast('不能组合已有组合节点', 'warn')
-        return
-      }
-
-      const positions = selected.map(n => n.position)
-      const minX = Math.min(...positions.map(p => p.x))
-      const maxX = Math.max(...positions.map(p => p.x))
-      const minY = Math.min(...positions.map(p => p.y))
-      const maxY = Math.max(...positions.map(p => p.y))
-      const cx = (minX + maxX) / 2
-      const cy = (minY + maxY) / 2
-
-      const selectedIds = new Set(selected.map(n => n.id))
-
-      const innerNodes = selected.map(n => ({
-        id: n.id,
-        originType: n.data.originType as string,
-        name: n.data.name as string,
-        category: n.data.category as string,
-        label: n.data.label as string,
-        config: n.data.config as Record<string, unknown>,
-        mappings: (n.data.mappings as Record<string, string>) || {},
-        relativeX: n.position.x - cx,
-        relativeY: n.position.y - cy,
-      }))
-
-      const innerEdges = curEdges.filter(e => selectedIds.has(e.source) && selectedIds.has(e.target))
-      const innerLinks = innerEdges.map(e => ({
-        sourceNodeId: e.source,
-        targetNodeId: e.target,
-        linkType: (e.data?.linkType as string) || 'serial',
-        mappings: (e.data?.mappings as Record<string, string>) || {},
-      }))
-
-      const compositeId = generateId('composite')
-      const newNode: Node = {
-        id: compositeId,
-        type: 'composite-node',
-        position: { x: cx, y: cy },
-        data: {
-          originType: 'composite',
-          name: '组合原子',
-          category: '组合',
-          label: `${selected.length} 个节点`,
-          is_group: true,
-          inner_nodes: innerNodes,
-          inner_links: innerLinks,
-          config: {},
-          mappings: {},
-        },
-      }
-
-      setLocalEdges(curEdges
-        .filter(e => !selectedIds.has(e.source) || !selectedIds.has(e.target))
-        .map(e => {
-          if (selectedIds.has(e.target) && !selectedIds.has(e.source)) return { ...e, target: compositeId }
-          if (selectedIds.has(e.source) && !selectedIds.has(e.target)) return { ...e, source: compositeId }
-          return e
-        }),
-      )
-      setLocalNodes(nds => [...nds.filter(n => !selectedIds.has(n.id)), newNode])
+      groupSelected()
     },
     ungroupSelected() {
       pushHistory()
-      const composite = nodes.find(n => n.selected && n.type === 'composite-node')
-      if (!composite) {
-        showToast('请选中一个组合节点', 'warn')
-        return
-      }
-      const innerNodes = (composite.data?.inner_nodes as unknown[]) || []
-      const innerLinks = (composite.data?.inner_links as unknown[]) || []
-      if (innerNodes.length === 0) {
-        showToast('该组合为空', 'warn')
-        return
-      }
-
-      const { x: cx, y: cy } = composite.position
-      const restoredNodes: Node[] = (innerNodes as Array<Record<string, unknown>>).map(n => ({
-        id: n.id as string,
-        type: 'atom-node',
-        position: { x: cx + (n.relativeX as number), y: cy + (n.relativeY as number) },
-        data: {
-          originType: n.originType as string,
-          name: n.name as string,
-          category: n.category as string,
-          label: n.label as string,
-          config: n.config as Record<string, unknown>,
-        },
-      }))
-
-      const restoredEdges: Edge[] = (innerLinks as Array<Record<string, unknown>>).map(l => ({
-        id: generateId('edge'),
-        source: l.sourceNodeId as string,
-        target: l.targetNodeId as string,
-        type: 'default',
-        data: { linkType: l.linkType || 'serial', mappings: l.mappings || {} },
-      }))
-
-      const compositeId = composite.id
-      const incoming = edges.filter(e => e.target === compositeId)
-      const outgoing = edges.filter(e => e.source === compositeId)
-
-      const firstId = restoredNodes[0].id
-      const lastId = restoredNodes[restoredNodes.length - 1].id
-
-      setLocalEdges(
-        edges
-          .filter(e => e.source !== compositeId && e.target !== compositeId)
-          .concat(incoming.map(e => ({ ...e, target: firstId })))
-          .concat(outgoing.map(e => ({ ...e, source: lastId })))
-          .concat(restoredEdges),
-      )
-      setLocalNodes(nds => nds.filter(n => n.id !== compositeId).concat(restoredNodes))
-      showToast(`已展开为 ${restoredNodes.length} 个节点`, 'success')
+      ungroupSelected()
     },
     deleteSelected() {
-      const selectedNodes = nodes.filter(n => n.selected)
-      const selectedEdges = edges.filter(e => e.selected)
-      if (selectedNodes.length === 0 && selectedEdges.length === 0) {
-        showToast('请选中要删除的节点或连线', 'warn')
-        return
-      }
       pushHistory()
-      const selectedNodeIds = new Set(selectedNodes.map(n => n.id))
-      const selectedEdgeIds = new Set(selectedEdges.map(e => e.id))
-      setLocalNodes(prev => prev.filter(n => !selectedNodeIds.has(n.id)))
-      setLocalEdges(prev => prev.filter(e => !selectedEdgeIds.has(e.id)))
+      deleteSelected()
       dispatch(selectNode(null))
-      showToast(`已删除 ${selectedNodes.length} 个节点、${selectedEdges.length} 条连线`, 'info')
     },
     deleteNodeById(id: string) {
       pushHistory()
@@ -397,18 +196,16 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
       showToast('已删除连线', 'info')
     },
     undo() {
-      if (historyIdxRef.current <= 0) { showToast('没有可撤销的操作', 'warn'); return }
-      historyIdxRef.current--
-      const entry = historyRef.current[historyIdxRef.current]
+      const entry = historyUndo()
+      if (!entry) { showToast('没有可撤销的操作', 'warn'); return }
       skipHistoryRef.current = true
       setLocalNodes(entry.nodes)
       setLocalEdges(entry.edges)
       showToast('已撤销', 'info')
     },
     redo() {
-      if (historyIdxRef.current >= historyRef.current.length - 1) { showToast('没有可重做的操作', 'warn'); return }
-      historyIdxRef.current++
-      const entry = historyRef.current[historyIdxRef.current]
+      const entry = historyRedo()
+      if (!entry) { showToast('没有可重做的操作', 'warn'); return }
       skipHistoryRef.current = true
       setLocalNodes(entry.nodes)
       setLocalEdges(entry.edges)
@@ -420,7 +217,7 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
         n.id === nodeId ? { ...n, data: { ...n.data, ...data } } : n,
       ))
     },
-  }), [nodes, edges, dispatch, setLocalNodes, setLocalEdges, showToast])
+  }), [nodes, edges, dispatch, setLocalNodes, setLocalEdges, showToast, pushHistory, historyUndo, historyRedo, skipHistoryRef, groupSelected, ungroupSelected, deleteSelected, runSimulation, showResults])
 
   const onInit = React.useCallback((instance: ReactFlowInstance) => {
     rfInstanceRef.current = instance
@@ -433,8 +230,8 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
     const targetNode = nodes.find(n => n.id === connection.target)
     if (!sourceNode || !targetNode) return false
 
-    const sourceMeta = getNodeMeta((sourceNode.data?.originType as string) || '')
-    const targetMeta = getNodeMeta((targetNode.data?.originType as string) || '')
+    const sourceMeta = getNodeMeta(sourceNode.data?.originType || '')
+    const targetMeta = getNodeMeta(targetNode.data?.originType || '')
 
     const sourcePorts = sourceMeta.outputSchema
     const targetPorts = targetMeta.inputSchema
@@ -470,27 +267,11 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
     setSelectedEdgeIdLocal(null)
   }, [dispatch])
 
-  const handleEdgeInsert = React.useCallback((edge: Edge, nodeType: string) => {
-    const sourceNode = nodes.find(n => n.id === edge.source)
-    const targetNode = nodes.find(n => n.id === edge.target)
-    if (!sourceNode || !targetNode) return
-
-    const meta = getNodeMeta(nodeType)
-    const newNode = createAtomNode(nodeType, {
-      x: (sourceNode.position.x + targetNode.position.x) / 2,
-      y: (sourceNode.position.y + targetNode.position.y) / 2,
-    })
-    const targetFirstInput = meta.inputSchema[0]?.name || '__default'
-    const sourceFirstOutput = meta.outputSchema[0]?.name || '__default'
-
+  const onEdgeInsert = React.useCallback((edge: Edge, nodeType: string) => {
     pushHistory()
-    setLocalEdges(eds => eds.filter(e => e.id !== edge.id).concat([
-      createFlowEdge(edge.source, newNode.id, edge.sourceHandle, targetFirstInput),
-      createFlowEdge(newNode.id, edge.target, sourceFirstOutput, edge.targetHandle),
-    ]))
-    setLocalNodes(nds => nds.concat(newNode))
+    handleEdgeInsert(edge, nodeType)
     setEdgeInsert({ visible: false, edge: null, clientX: 0, clientY: 0 })
-  }, [nodes, setLocalNodes, setLocalEdges, pushHistory])
+  }, [handleEdgeInsert, pushHistory])
 
   const onEdgeClick = React.useCallback((event: React.MouseEvent, edge: Edge) => {
     setEdgeInsert({ visible: true, edge, clientX: event.clientX, clientY: event.clientY })
@@ -523,10 +304,21 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
     event.preventDefault()
     const typeStr = event.dataTransfer.getData('application/reactflow')
     if (!typeStr || !rfInstanceRef.current) return
-
     const { type } = JSON.parse(typeStr)
     const position = rfInstanceRef.current.screenToFlowPosition({ x: event.clientX, y: event.clientY })
-    const newNode = createAtomNode(type, position)
+    const meta = getNodeMeta(type)
+    const newNode: Node = {
+      id: `node_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      type: 'atom-node',
+      position,
+      data: {
+        originType: type,
+        name: meta.name,
+        category: meta.category,
+        label: meta.name,
+        config: {},
+      },
+    }
     pushHistory()
     setLocalNodes(nds => nds.concat(newNode))
   }, [setLocalNodes, pushHistory])
@@ -551,57 +343,6 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
     }
   }, [reduxSaveTimestamp, reduxEdges, selectedEdgeId, setLocalEdges])
 
-  React.useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail as { afterNodeId: string; sourcePort: string; nodeType: string }
-      if (!detail || !rfInstanceRef.current) return
-      const sourceNode = nodes.find(n => n.id === detail.afterNodeId)
-      if (!sourceNode) return
-
-      const existingFromNode = edges.filter(e => e.source === detail.afterNodeId).length
-      const newNode = createAtomNode(detail.nodeType, {
-        x: sourceNode.position.x + existingFromNode * 220 - existingFromNode * Math.min(existingFromNode, 3) * 10,
-        y: sourceNode.position.y + 140 + existingFromNode * 20,
-      })
-
-      pushHistory()
-      setLocalNodes(nds => nds.concat(newNode))
-      const meta = getNodeMeta(detail.nodeType)
-      if (meta.inputSchema.length > 0) {
-        const targetFirstInput = meta.inputSchema[0]?.name || '__default'
-        setLocalEdges(eds => eds.concat(createFlowEdge(detail.afterNodeId, newNode.id, detail.sourcePort, targetFirstInput)))
-      }
-    }
-    window.addEventListener('flow:add-node', handler)
-    return () => window.removeEventListener('flow:add-node', handler)
-  }, [nodes, edges, setLocalNodes, setLocalEdges, pushHistory])
-
-  React.useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail as { targetNodeId: string; targetPort: string; nodeType: string }
-      if (!detail || !rfInstanceRef.current) return
-
-      const targetNode = nodes.find(n => n.id === detail.targetNodeId)
-      if (!targetNode) return
-
-      const existingToNode = edges.filter(e => e.target === detail.targetNodeId).length
-      const newNode = createAtomNode(detail.nodeType, {
-        x: targetNode.position.x + existingToNode * 220 - existingToNode * Math.min(existingToNode, 3) * 10,
-        y: targetNode.position.y - 140 + existingToNode * 20,
-      })
-
-      pushHistory()
-      setLocalNodes(nds => nds.concat(newNode))
-      const meta = getNodeMeta(detail.nodeType)
-      if (meta.outputSchema.length > 0) {
-        const sourceFirstOutput = meta.outputSchema[0]?.name || '__default'
-        setLocalEdges(eds => eds.concat(createFlowEdge(newNode.id, detail.targetNodeId, sourceFirstOutput, detail.targetPort)))
-      }
-    }
-    window.addEventListener('flow:add-parent', handler)
-    return () => window.removeEventListener('flow:add-parent', handler)
-  }, [nodes, edges, setLocalNodes, setLocalEdges, pushHistory])
-
   const [connectTarget, setConnectTarget] = React.useState<{
     nodeId: string; port: string; clientX: number; clientY: number
   } | null>(null)
@@ -620,10 +361,10 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
     if (!connectTarget) return []
     const targetNode = nodes.find(n => n.id === connectTarget.nodeId)
     if (!targetNode) return []
-    const targetOriginType = targetNode.data?.originType as string
+    const targetOriginType = targetNode.data?.originType || ''
     return nodes.filter(n => {
       if (n.id === connectTarget.nodeId) return false
-      const sourceOriginType = n.data?.originType as string
+      const sourceOriginType = n.data?.originType || ''
       if (!sourceOriginType) return false
 
       if (getCompatibleTargets(sourceOriginType).includes(targetOriginType)) return true
@@ -640,24 +381,10 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
 
   const handleConnectExistingSelect = React.useCallback((sourceNodeId: string) => {
     if (!connectTarget) return
-    const sourceNode = nodes.find(n => n.id === sourceNodeId)
-    if (!sourceNode) return
-    const sourceOriginType = sourceNode.data?.originType as string
-    const sourceMeta = getNodeMeta(sourceOriginType)
-    const sourceFirstOutput = sourceMeta.outputSchema[0]?.name || '__default'
-    const newEdge: Edge = {
-      id: generateId('edge'),
-      source: sourceNodeId,
-      sourceHandle: sourceFirstOutput,
-      target: connectTarget.nodeId,
-      targetHandle: connectTarget.port,
-      type: 'flow-edge',
-      data: { linkType: 'serial', mappings: {} },
-    }
     pushHistory()
-    setLocalEdges(eds => eds.concat(newEdge))
+    handleConnectExisting(sourceNodeId, connectTarget.nodeId, connectTarget.port)
     setConnectTarget(null)
-  }, [connectTarget, nodes, setLocalEdges, pushHistory])
+  }, [connectTarget, handleConnectExisting, pushHistory])
 
   const connectTargetNode = connectTarget ? nodes.find(n => n.id === connectTarget.nodeId) : null
   const [connectPickerRect, setConnectPickerRect] = React.useState<{ left: number; top: number } | null>(null)
@@ -672,65 +399,42 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
     setConnectPickerRect({ left: screenX + 80, top: screenY })
   }, [connectTarget, connectTargetNode])
 
-  const clipboardRef = React.useRef<Node[]>([])
-
   React.useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Ignore if focus is in an input/textarea
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
 
       const selected = nodes.filter(n => n.selected)
 
-      // Ctrl+C: copy
       if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
         if (selected.length === 0) return
-        clipboardRef.current = JSON.parse(JSON.stringify(selected))
+        handleCopy()
         return
       }
 
-      // Ctrl+V: paste
       if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
         e.preventDefault()
-        if (clipboardRef.current.length === 0) return
-        const maxX = Math.max(...nodes.map(n => n.position.x)) + 200
-        const clones = clipboardRef.current.map(n => ({
-          ...JSON.parse(JSON.stringify(n)),
-          id: `node_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-          position: { x: n.position.x + maxX * 0.1 + 30, y: n.position.y + 30 },
-          selected: false,
-        }))
         pushHistory()
-        setLocalNodes(nds => [...nds, ...clones])
+        handlePaste()
         return
       }
 
       if (selected.length === 0) return
 
-      // Ctrl+D: duplicate
       if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
         e.preventDefault()
-        const maxX = Math.max(...nodes.map(n => n.position.x)) + 200
-        const clones = selected.map(n => ({
-          ...JSON.parse(JSON.stringify(n)),
-          id: `node_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-          position: { x: n.position.x + maxX * 0.1 + 30, y: n.position.y + 30 },
-          selected: false,
-        }))
         pushHistory()
-        setLocalNodes(nds => [...nds, ...clones])
+        handleDuplicateSelected()
         return
       }
 
-      // Arrow keys: nudge
-      const step = e.shiftKey ? 10 : 1
-      if (e.key === 'ArrowUp') { e.preventDefault(); setLocalNodes(nds => nds.map(n => n.selected ? { ...n, position: { x: n.position.x, y: n.position.y - step } } : n)) }
-      if (e.key === 'ArrowDown') { e.preventDefault(); setLocalNodes(nds => nds.map(n => n.selected ? { ...n, position: { x: n.position.x, y: n.position.y + step } } : n)) }
-      if (e.key === 'ArrowLeft') { e.preventDefault(); setLocalNodes(nds => nds.map(n => n.selected ? { ...n, position: { x: n.position.x - step, y: n.position.y } } : n)) }
-      if (e.key === 'ArrowRight') { e.preventDefault(); setLocalNodes(nds => nds.map(n => n.selected ? { ...n, position: { x: n.position.x + step, y: n.position.y } } : n)) }
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault()
+        handleNudge(e.key, e.shiftKey)
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [nodes, setLocalNodes, pushHistory])
+  }, [nodes, handleCopy, handlePaste, handleDuplicateSelected, handleNudge, pushHistory])
 
   return (
     <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden', background: '#fcfcfb' }}>
