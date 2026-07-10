@@ -57,7 +57,7 @@ describe('generatePythonCode — 完整功能测试', () => {
     expect(idxD).toBeGreaterThan(idxC)
   })
 
-  // ─── 3. 所有 26 种节点类型 ───
+  // ─── 3. 所有 28 种节点类型 ───
   const nodeTypes: { type: string; label: string; config?: Record<string, unknown>; assertMatch: string[] }[] = [
     { type: 'input', label: '输入', config: { default_value: 'test' }, assertMatch: ['handle_input', 'pool['] },
     { type: 'llm', label: 'LLM', config: { model: 'deepseek-chat', system_prompt: 'help' }, assertMatch: ['call_llm', 'model='] },
@@ -66,7 +66,7 @@ describe('generatePythonCode — 完整功能测试', () => {
     { type: 'loop', label: '循环', config: { loop_var: 'item' }, assertMatch: ['尚未实现'] },
     { type: 'trigger', label: '触发器', config: {}, assertMatch: ['尚未实现'] },
     { type: 'code', label: '代码', config: { code: 'return x * 2' }, assertMatch: ['execute_python_code'] },
-    { type: 'knowledge', label: '知识库', config: { top_k: 5 }, assertMatch: ['尚未实现'] },
+    { type: 'knowledge', label: '知识库', config: { top_k: 5 }, assertMatch: ['search_knowledge', 'pool['] },
     { type: 'prompt-assembly', label: '提示词组装', config: { stable: '你是助手' }, assertMatch: ['尚未实现'] },
     { type: 'http', label: 'HTTP', config: { url: 'https://api.example.com', method: 'GET' }, assertMatch: ['call_http'] },
     { type: 'search', label: '搜索', config: { top_k: 3 }, assertMatch: ['web_search'] },
@@ -80,10 +80,12 @@ describe('generatePythonCode — 完整功能测试', () => {
     { type: 'extract-memory', label: '提取', config: {}, assertMatch: ['尚未实现'] },
     { type: 'search-sessions', label: '搜索会话', config: { query: 'test' }, assertMatch: ['尚未实现'] },
     { type: 'approval', label: '审批', config: { message: '请审核' }, assertMatch: ['handle_approval', 'approved'] },
-    { type: 'tool-call', label: '工具', config: { tool_name: 'get_weather' }, assertMatch: ['尚未实现'] },
-    { type: 'register-tool', label: '注册工具', config: {}, assertMatch: ['尚未实现'] },
-    { type: 'learn-skill', label: '学习技能', config: {}, assertMatch: ['尚未实现'] },
-    { type: 'execute-skill', label: '执行技能', config: { skill_name: 'greet' }, assertMatch: ['尚未实现'] },
+    { type: 'tool-call', label: '工具', config: { tool_name: 'get_weather', args: '{}' }, assertMatch: ['call_tool', 'get_weather', 'pool['] },
+    { type: 'register-tool', label: '注册工具', config: {}, assertMatch: ['register_tool_from_llm', 'pool['] },
+    { type: 'learn-skill', label: '学习技能', config: {}, assertMatch: ['learn_skill_from_llm', 'pool['] },
+    { type: 'execute-skill', label: '执行技能', config: { skill_name: 'greet', params: '{}' }, assertMatch: ['execute_skill', 'greet', 'pool['] },
+    { type: 'mcp-tools', label: 'MCP 工具', config: { server: '__internal__' }, assertMatch: ['mcp_list_tools', 'pool['] },
+    { type: 'mcp-call', label: 'MCP 调用', config: { server: '__internal__', tool_name: 'hello', args: '{}' }, assertMatch: ['mcp_call_tool', 'pool['] },
   ]
 
   nodeTypes.forEach(({ type, label, config, assertMatch }) => {

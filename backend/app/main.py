@@ -56,6 +56,7 @@ from .routers import variables as variables_router    # /api/v1/variables/*
 from .routers import monitor as monitor_router        # /api/v1/monitor/*
 from .routers import export_compile as export_router  # /api/v1/export/*
 from .routers import trigger as trigger_router        # /api/v1/trigger/*
+from .routers import mcp as mcp_router                # /api/v1/mcp/*
 
 
 # ---------------------------------------------------------------------------
@@ -83,6 +84,8 @@ async def lifespan(app: FastAPI):
     """
     # -------------------- 启动 --------------------
     await init_db()   # 建表（幂等，重复调用安全）
+    from .services.mcp import _init_internal_tools
+    await _init_internal_tools()
     yield
     # -------------------- 关闭 --------------------
     # 后续在此处添加清理逻辑（如关闭连接池、停止后台任务）
@@ -138,6 +141,7 @@ app.include_router(variables_router.router)
 app.include_router(monitor_router.router)
 app.include_router(export_router.router)
 app.include_router(trigger_router.router)
+app.include_router(mcp_router.router)
 
 
 # ---------------------------------------------------------------------------

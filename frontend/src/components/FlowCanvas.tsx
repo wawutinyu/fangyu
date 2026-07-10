@@ -149,7 +149,21 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
     importFlow(data: unknown) {
       pushHistory()
       try {
-        const { nodes: importedNodes, edges: importedEdges } = convertFromExportFormat(data as Parameters<typeof convertFromExportFormat>[0])
+        let { nodes: importedNodes, edges: importedEdges } = convertFromExportFormat(data as Parameters<typeof convertFromExportFormat>[0])
+        // Auto-fill missing sourceHandle/targetHandle
+        importedEdges = importedEdges.map(e => {
+          const src = importedNodes.find(n => n.id === e.source)
+          const tgt = importedNodes.find(n => n.id === e.target)
+          if (!e.sourceHandle && src) {
+            const srcMeta = getNodeMeta((src.data?.originType as string) || '')
+            e = { ...e, sourceHandle: srcMeta.outputSchema[0]?.name }
+          }
+          if (!e.targetHandle && tgt) {
+            const tgtMeta = getNodeMeta((tgt.data?.originType as string) || '')
+            e = { ...e, targetHandle: tgtMeta.inputSchema[0]?.name }
+          }
+          return e
+        })
         setLocalNodes(importedNodes)
         setLocalEdges(importedEdges)
         dispatch(selectNode(null))
@@ -173,7 +187,7 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
       setLocalEdges(restoredEdges)
       showToast('已恢复', 'info')
     },
-    async runSimulation(autoResolveInput?: boolean) {
+        async runSimulation(autoResolveInput?: boolean) {
       const curNodes = nodesRef.current
       const curEdges = edgesRef.current
       if (curNodes.length === 0) return
@@ -196,7 +210,11 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
       setSimProgress(100)
       setPendingInteraction(null)
       const results = result.results.map(r => ({ nodeId: r.nodeId, nodeName: r.nodeName, output: r.output || {} }))
-      showResults(results)
+      setSimResults(results.map(r => ({ nodeName: r.nodeName, output: r.output })))
+      setLocalNodes(nds => nds.map(n => {
+        const res = results.find(r => r.nodeId === n.id)
+        return { ...n, data: { ...n.data, _simulating: false, _output: res?.output || null, _status: 'done' as const } }
+      }))
       saveRunRecord({
         id: `run_${Date.now()}`,
         time: Date.now(),

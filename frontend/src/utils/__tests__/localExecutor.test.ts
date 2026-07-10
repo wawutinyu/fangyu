@@ -212,4 +212,160 @@ describe('runLocalFlow', () => {
 
     expect(result.success).toBe(true)
   })
+
+  it('executes tool-call node', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true, result: 'tool result' }), { status: 200 })
+    )
+    const nodes = [
+      makeNode('in', 'input', '输入'),
+      makeNode('tc', 'tool-call', '工具', { tool_name: 'get_weather', args: '{"city":"Beijing"}' }),
+    ]
+    const edges = [makeEdge('e1', 'in', 'tc')]
+
+    const result = await runFlowWithResolvers(nodes, edges, [
+      p => p.resolve({ value: 'data' }),
+    ])
+
+    expect(result.success).toBe(true)
+    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/tools/execute', expect.objectContaining({ method: 'POST' }))
+    fetchSpy.mockRestore()
+  })
+
+  it('executes register-tool node', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ tools_registered: [{ name: 'weather' }], count: 1 }), { status: 200 })
+    )
+    const nodes = [
+      makeNode('in', 'input', '输入'),
+      makeNode('rt', 'register-tool', '注册工具'),
+    ]
+    const edges = [makeEdge('e1', 'in', 'rt')]
+
+    const result = await runFlowWithResolvers(nodes, edges, [
+      p => p.resolve({ value: '{"tool": "weather"}' }),
+    ])
+
+    expect(result.success).toBe(true)
+    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/tools/parse-from-llm', expect.objectContaining({ method: 'POST' }))
+    fetchSpy.mockRestore()
+  })
+
+  it('executes execute-skill node', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ found: true, content: 'skill content' }), { status: 200 })
+    )
+    const nodes = [
+      makeNode('in', 'input', '输入'),
+      makeNode('es', 'execute-skill', '执行技能', { skill_name: 'greet', params: '{}' }),
+    ]
+    const edges = [makeEdge('e1', 'in', 'es')]
+
+    const result = await runFlowWithResolvers(nodes, edges, [
+      p => p.resolve({ value: 'data' }),
+    ])
+
+    expect(result.success).toBe(true)
+    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/skills/greet')
+    fetchSpy.mockRestore()
+  })
+
+  it('executes learn-skill node', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ skills_created: [{ name: 'greet' }], count: 1 }), { status: 200 })
+    )
+    const nodes = [
+      makeNode('in', 'input', '输入'),
+      makeNode('ls', 'learn-skill', '学习技能'),
+    ]
+    const edges = [makeEdge('e1', 'in', 'ls')]
+
+    const result = await runFlowWithResolvers(nodes, edges, [
+      p => p.resolve({ value: 'LLM output with skill' }),
+    ])
+
+    expect(result.success).toBe(true)
+    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/skills/learn-from-llm', expect.objectContaining({ method: 'POST' }))
+    fetchSpy.mockRestore()
+  })
+
+  it('executes mcp-call node', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ result: 'mcp result' }), { status: 200 })
+    )
+    const nodes = [
+      makeNode('in', 'input', '输入'),
+      makeNode('mcp', 'mcp-call', 'MCP 调用', { server: '__internal__', tool_name: 'hello', args: '{}' }),
+    ]
+    const edges = [makeEdge('e1', 'in', 'mcp')]
+
+    const result = await runFlowWithResolvers(nodes, edges, [
+      p => p.resolve({ value: 'data' }),
+    ])
+
+    expect(result.success).toBe(true)
+    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/mcp/call', expect.objectContaining({ method: 'POST' }))
+    fetchSpy.mockRestore()
+  })
+
+  it('passthrough: knowledge context reaches LLM inputData', async () => {
+    // Mock knowledge search: returns context
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    fetchSpy.mockImplementation(async (url) => {
+      if (url === '/api/v1/knowledge/search') {
+        return new Response(JSON.stringify({ results: [{ content: 'AI agents are...' }], context: 'AI context data' }), { status: 200 })
+      }
+      if (url === '/api/v1/llm/chat') {
+        return new Response(JSON.stringify({ content: 'Answer with context', usage: { total_tokens: 10 } }), { status: 200 })
+      }
+      return new Response('{}', { status: 404 })
+    })
+    const nodes = [
+      makeNode('in', 'input', '输入', { default_value: 'AI 代理是什么' }),
+      makeNode('kw', 'knowledge', '知识库', { top_k: 3 }),
+      makeNode('llm', 'llm', 'LLM', { model: 'test', system_prompt: '基于知识回答' }),
+    ]
+    const edges = [
+      { ...makeEdge('e1', 'in', 'kw'), targetHandle: 'input' },
+      { ...makeEdge('e2', 'kw', 'llm'), targetHandle: 'input', sourceHandle: 'result' },
+    ]
+
+    const result = await runFlowWithResolvers(nodes, edges, [
+      p => p.resolve({ value: 'AI 代理是什么' }),
+    ])
+
+    expect(result.success).toBe(true)
+    const llmResult = result.results.find(r => r.nodeId === 'llm')
+    expect(llmResult).toBeDefined()
+    // context should be in output via passthrough
+    expect(llmResult!.output?.context).toBe('AI context data')
+    // input query should also be preserved
+    expect(llmResult!.output?.input).toBe('AI 代理是什么')
+    // LLM should have been called with context in the user message
+    const chatCall = fetchSpy.mock.calls.find(c => c[0] === '/api/v1/llm/chat')
+    expect(chatCall).toBeDefined()
+    const body = JSON.parse(chatCall![1].body as string)
+    expect(body.messages[1].content).toContain('上下文：')
+    expect(body.messages[1].content).toContain('AI context data')
+    fetchSpy.mockRestore()
+  })
+
+  it('executes mcp-tools node', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ tools: [{ name: 'hello' }] }), { status: 200 })
+    )
+    const nodes = [
+      makeNode('in', 'input', '输入'),
+      makeNode('mt', 'mcp-tools', 'MCP 工具列表', { server: '__internal__' }),
+    ]
+    const edges = [makeEdge('e1', 'in', 'mt')]
+
+    const result = await runFlowWithResolvers(nodes, edges, [
+      p => p.resolve({ value: 'data' }),
+    ])
+
+    expect(result.success).toBe(true)
+    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/mcp/tools?server=__internal__')
+    fetchSpy.mockRestore()
+  })
 })

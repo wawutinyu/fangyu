@@ -280,6 +280,67 @@ export function generatePythonCode(nodes: Node[], edges: Edge[], options: Genera
         w(`${INDENT}pool["${nodeId}"] = ${varName}`)
         break
       }
+      case 'knowledge': {
+        w(`${INDENT}# 知识库检索: top_k=${config.top_k || 5}`)
+        w(`${INDENT}${varName} = ${desktopGUI ? '' : 'await '}search_knowledge(`)
+        w(`${INDENT}${INDENT}query=${resolveTpl('')},`)
+        w(`${INDENT}${INDENT}top_k=${config.top_k || 5},`)
+        w(`${INDENT})`)
+        w(`${INDENT}pool["${nodeId}"] = ${varName}`)
+        break
+      }
+      case 'tool-call': {
+        w(`${INDENT}# 工具调用: ${config.tool_name || ''}`)
+        w(`${INDENT}${varName} = ${desktopGUI ? '' : 'await '}call_tool(`)
+        w(`${INDENT}${INDENT}name="${config.tool_name || ''}",`)
+        w(`${INDENT}${INDENT}args=${JSON.stringify(config.args || {}, defaultReplacer)},`)
+        w(`${INDENT})`)
+        w(`${INDENT}pool["${nodeId}"] = ${varName}`)
+        break
+      }
+      case 'register-tool': {
+        w(`${INDENT}# 从 LLM 输出注册工具`)
+        w(`${INDENT}${varName} = ${desktopGUI ? '' : 'await '}register_tool_from_llm(`)
+        w(`${INDENT}${INDENT}content=str(pool.get("${nodeId}", {})),`)
+        w(`${INDENT})`)
+        w(`${INDENT}pool["${nodeId}"] = ${varName}`)
+        break
+      }
+      case 'execute-skill': {
+        w(`${INDENT}# 执行技能: ${config.skill_name || ''}`)
+        w(`${INDENT}${varName} = ${desktopGUI ? '' : 'await '}execute_skill(`)
+        w(`${INDENT}${INDENT}name="${config.skill_name || ''}",`)
+        w(`${INDENT}${INDENT}params=${JSON.stringify(config.params || {}, defaultReplacer)},`)
+        w(`${INDENT})`)
+        w(`${INDENT}pool["${nodeId}"] = ${varName}`)
+        break
+      }
+      case 'learn-skill': {
+        w(`${INDENT}# 从 LLM 输出学习技能`)
+        w(`${INDENT}${varName} = ${desktopGUI ? '' : 'await '}learn_skill_from_llm(`)
+        w(`${INDENT}${INDENT}content=str(pool.get("${nodeId}", {})),`)
+        w(`${INDENT})`)
+        w(`${INDENT}pool["${nodeId}"] = ${varName}`)
+        break
+      }
+      case 'mcp-tools': {
+        w(`${INDENT}# MCP 工具列表: server=${config.server || '__internal__'}`)
+        w(`${INDENT}${varName} = ${desktopGUI ? '' : 'await '}mcp_list_tools(`)
+        w(`${INDENT}${INDENT}server="${config.server || '__internal__'}",`)
+        w(`${INDENT})`)
+        w(`${INDENT}pool["${nodeId}"] = ${varName}`)
+        break
+      }
+      case 'mcp-call': {
+        w(`${INDENT}# MCP 工具调用: ${config.tool_name || ''} @ ${config.server || '__internal__'}`)
+        w(`${INDENT}${varName} = ${desktopGUI ? '' : 'await '}mcp_call_tool(`)
+        w(`${INDENT}${INDENT}server="${config.server || '__internal__'}",`)
+        w(`${INDENT}${INDENT}name="${config.tool_name || ''}",`)
+        w(`${INDENT}${INDENT}arguments=${JSON.stringify(config.args || {}, defaultReplacer)},`)
+        w(`${INDENT})`)
+        w(`${INDENT}pool["${nodeId}"] = ${varName}`)
+        break
+      }
       default: {
         w(`${INDENT}# TODO: 节点类型 "${originType}" 尚未实现`)
         w(`${INDENT}${varName} = {}`)
@@ -328,6 +389,34 @@ export function generatePythonCode(nodes: Node[], edges: Edge[], options: Genera
     w('    """执行网络搜索（替换此函数以接入搜索 API）。"""')
     w('    return {"results": [], "summary": ""}')
     w()
+    w('def search_knowledge(query, top_k=5):')
+    w('    """知识库检索。"""')
+    w('    return {"results": [], "context": ""}')
+    w()
+    w('def call_tool(name, args=None):')
+    w('    """调用已注册的工具。"""')
+    w('    return {"success": False, "result": "", "error": f"tool {name} not implemented"}')
+    w()
+    w('def register_tool_from_llm(content):')
+    w('    """从 LLM 输出自动注册工具。"""')
+    w('    return {"tools_registered": [], "count": 0}')
+    w()
+    w('def execute_skill(name, params=None):')
+    w('    """执行技能。"""')
+    w('    return {"found": False, "result": ""}')
+    w()
+    w('def learn_skill_from_llm(content):')
+    w('    """从 LLM 输出学习技能。"""')
+    w('    return {"skills_created": [], "count": 0}')
+    w()
+    w('def mcp_list_tools(server="__internal__"):')
+    w('    """列出 MCP 服务器工具。"""')
+    w('    return {"tools": []}')
+    w()
+    w('def mcp_call_tool(server, name, arguments=None):')
+    w('    """调用 MCP 工具。"""')
+    w('    return {"success": False, "result": ""}')
+    w()
   } else {
     w('async def call_llm(model: str, system_prompt: str, user_input: str, user_template: str, context: str = "", config: dict = None) -> dict:')
     w('    # TODO: 接入你的 LLM API')
@@ -350,6 +439,34 @@ export function generatePythonCode(nodes: Node[], edges: Edge[], options: Genera
     w('async def web_search(query: str, top_k: int) -> dict:')
     w('    # TODO: 接入搜索 API')
     w('    return {"results": [], "summary": ""}')
+    w()
+    w('async def search_knowledge(query: str, top_k: int) -> dict:')
+    w('    # TODO: 接入知识库检索 API')
+    w('    return {"results": [], "context": ""}')
+    w()
+    w('async def call_tool(name: str, args: dict) -> dict:')
+    w('    # TODO: 接入工具调用 API')
+    w('    return {"success": False, "result": "", "error": f"tool {name} not implemented"}')
+    w()
+    w('async def register_tool_from_llm(content: str) -> dict:')
+    w('    # TODO: 接入 LLM 工具注册 API')
+    w('    return {"tools_registered": [], "count": 0}')
+    w()
+    w('async def execute_skill(name: str, params: dict) -> dict:')
+    w('    # TODO: 接入技能执行 API')
+    w('    return {"found": False, "result": ""}')
+    w()
+    w('async def learn_skill_from_llm(content: str) -> dict:')
+    w('    # TODO: 接入 LLM 技能学习 API')
+    w('    return {"skills_created": [], "count": 0}')
+    w()
+    w('async def mcp_list_tools(server: str = "__internal__") -> dict:')
+    w('    # TODO: 接入 MCP 工具列表 API')
+    w('    return {"tools": []}')
+    w()
+    w('async def mcp_call_tool(server: str, name: str, arguments: dict) -> dict:')
+    w('    # TODO: 接入 MCP 工具调用 API')
+    w('    return {"success": False, "result": ""}')
     w()
   }
 

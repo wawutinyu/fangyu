@@ -75,3 +75,5 @@
 {"session_id": "default", "role": "assistant", "content": "你好！我是 Hermes，一个能调用工具帮你干活的 AI 智能体。有什么需要我协助的吗？", "timestamp": "2026-07-06T15:50:56.318095"}
 {"session_id": "default", "role": "assistant", "content": "你好！我是 Hermes，一个能调用工具帮你干活的 AI 智能体。有什么需要我协助的吗？", "timestamp": "2026-07-06T15:50:57.539070"}
 {"session_id": "default", "role": "user", "content": "你好", "timestamp": "2026-07-06T15:50:57.553243"}
+{"session_id": "default", "role": "user", "content": "？", "timestamp": "2026-07-07T16:38:36.784855"}
+{"session_id": "default", "role": "assistant", "content": "[\n  {\n    \"name\": \"weather_check\",\n    \"desc\": \"提供指定地点的实时天气状况、温度、湿度、风速及未来天气预报查询功能。\"\n  }\n]", "timestamp": "2026-07-07T16:38:36.806856"}

@@ -135,6 +135,7 @@ const REQUIREMENTS_TEMPLATE = `# AI Flow Canvas — 导出流程运行时依赖
 
 cryptography>=41.0.0
 pyinstaller>=6.0.0
+sentence-transformers>=3.0.0
 `
 
 export function getFlowExportBundle(

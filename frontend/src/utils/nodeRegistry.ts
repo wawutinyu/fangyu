@@ -328,6 +328,34 @@ export const NODE_CATEGORIES: Category[] = [
         ],
         configSchema: [],
       },
+      {
+        type: 'mcp-tools', name: 'MCP 工具列表', desc: '列出 MCP 服务器的可用工具',
+        defaultConfig: { server: '__internal__' },
+        inputSchema: [],
+        outputSchema: [
+          { name: 'tools', type: 'any', label: '工具列表' },
+        ],
+        configSchema: [
+          { key: 'server', label: 'MCP 服务器', type: 'input', default: '__internal__', placeholder: '__internal__ 或外部服务器名' },
+        ],
+      },
+      {
+        type: 'mcp-call', name: 'MCP 工具调用', desc: '通过 MCP 协议调用工具',
+        defaultConfig: { server: '__internal__', tool_name: '', args: '{}' },
+        inputSchema: [
+          { name: 'server', type: 'string', label: 'MCP 服务器', required: false },
+          { name: 'tool_name', type: 'string', label: '工具名', required: false },
+          { name: 'args', type: 'object', label: '参数', required: false },
+        ],
+        outputSchema: [
+          { name: 'result', type: 'any', label: '输出' },
+        ],
+        configSchema: [
+          { key: 'server', label: 'MCP 服务器', type: 'input', default: '__internal__', placeholder: '__internal__ 或外部服务器名' },
+          { key: 'tool_name', label: '工具名', type: 'input', default: '', placeholder: '例如: web_search' },
+          { key: 'args', label: '默认参数 (JSON)', type: 'code', default: '{}', placeholder: '{"key": "value"}' },
+        ],
+      },
     ],
   },
   {

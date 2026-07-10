@@ -16,7 +16,9 @@ interface ExportNode {
 interface ExportEdge {
   id: string
   sourceNodeId: string
+  sourceHandle?: string
   targetNodeId: string
+  targetHandle?: string
   linkType: string
   mappings?: Record<string, string>
 }
@@ -52,7 +54,9 @@ export function convertToExportFormat(nodes: Node[], edges: Edge[]): ExportForma
   const exportEdges: ExportEdge[] = edges.map(e => ({
     id: e.id,
     sourceNodeId: e.source,
+    sourceHandle: e.sourceHandle,
     targetNodeId: e.target,
+    targetHandle: e.targetHandle,
     linkType: (e.data?.linkType as string) || 'serial',
     mappings: (e.data?.mappings as Record<string, string>) || {},
   }))
@@ -84,7 +88,9 @@ export function convertFromExportFormat(exportData: ExportFormat): { nodes: Node
   const edges: Edge[] = (exportData.links || []).map(e => ({
     id: e.id,
     source: e.sourceNodeId,
+    sourceHandle: e.sourceHandle,
     target: e.targetNodeId,
+    targetHandle: e.targetHandle,
     type: 'flow-edge',
     data: {
       linkType: e.linkType || 'serial',
