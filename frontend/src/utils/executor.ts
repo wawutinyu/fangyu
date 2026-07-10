@@ -41,30 +41,37 @@ export class Executor {
       return { success: false, error: '画布为空', results: [], logs: [] }
     }
 
-    const backendNodes = (this.nodes as Record<string, unknown>[]).map(n => ({
-      id: n.id,
-      type: n.type,
-      data: {
-        originType: n.type,
-        label: (n.name as string) || (n.label as string) || '',
-        config: (n.config as Record<string, unknown>) || {},
-        mappings: (n.mappings as Record<string, string>) || {},
-        inner_nodes: (n.inner_nodes as unknown[]) || [],
-        inner_links: (n.inner_links as unknown[]) || [],
-      },
-      position: (n.position as { x: number; y: number }) || { x: 0, y: 0 },
-    }))
+    const backendNodes = this.nodes.map(n => {
+      const node = n as Record<string, unknown>
+      return {
+        id: node.id,
+        type: node.type,
+        data: {
+          originType: node.type,
+          label: (node.name as string) || (node.label as string) || '',
+          config: (node.config as Record<string, unknown>) || {},
+          mappings: (node.mappings as Record<string, string>) || {},
+          inner_nodes: (node.inner_nodes as unknown[]) || [],
+          inner_links: (node.inner_links as unknown[]) || [],
+        },
+        position: node.position || { x: 0, y: 0 },
+      }
+    })
 
-    const backendEdges = (this.edges as Record<string, unknown>[]).map(e => ({
-      id: e.id,
-      source: e.sourceNodeId || e.source,
-      target: e.targetNodeId || e.target,
-      type: 'flow-edge',
-      data: {
-        linkType: ((e.data as Record<string, unknown>)?.linkType as string) || (e.linkType as string) || 'serial',
-        mappings: ((e.data as Record<string, unknown>)?.mappings as Record<string, string>) || (e.mappings as Record<string, string>) || {},
-      },
-    }))
+    const backendEdges = this.edges.map(e => {
+      const edge = e as Record<string, unknown>
+      const edgeData = edge.data as Record<string, unknown> | undefined
+      return {
+        id: edge.id,
+        source: edge.sourceNodeId || edge.source,
+        target: edge.targetNodeId || edge.target,
+        type: 'flow-edge',
+        data: {
+          linkType: (edgeData?.linkType as string) || (edge.linkType as string) || 'serial',
+          mappings: (edgeData?.mappings as Record<string, string>) || (edge.mappings as Record<string, string>) || {},
+        },
+      }
+    })
 
     try {
       const resp = await fetch('/api/v1/flow/run/stream', {

@@ -1,7 +1,7 @@
 import { getNodeMeta } from './nodeRegistry'
 import { getExecutionOrder } from './flowHelper'
 import { VariablePool } from './variablePool'
-import type { Node, Edge } from 'reactflow'
+import type { FlowNode, FlowEdge } from '../types'
 
 const FETCH_TIMEOUT = 8000
 
@@ -67,8 +67,8 @@ export interface LocalExecutorOptions {
 }
 
 export async function runLocalFlow(
-  nodes: Node[],
-  edges: Edge[],
+  nodes: FlowNode[],
+  edges: FlowEdge[],
   options: LocalExecutorOptions,
 ): Promise<{ success: boolean; results: NodeResult[] }> {
   console.log(`[exec] runLocalFlow start nodes=${nodes.length} edges=${edges.length}`)
@@ -87,10 +87,10 @@ export async function runLocalFlow(
       continue
     }
 
-    const originType = (node.data?.originType as string) || ''
+    const originType = node.data.originType || ''
     const meta = getNodeMeta(originType)
-    const rawConfig = (node.data?.config as Record<string, unknown>) || {}
-    const nodeName = (node.data?.label as string) || meta.name
+    const rawConfig = node.data.config || {}
+    const nodeName = node.data.label || meta.name
 
     console.log(`[exec] node ${nodeId} type=${originType} name=${nodeName}`)
 

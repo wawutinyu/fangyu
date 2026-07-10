@@ -1,4 +1,4 @@
-import type { Node, Edge } from 'reactflow'
+import type { FlowNode, FlowEdge } from '../types'
 import { getNodeMeta } from './nodeRegistry'
 
 const TEMPLATE_RE = /\{\{(.+?)\.(.+?)\}\}/g
@@ -57,8 +57,8 @@ export class VariablePool {
 
 export function getUpstreamSelectors(
   nodeId: string,
-  nodes: Node[],
-  edges: Edge[],
+  nodes: FlowNode[],
+  edges: FlowEdge[],
   sortByLabel = true,
 ): Array<{ selector: string; nodeLabel: string; portName: string }> {
   const upstreamIds = edges.filter(e => e.target === nodeId).map(e => e.source)
@@ -67,8 +67,8 @@ export function getUpstreamSelectors(
   for (const uid of upstreamIds) {
     const upNode = nodes.find(n => n.id === uid)
     if (!upNode) continue
-    const upMeta = getNodeMeta((upNode.data?.originType as string) || '')
-    const label = (upNode.data?.label as string) || upNode.id
+    const upMeta = getNodeMeta(upNode.data.originType)
+    const label = upNode.data.label || upNode.id
     for (const port of upMeta.outputSchema) {
       results.push({ selector: `${uid}.${port.name}`, nodeLabel: label, portName: port.name })
     }

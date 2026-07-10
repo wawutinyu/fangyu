@@ -1,4 +1,5 @@
 import { Handle, Position, type NodeProps } from 'reactflow'
+import type { FlowNodeData, InnerNodeDef, InnerLinkDef } from '../types'
 
 const LINK_COLORS: Record<string, string> = {
   serial: '#37352f',
@@ -13,18 +14,18 @@ const LINK_LABELS: Record<string, string> = {
   parallel: '⇉',
 }
 
-export default function CompositeNode({ data, selected }: NodeProps) {
-  const label = (data.label as string) || '组合原子'
-  const innerNodes = (data.inner_nodes as Array<Record<string, unknown>>) || []
-  const innerLinks = (data.inner_links as Array<Record<string, unknown>>) || []
-  const desc = (data.desc as string) || ''
+export default function CompositeNode({ data, selected }: NodeProps<FlowNodeData>) {
+  const label = data.label || '组合原子'
+  const innerNodes = (data.inner_nodes || []) as InnerNodeDef[]
+  const innerLinks = (data.inner_links || []) as InnerLinkDef[]
+  const desc = data.desc || ''
 
-  const nodeNames = new Map(innerNodes.map(n => [n.id as string, (n.label as string) || (n.name as string) || n.originType as string]))
+  const nodeNames = new Map(innerNodes.map(n => [n.id, (n.label || n.name || n.originType)]))
   const incomingLinks = new Map<string, { fromId: string; type: string }[]>()
   for (const l of innerLinks) {
-    const tgt = l.targetNodeId as string
+    const tgt = l.targetNodeId
     if (!incomingLinks.has(tgt)) incomingLinks.set(tgt, [])
-    incomingLinks.get(tgt)!.push({ fromId: l.sourceNodeId as string, type: (l.linkType as string) || 'serial' })
+    incomingLinks.get(tgt)!.push({ fromId: l.sourceNodeId, type: l.linkType || 'serial' })
   }
 
   return (
@@ -46,7 +47,7 @@ export default function CompositeNode({ data, selected }: NodeProps) {
       {innerNodes.length > 0 && (
         <div style={{ borderTop: '1px solid #e0e0de', paddingTop: 4 }}>
           {innerNodes.map((n, i) => {
-            const nid = n.id as string
+            const nid = n.id
             const nlabel = nodeNames.get(nid) || nid
             const inLinks = incomingLinks.get(nid) || []
             return (

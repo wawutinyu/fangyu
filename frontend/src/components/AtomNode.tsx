@@ -2,6 +2,7 @@ import { useCallback, useState, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { Handle, Position, type NodeProps } from 'reactflow'
 import { getNodeMeta, getCompatibleTargets, getAllNodeTypes, filterUniqueTypes } from '../utils/nodeRegistry'
+import type { FlowNodeData } from '../types'
 import NodePicker from './NodePicker'
 import { useAppSelector } from '../store/hooks'
 
@@ -26,13 +27,13 @@ function buildPorts(schema: { name: string; label?: string }[], branchCount?: nu
   return ports
 }
 
-export default function AtomNode({ data, selected, id }: NodeProps) {
-  const originType = (data.originType as string) || ''
-  const config = (data.config as Record<string, unknown>) || {}
+export default function AtomNode({ data, selected, id }: NodeProps<FlowNodeData>) {
+  const originType = data.originType || ''
+  const config = data.config || {}
   const meta = getNodeMeta(originType)
   const catColor = CATEGORY_COLORS[meta.category] || '#999'
-  const label = (data.label as string) || meta.name
-  const desc = (data.desc as string) || ''
+  const label = data.label || meta.name
+  const desc = data.desc || ''
   const [pickerVisible, setPickerVisible] = useState(false)
   const [pickerAnchor, setPickerAnchor] = useState<DOMRect | null>(null)
   const inPorts = meta.inputSchema
@@ -41,8 +42,7 @@ export default function AtomNode({ data, selected, id }: NodeProps) {
     originType === 'condition' ? (config.branch_count as number) || 2 : undefined,
   )
 
-  const existingNodeTypes = useAppSelector(s => s.flow.nodes.map(n => n.data?.originType as string))
-  const compatibleTypes = useMemo(() => filterUniqueTypes(getCompatibleTargets(originType), existingNodeTypes), [originType, existingNodeTypes])
+  const existingNodeTypes = useAppSelector(s => s.flow.nodes.map(n => n.data?.originType || ''))
   const sourcePortRef = useRef(outPorts[0]?.name || '__default')
 
   const openPicker = useCallback((rect: DOMRect, portName?: string) => {
