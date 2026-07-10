@@ -291,6 +291,28 @@ AtomNode root div
 
 > 这条规则本身也适用于你对 AGENTS.md 本身的修改——你现在正在执行第 6 步。
 
+## 最新变更（2025-07-10）
+
+### 执行器架构重构（commit 4d35e89）
+- 拆分 executor.py → 6 文件：executor.py(facade) + scheduler.py + registry.py + context.py + utils.py + 5 个 exec_*.py handler 模块
+- 28 handler 统一签名 `async def handler(ctx: NodeContext) -> dict[str, Any]`
+- 注册模式：`register()` → `register_executor("type", fn)`（无 import 副作用）
+- 错误隔离：异常 → `{error: msg}`，非 dict 返回值兜底
+- 监控：每个节点结果含 `elapsed_ms`
+- 递归防护：`_flow_depth` 上限 10 层
+- 循环引用修复：handler 模块直接 import `.scheduler`
+- 文档更新：AGENTS.md 关键文件列表、注意事项
+
+### 小修复（commit ac28df7）
+- approval 节点：`raise ValueError("APPROVAL_PENDING:...")` → `return {"_pending": True, ...}` 字典返回值
+- 子图映射加固：`convertFromExportFormat` 归一化 inner_nodes 格式（兼容扁平/ReactFlow 嵌套）
+- 7 个导出存根：switch/loop/trigger/prompt-assembly/text-process/extract-memory/search-sessions 替换 default 中的"尚未实现"
+
+### 已知问题（未修复）
+- headless Chromium fetch 挂起（`/api/v1/llm/chat`），AbortController + setTimeout 无法可靠中止
+- `SentenceTransformer` 同步 encode() 阻塞异步事件循环
+- 4 个 pre-existing 测试失败（localExecutor.test.ts: fetch spy matcher + knowledge context passthrough）
+
 ## 后续规划（详见 ROADMAP.md）
 
 1. Agent 节点（LLM + tool-call + memory 闭环）
