@@ -211,21 +211,9 @@ async def run_flow(nodes, edges, external_inputs=None, global_vars=None, on_even
         try:
             node_outputs = await executor_fn(ctx)
         except Exception as e:
-            msg = str(e)
-            if msg.startswith("APPROVAL_PENDING:"):
-                parts = msg.split(":", 2)
-                approval_id = parts[1] if len(parts) > 1 else ""
-                approval_msg = parts[2] if len(parts) > 2 else ""
-                approval_out = {"approval_id": approval_id, "message": approval_msg, "status": "pending"}
-                outputs[node_id] = approval_out
-                outputs[node_name] = approval_out
-                _add_log(node_id, node_name, "approval_pending", approval_out)
-                _emit("node_complete", {"nodeId": node_id, "nodeName": node_name, "outputs": approval_out})
-                results.append({"nodeId": node_id, "nodeName": node_name, "type": origin_type, "outputs": approval_out, "pending": True})
-                return
-            node_outputs = {"error": f"[{origin_type}] {msg}"}
-            _add_log(node_id, node_name, "error", {"error": msg})
-            _emit("node_error", {"nodeId": node_id, "nodeName": node_name, "error": msg})
+            node_outputs = {"error": f"[{origin_type}] {str(e)}"}
+            _add_log(node_id, node_name, "error", {"error": str(e)})
+            _emit("node_error", {"nodeId": node_id, "nodeName": node_name, "error": str(e)})
 
         if not isinstance(node_outputs, dict):
             node_outputs = {"result": node_outputs, "error": f"handler returned {type(node_outputs).__name__}"}

@@ -81,7 +81,18 @@ export function convertFromExportFormat(exportData: ExportFormat): { nodes: Node
       category: n.category,
       label: n.name || '',
       config: n.config || {},
-      ...(n.is_group ? { is_group: true, inner_nodes: n.inner_nodes || [], inner_links: n.inner_links || [], mappings: n.mappings || {} } : {}),
+      ...(n.is_group ? {
+        is_group: true,
+        inner_nodes: (n.inner_nodes || []).map(inode => {
+          if (inode && typeof inode === 'object' && 'data' in inode && (inode as Record<string, unknown>).data && typeof (inode as Record<string, unknown>).data === 'object') {
+            const d = (inode as Record<string, unknown>).data as Record<string, unknown>
+            return { id: inode.id as string, originType: (d.originType as string) || 'start', config: (d.config as Record<string, unknown>) || {}, mappings: (d.mappings as Record<string, string>) || {} }
+          }
+          return inode
+        }),
+        inner_links: n.inner_links || [],
+        mappings: n.mappings || {},
+      } : {}),
     },
   }))
 

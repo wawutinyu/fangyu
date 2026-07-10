@@ -127,7 +127,7 @@ async def _exec_approval(ctx: NodeContext) -> dict[str, Any]:
     message = ctx.inputs.get("input", ctx.config.get("message", ""))
     approval_id = f"apr_{hash(str(ctx.config)) % 1000000:06d}"
     ctx.global_vars["_pending_approval"] = {"approval_id": approval_id, "message": message, "status": "pending"}
-    raise ValueError(f"APPROVAL_PENDING:{approval_id}:{message}")
+    return {"_pending": True, "approval_id": approval_id, "message": message, "status": "pending"}
 
 
 async def _exec_trigger(ctx: NodeContext) -> dict[str, Any]:

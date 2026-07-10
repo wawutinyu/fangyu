@@ -341,6 +341,91 @@ export function generatePythonCode(nodes: Node[], edges: Edge[], options: Genera
         w(`${INDENT}pool["${nodeId}"] = ${varName}`)
         break
       }
+      case 'switch': {
+        const expr = config.expression || 'input'
+        w(`${INDENT}# 多路分支: ${expr}`)
+        w(`${INDENT}switch_val = ${resolveTpl(expr)}`)
+        w(`${INDENT}${varName} = {"result": switch_val, "branch": f"branch_{switch_val}"}`)
+        w(`${INDENT}pool["${nodeId}"] = ${varName}`)
+        break
+      }
+      case 'loop': {
+        const loopVar = config.loop_var || 'item'
+        const maxIter = config.max_iterations || 100
+        w(`${INDENT}# 循环体: loop_var=${loopVar}, max_iter=${maxIter}`)
+        w(`${INDENT}loop_arr = pool.get("${nodeId}", {}).get("array", [])`)
+        w(`${INDENT}if not isinstance(loop_arr, list): loop_arr = [loop_arr]`)
+        w(`${INDENT}loop_results = []`)
+        w(`${INDENT}for idx, ${loopVar} in enumerate(loop_arr[:${maxIter}]):`)
+        w(`${INDENT}${INDENT}# 子图执行（未展开）`)
+        w(`${INDENT}${INDENT}loop_results.append({"index": idx, "${loopVar}": ${loopVar}})}`)
+        w(`${INDENT}${varName} = {"result": loop_results, "count": len(loop_results)}`)
+        w(`${INDENT}pool["${nodeId}"] = ${varName}`)
+        break
+      }
+      case 'trigger': {
+        w(`${INDENT}# 触发器: 接收外部消息`)
+        w(`${INDENT}trigger_msg = _external_inputs.get("message", pool.get("${nodeId}", {}).get("message", ""))`)
+        w(`${INDENT}${varName} = {"message": trigger_msg, "triggered": True}`)
+        w(`${INDENT}pool["${nodeId}"] = ${varName}`)
+        break
+      }
+      case 'prompt-assembly': {
+        const stable = (config.stable as string) || ''
+        const context = (config.context as string) || ''
+        const volatile = (config.volatile as string) || ''
+        w(`${INDENT}# 提示词组装: stable + context + volatile`)
+        w(`${INDENT}stable_part = ${resolveTpl(stable)}`)
+        w(`${INDENT}context_part = ${resolveTpl(context)}`)
+        w(`${INDENT}volatile_part = ${resolveTpl(volatile)}`)
+        w(`${INDENT}${varName} = {"prompt": f"{stable_part}\\n{context_part}\\n{volatile_part}".strip()}`)
+        w(`${INDENT}pool["${nodeId}"] = ${varName}`)
+        break
+      }
+      case 'text-process': {
+        const operation = config.operation as string || 'upper'
+        w(`${INDENT}# 文本处理: ${operation}`)
+        w(`${INDENT}input_text = str(pool.get("${nodeId}", {}).get("input", pool.get("${nodeId}", "")))`)
+        w(`${INDENT}if "${operation}" == "upper":`)
+        w(`${INDENT}${INDENT}result_text = input_text.upper()`)
+        w(`${INDENT}elif "${operation}" == "lower":`)
+        w(`${INDENT}${INDENT}result_text = input_text.lower()`)
+        w(`${INDENT}elif "${operation}" == "trim":`)
+        w(`${INDENT}${INDENT}result_text = input_text.strip()`)
+        w(`${INDENT}elif "${operation}" == "replace":`)
+        w(`${INDENT}${INDENT}old = "${((config.replace_old as string) || '').replace(/"/g, '\\"')}"`)
+        w(`${INDENT}${INDENT}new = "${((config.replace_new as string) || '').replace(/"/g, '\\"')}"`)
+        w(`${INDENT}${INDENT}result_text = input_text.replace(old, new)`)
+        w(`${INDENT}else:`)
+        w(`${INDENT}${INDENT}result_text = input_text.upper()`)
+        w(`${INDENT}${varName} = {"result": result_text}`)
+        w(`${INDENT}pool["${nodeId}"] = ${varName}`)
+        break
+      }
+      case 'extract-memory': {
+        const memKey = config.memory_key as string || 'extracted'
+        w(`${INDENT}# 事实提取: key=${memKey}`)
+        w(`${INDENT}source_text = str(pool.get("${nodeId}", {}).get("input", ""))`)
+        w(`${INDENT}extracted = source_text.strip() if source_text else None`)
+        w(`${INDENT}if extracted:`)
+        w(`${INDENT}${INDENT}_memory["${memKey}"] = extracted`)
+        w(`${INDENT}${varName} = {"extracted": extracted, "count": 1 if extracted else 0}`)
+        w(`${INDENT}pool["${nodeId}"] = ${varName}`)
+        break
+      }
+      case 'search-sessions': {
+        const query = config.query as string || ''
+        w(`${INDENT}# 会话搜索: query=${query}`)
+        w(`${INDENT}search_q = ${resolveTpl(query)}`)
+        w(`${INDENT}search_results = []`)
+        w(`${INDENT}# 遍历 _memory 实现会话搜索`)
+        w(`${INDENT}for key, val in _memory.items():`)
+        w(`${INDENT}${INDENT}if isinstance(val, str) and search_q.lower() in val.lower():`)
+        w(`${INDENT}${INDENT}${INDENT}search_results.append({"key": key, "content": val})`)
+        w(`${INDENT}${varName} = {"results": search_results, "count": len(search_results)}`)
+        w(`${INDENT}pool["${nodeId}"] = ${varName}`)
+        break
+      }
       default: {
         w(`${INDENT}# TODO: 节点类型 "${originType}" 尚未实现`)
         w(`${INDENT}${varName} = {}`)
