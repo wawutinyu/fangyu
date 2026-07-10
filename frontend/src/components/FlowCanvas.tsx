@@ -21,7 +21,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks'
 import { store } from '../store'
 import { setNodes, setEdges, setEdgeData, selectEdge, openEdgeConfigPanel } from '../store/flowSlice'
 import { selectNode, openConfigPanel } from '../store/flowSlice'
-import { getNodeMeta, getCompatibleTargets, getAllNodeTypes, filterUniqueTypes } from '../utils/nodeRegistry'
+import { getNodeMeta, getCompatibleTargets, getAllNodeTypes, filterUniqueTypes, LEGACY_TYPES } from '../utils/nodeRegistry'
 import { generateId, convertFromExportFormat, convertToExportFormat } from '../utils/flowHelper'
 import { Executor } from '../utils/executor'
 import { type PendingInteraction } from '../utils/localExecutor'
@@ -76,6 +76,7 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
   const existingNodeTypes = useAppSelector(s => s.flow.nodes.map(n => n.data?.originType || ''))
   const edgeInsertableTypes = React.useMemo(() => {
     return filterUniqueTypes(getAllNodeTypes().filter(type => {
+      if (LEGACY_TYPES.has(type)) return false
       const meta = getNodeMeta(type)
       return meta.inputSchema.length > 0 && meta.outputSchema.length > 0
     }), existingNodeTypes)

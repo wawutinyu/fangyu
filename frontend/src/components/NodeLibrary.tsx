@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react'
-import { NODE_CATEGORIES } from '../utils/nodeRegistry'
+import { NODE_CATEGORIES, LEGACY_TYPES } from '../utils/nodeRegistry'
 
 interface Props {
   onCollapse?: () => void
@@ -16,9 +16,11 @@ export default function NodeLibrary({ onCollapse }: Props) {
       .map(cat => ({
         ...cat,
         nodes: cat.nodes.filter(n =>
-          n.name.toLowerCase().includes(q) ||
-          n.type.toLowerCase().includes(q) ||
-          n.desc.toLowerCase().includes(q)
+          !LEGACY_TYPES.has(n.type) && (
+            n.name.toLowerCase().includes(q) ||
+            n.type.toLowerCase().includes(q) ||
+            n.desc.toLowerCase().includes(q)
+          )
         ),
       }))
       .filter(cat => cat.nodes.length > 0)

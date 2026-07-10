@@ -137,6 +137,21 @@ export const NODE_CATEGORIES: Category[] = [
         outputSchema: [],
         configSchema: [],
       },
+      {
+        type: 'branch', name: '条件/多路分支', desc: '条件分支或多值匹配路由',
+        defaultConfig: { mode: 'bool', expression: '', branch_count: 2, cases: [] },
+        inputSchema: [{ name: 'input', type: 'any', label: '输入值', required: true }],
+        outputSchema: [
+          { name: 'true', type: 'any', label: 'True 分支' },
+          { name: 'false', type: 'any', label: 'False 分支' },
+        ],
+        configSchema: [
+          { key: 'mode', label: '模式', type: 'select', default: 'bool', options: ['bool', 'multi'] },
+          { key: 'expression', label: '表达式', type: 'code', default: '', placeholder: '例如: input > 10（bool）或 input.status（multi）' },
+          { key: 'branch_count', label: '分支数', type: 'number', default: 2, min: 2, max: 10 },
+          { key: 'cases', label: '分支定义', type: 'key-value', default: [], itemLabel: '值', itemValue: '分支名' },
+        ],
+      },
     ],
   },
   {
@@ -356,6 +371,52 @@ export const NODE_CATEGORIES: Category[] = [
           { key: 'args', label: '默认参数 (JSON)', type: 'code', default: '{}', placeholder: '{"key": "value"}' },
         ],
       },
+      {
+        type: 'execute', name: '执行', desc: '调用工具或执行技能',
+        defaultConfig: { mode: 'tool', tool_name: '', skill_name: '', args: '{}', params: '{}' },
+        inputSchema: [
+          { name: 'input', type: 'any', label: '输入', required: false },
+        ],
+        outputSchema: [
+          { name: 'result', type: 'any', label: '输出' },
+        ],
+        configSchema: [
+          { key: 'mode', label: '模式', type: 'select', default: 'tool', options: ['tool', 'skill'] },
+          { key: 'tool_name', label: '工具名', type: 'input', default: '', placeholder: '例如: web_search' },
+          { key: 'skill_name', label: '技能名', type: 'input', default: '', placeholder: '例如: my_skill' },
+          { key: 'args', label: '工具参数 (JSON)', type: 'code', default: '{}', placeholder: '{"key": "value"}' },
+          { key: 'params', label: '技能参数 (JSON)', type: 'code', default: '{}', placeholder: '{"key": "value"}' },
+        ],
+      },
+      {
+        type: 'register', name: '注册', desc: '从 LLM 输出自动注册工具或技能',
+        defaultConfig: { mode: 'tool' },
+        inputSchema: [
+          { name: 'llm_output', type: 'string', label: 'LLM 输出', required: false },
+        ],
+        outputSchema: [
+          { name: 'result', type: 'any', label: '输出' },
+        ],
+        configSchema: [
+          { key: 'mode', label: '注册类型', type: 'select', default: 'tool', options: ['tool', 'skill'] },
+        ],
+      },
+      {
+        type: 'mcp', name: 'MCP 操作', desc: 'MCP 工具列表查询或调用',
+        defaultConfig: { operation: 'list', server: '__internal__', tool_name: '', args: '{}' },
+        inputSchema: [
+          { name: 'input', type: 'any', label: '输入', required: false },
+        ],
+        outputSchema: [
+          { name: 'result', type: 'any', label: '输出' },
+        ],
+        configSchema: [
+          { key: 'operation', label: '操作', type: 'select', default: 'list', options: ['list', 'call'] },
+          { key: 'server', label: 'MCP 服务器', type: 'input', default: '__internal__', placeholder: '__internal__ 或外部服务器名' },
+          { key: 'tool_name', label: '工具名', type: 'input', default: '', placeholder: '例如: web_search' },
+          { key: 'args', label: '参数 (JSON)', type: 'code', default: '{}', placeholder: '{"key": "value"}' },
+        ],
+      },
     ],
   },
   {
@@ -483,9 +544,38 @@ export const NODE_CATEGORIES: Category[] = [
           { key: 'limit', label: '返回条数', type: 'number', default: 10, min: 1, max: 100 },
         ],
       },
+      {
+        type: 'memory', name: '记忆操作', desc: '记忆读取/写入/事实提取/会话搜索',
+        defaultConfig: { operation: 'read', memory_key: '', scope: 'user', max_facts: 3, limit: 10 },
+        inputSchema: [
+          { name: 'input', type: 'any', label: '输入', required: false },
+        ],
+        outputSchema: [
+          { name: 'result', type: 'any', label: '输出' },
+        ],
+        configSchema: [
+          { key: 'operation', label: '操作', type: 'select', default: 'read', options: ['read', 'write', 'extract', 'search'] },
+          { key: 'memory_key', label: '记忆键名', type: 'input', default: '', placeholder: '例如: user_preferences' },
+          { key: 'scope', label: '作用域', type: 'select', default: 'user', options: ['session', 'user', 'global'] },
+          { key: 'max_facts', label: '最大提取数', type: 'number', default: 3, min: 1, max: 20 },
+          { key: 'limit', label: '返回条数', type: 'number', default: 10, min: 1, max: 100 },
+        ],
+      },
     ],
   },
 ]
+
+export const LEGACY_TYPES = new Set([
+  'condition', 'switch',
+  'memory-read', 'memory-write', 'extract-memory', 'search-sessions',
+  'tool-call', 'execute-skill',
+  'register-tool', 'learn-skill',
+  'mcp-tools', 'mcp-call',
+])
+
+export function getActiveNodeTypes(): string[] {
+  return getAllNodeTypes().filter(t => !LEGACY_TYPES.has(t))
+}
 
 export const EDGE_TYPES: Record<string, { name: string; color: string; style: string }> = {
   serial: { name: '串行', color: '#333', style: 'solid' },

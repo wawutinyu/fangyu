@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useEffect, useLayoutEffect } from 'react'
-import { NODE_CATEGORIES } from '../utils/nodeRegistry'
+import { NODE_CATEGORIES, LEGACY_TYPES } from '../utils/nodeRegistry'
 
 interface NodePickerProps {
   compatibleTypes: string[]
@@ -60,6 +60,7 @@ export default function NodePicker({ compatibleTypes, anchorRect, onSelect, onCl
       .map(cat => ({
         ...cat,
         nodes: cat.nodes.filter(n =>
+          !LEGACY_TYPES.has(n.type) &&
           validTypes.has(n.type) &&
           (!q || n.name.toLowerCase().includes(q) || n.type.toLowerCase().includes(q) || n.desc.toLowerCase().includes(q))
         ),

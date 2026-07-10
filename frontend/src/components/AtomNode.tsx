@@ -1,7 +1,7 @@
 import { useCallback, useState, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { Handle, Position, type NodeProps } from 'reactflow'
-import { getNodeMeta, getCompatibleTargets, getAllNodeTypes, filterUniqueTypes } from '../utils/nodeRegistry'
+import { getNodeMeta, getCompatibleTargets, getAllNodeTypes, filterUniqueTypes, LEGACY_TYPES } from '../utils/nodeRegistry'
 import type { FlowNodeData } from '../types'
 import NodePicker from './NodePicker'
 import { useAppSelector } from '../store/hooks'
@@ -66,7 +66,10 @@ export default function AtomNode({ data, selected, id }: NodeProps<FlowNodeData>
   const targetPortRef = useRef('')
 
   const compatibleSources = useMemo(() => {
-    return filterUniqueTypes(getAllNodeTypes().filter(t => getCompatibleTargets(t).includes(originType)), existingNodeTypes)
+    return filterUniqueTypes(getAllNodeTypes().filter(t => {
+      if (LEGACY_TYPES.has(t)) return false
+      return getCompatibleTargets(t).includes(originType)
+    }), existingNodeTypes)
   }, [originType, existingNodeTypes])
 
   const handleInputPortClick = useCallback((portName: string, el?: HTMLElement) => {

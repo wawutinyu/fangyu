@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Optional
 
@@ -29,13 +30,15 @@ def text_similarity(query: str, content: str) -> float:
     return overlap / len(q_ngrams)
 
 
-def _get_encoder():
+async def _get_encoder():
     global _encoder
     if _encoder is not None:
         return _encoder
     try:
         from sentence_transformers import SentenceTransformer
-        _encoder = SentenceTransformer("BAAI/bge-small-zh-v1.5")
+        _encoder = await asyncio.to_thread(
+            SentenceTransformer, "BAAI/bge-small-zh-v1.5"
+        )
         logger.info("Loaded local embedding model: BAAI/bge-small-zh-v1.5")
     except ImportError:
         logger.warning("sentence-transformers not installed, using n-gram similarity")
@@ -47,11 +50,11 @@ def _get_encoder():
 
 
 async def get_embedding(text: str) -> Optional[list[float]]:
-    enc = _get_encoder()
+    enc = await _get_encoder()
     if enc is None:
         return None
     try:
-        emb = enc.encode(text, normalize_embeddings=True)
+        emb = await asyncio.to_thread(enc.encode, text, normalize_embeddings=True)
         return emb.tolist()
     except Exception as e:
         logger.warning(f"Embedding failed: {e}")
@@ -59,11 +62,11 @@ async def get_embedding(text: str) -> Optional[list[float]]:
 
 
 async def get_embeddings_batch(texts: list[str]) -> list[Optional[list[float]]]:
-    enc = _get_encoder()
+    enc = await _get_encoder()
     if enc is None or not texts:
         return [None] * len(texts)
     try:
-        embs = enc.encode(texts, normalize_embeddings=True)
+        embs = await asyncio.to_thread(enc.encode, texts, normalize_embeddings=True)
         return [e.tolist() for e in embs]
     except Exception as e:
         logger.warning(f"Batch embedding failed: {e}")

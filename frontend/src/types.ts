@@ -1,14 +1,14 @@
 import type { Node, Edge } from 'reactflow'
 
 export type FlowNodeType =
-  | 'start' | 'end' | 'condition' | 'switch' | 'loop' | 'composite'
+  | 'start' | 'end' | 'condition' | 'switch' | 'branch' | 'loop' | 'composite'
   | 'trigger' | 'input' | 'output' | 'approval'
   | 'llm' | 'code' | 'knowledge' | 'search' | 'prompt-assembly'
   | 'http' | 'json-parse' | 'transform' | 'text-process'
   | 'variable-set' | 'variable-get'
-  | 'memory-read' | 'memory-write' | 'extract-memory' | 'search-sessions'
-  | 'tool-call' | 'register-tool' | 'execute-skill' | 'learn-skill'
-  | 'mcp-tools' | 'mcp-call'
+  | 'memory-read' | 'memory-write' | 'extract-memory' | 'search-sessions' | 'memory'
+  | 'tool-call' | 'register-tool' | 'execute-skill' | 'learn-skill' | 'execute' | 'register'
+  | 'mcp-tools' | 'mcp-call' | 'mcp'
 
 export interface FlowNodeData {
   originType: FlowNodeType | string
