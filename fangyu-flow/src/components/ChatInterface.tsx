@@ -4,7 +4,7 @@ import { Executor } from '../utils/executor'
 import type { ExecutorLog } from '../utils/executor'
 import { convertToExportFormat } from '../utils/flowHelper'
 import { useAppSelector } from '../store/hooks'
-import { deployAgentsToBackend } from '../utils/agentDeploy'
+import { deployAllAgents } from '../utils/externalAgent'
 import {
   buildPipelineFromCanvas,
   hasCollaborationPipeline,
@@ -54,7 +54,7 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(messages))
   }, [messages])
 
-  const agents = agentNodes.filter(n => n.type === 'a2a-agent')
+  const agents = agentNodes.filter(n => n.type === 'a2a-agent' || n.type === 'a2a-external')
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
@@ -64,7 +64,7 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
 
   const sendToAgent = useCallback(async (text: string) => {
     try {
-      await deployAgentsToBackend(agentNodes)
+      await deployAllAgents(agentNodes)
 
       if (agentCollabMode && collabPipeline && collabPipeline.length >= 2) {
         const result = await orchestrateAgents(text, collabPipeline, 'append')

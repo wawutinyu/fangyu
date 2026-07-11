@@ -1,11 +1,13 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
-import type { AgentCard, TrustConfig, RoutingRule } from '../utils/a2aProtocol'
+import type { AgentCard, TrustConfig, RoutingRule, AgentKind } from '../utils/a2aProtocol'
+import type { ExternalAgentConfig } from '../utils/externalAgent'
 
 export interface AgentCanvasNode {
   id: string
   label: string
-  type: 'a2a-agent' | 'a2a-router' | 'a2a-group'
-  agentKind?: 'interface' | 'worker' | 'hybrid'
+  type: 'a2a-agent' | 'a2a-external' | 'a2a-router' | 'a2a-group'
+  agentKind?: AgentKind
+  externalConfig?: ExternalAgentConfig
   position: { x: number; y: number }
   agentCard?: AgentCard
   trust?: TrustConfig

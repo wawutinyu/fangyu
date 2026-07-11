@@ -3,6 +3,7 @@ import { useAppSelector, useAppDispatch } from '../store/hooks'
 import { updateAgentCard, updateAgentNode, updateAgentEdge, updateRoutingRules, updateSkillFlow, clearSkillFlow } from '../store/agentSlice'
 import type { AgentSkill, RoutingRule, AgentKind } from '../utils/a2aProtocol'
 import { snapshotFlowFromCanvas } from '../utils/agentDeploy'
+import { discoverExternalAgent, authorizeExternalAgent } from '../utils/externalAgent'
 
 export default function AgentConfigPanel() {
   const dispatch = useAppDispatch()
@@ -13,12 +14,14 @@ export default function AgentConfigPanel() {
 
   const node = useMemo(() => nodes.find(n => n.id === selectedNodeId), [nodes, selectedNodeId])
   const edge = useMemo(() => edges.find(e => e.id === selectedEdgeId), [edges, selectedEdgeId])
+  const isExternal = node?.type === 'a2a-external'
   const isRouter = node?.type === 'a2a-router'
-  const [tab, setTab] = useState<'card' | 'trust' | 'transport' | 'task' | 'ext' | 'router'>('card')
+  const [tab, setTab] = useState<'card' | 'trust' | 'transport' | 'task' | 'ext' | 'router' | 'external'>('card')
 
   useEffect(() => {
     if (isRouter) setTab('router')
-  }, [isRouter])
+    else if (isExternal) setTab('external')
+  }, [isRouter, isExternal])
   const [newRuleSkill, setNewRuleSkill] = useState('')
   const [newRuleTarget, setNewRuleTarget] = useState('')
   const [newRuleCondition, setNewRuleCondition] = useState('')
@@ -50,8 +53,8 @@ export default function AgentConfigPanel() {
     )
   }
 
-  const card = node.agentCard
-  const trust = node.trust
+  const card = node.agentCard || { name: node.label, version: '1.0.0', capabilities: { streaming: false, pushNotifications: false }, skills: [], defaultInterface: { type: 'a2a' } }
+  const trust = node.trust || { enabled: false, algorithm: 'Ed25519' as const, anchorSource: 'auto' as const, policies: [], revocationList: [], auditEnabled: false, auditPath: '' }
 
   const updateCard = (patch: Partial<typeof card>) => {
     dispatch(updateAgentCard({ nodeId: node.id, card: { ...card, ...patch } }))
@@ -113,13 +116,48 @@ export default function AgentConfigPanel() {
   }
 
   const getAgentOptions = () => {
-    return nodes.filter(n => n.type === 'a2a-agent' && n.id !== node.id)
+    return nodes.filter(n => (n.type === 'a2a-agent' || n.type === 'a2a-external') && n.id !== node.id)
       .map(n => ({ id: n.id, label: n.label }))
+  }
+
+  const updateExternal = (patch: Partial<NonNullable<typeof node.externalConfig>>) => {
+    dispatch(updateAgentNode({
+      id: node.id,
+      data: {
+        externalConfig: {
+          ...(node.externalConfig || { rpcUrl: '', agentId: '', publicKey: '', remoteName: '', authorized: false, allowedSkills: ['*'] }),
+          ...patch,
+        },
+      },
+    }))
+  }
+
+  const handleDiscover = async () => {
+    const url = node.externalConfig?.rpcUrl
+    if (!url) { alert('请先填写 RPC URL'); return }
+    try {
+      const result = await discoverExternalAgent(url)
+      updateCard(result.card)
+      updateExternal({ rpcUrl: result.rpc_url, remoteName: result.card.name || '' })
+    } catch (e: unknown) {
+      alert(`发现失败: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  const handleAuthorize = async (authorized: boolean) => {
+    updateExternal({ authorized })
+    try {
+      await authorizeExternalAgent(node.id, authorized, node.externalConfig?.allowedSkills)
+    } catch (e: unknown) {
+      alert(`授权同步失败: ${e instanceof Error ? e.message : String(e)}`)
+    }
   }
 
   const tabs = isRouter
     ? [{ key: 'router' as const, label: '路由规则' }]
-    : [
+    : isExternal
+      ? [{ key: 'external' as const, label: '外部接入' }, { key: 'card' as const, label: 'AgentCard' }]
+      : [
         { key: 'card' as const, label: 'AgentCard' },
         { key: 'trust' as const, label: 'ATP 可信' },
         { key: 'transport' as const, label: '传输' },
@@ -178,7 +216,45 @@ export default function AgentConfigPanel() {
           </div>
         )}
 
-        {!isRouter && tab === 'card' && (
+        {isExternal && tab === 'external' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <Field label="RPC URL">
+              <input value={node.externalConfig?.rpcUrl || ''} onChange={e => updateExternal({ rpcUrl: e.target.value })} placeholder="http://127.0.0.1:9001/rpc" />
+            </Field>
+            <button onClick={handleDiscover} style={{ padding: '4px 12px', border: '1px solid #fa8c16', borderRadius: 6, background: '#fff7e6', color: '#fa8c16', cursor: 'pointer', fontSize: 12 }}>
+              发现远程 AgentCard
+            </button>
+            <Field label="远程 Agent 名称">
+              <input value={node.externalConfig?.remoteName || ''} onChange={e => updateExternal({ remoteName: e.target.value })} />
+            </Field>
+            <Field label="平台 Agent ID">
+              <input value={node.externalConfig?.agentId || ''} onChange={e => updateExternal({ agentId: e.target.value })} placeholder="fyu:agent:..." />
+            </Field>
+            <Field label="公钥 (hex)">
+              <textarea value={node.externalConfig?.publicKey || ''} onChange={e => updateExternal({ publicKey: e.target.value })} rows={2} />
+            </Field>
+            <Field label="允许技能 (逗号分隔)">
+              <input value={(node.externalConfig?.allowedSkills || ['*']).join(', ')} onChange={e => updateExternal({ allowedSkills: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} />
+            </Field>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+              <input type="checkbox" checked={!!node.externalConfig?.authorized} onChange={e => handleAuthorize(e.target.checked)} />
+              授权接入（允许编排调用此外部 Agent）
+            </label>
+            <div style={{ fontSize: 11, color: '#888', background: '#fff7e6', padding: 8, borderRadius: 6 }}>
+              外部 Agent 需填写 agent_id + 公钥（从 bundle 的 identity.json 获取），并完成授权后才会被协作链调用。
+            </div>
+          </div>
+        )}
+
+        {isExternal && tab === 'card' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <Field label="名称"><input value={card.name} onChange={e => updateCard({ name: e.target.value })} /></Field>
+            <Field label="描述"><textarea value={card.description || ''} onChange={e => updateCard({ description: e.target.value })} rows={2} /></Field>
+            <div style={{ fontSize: 11, color: '#888' }}>AgentCard 通常由「发现远程」自动填充，也可手动编辑。</div>
+          </div>
+        )}
+
+        {!isRouter && !isExternal && tab === 'card' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <Field label="Agent 类型">
               <select
@@ -243,7 +319,7 @@ export default function AgentConfigPanel() {
           </div>
         )}
 
-        {!isRouter && tab === 'trust' && (
+        {!isRouter && !isExternal && tab === 'trust' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
               <input type="checkbox" checked={trust.enabled} onChange={e => updateNodeData({ trust: { ...trust, enabled: e.target.checked } })} />
@@ -287,7 +363,7 @@ export default function AgentConfigPanel() {
           </div>
         )}
 
-        {!isRouter && tab === 'transport' && (
+        {!isRouter && !isExternal && tab === 'transport' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <Field label="传输协议">
               <select value={card.defaultInterface.type} onChange={e => updateCard({ defaultInterface: { ...card.defaultInterface, type: e.target.value as any } })}>
@@ -305,7 +381,7 @@ export default function AgentConfigPanel() {
           </div>
         )}
 
-        {!isRouter && tab === 'task' && (
+        {!isRouter && !isExternal && tab === 'task' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <Field label="超时 (ms)"><input type="number" value={node.timeout} onChange={e => updateNodeData({ timeout: parseInt(e.target.value) || 30000 })} /></Field>
             <Field label="重试次数"><input type="number" value={node.retryCount} onChange={e => updateNodeData({ retryCount: parseInt(e.target.value) || 0 })} min={0} max={10} /></Field>
@@ -321,7 +397,7 @@ export default function AgentConfigPanel() {
           </div>
         )}
 
-        {!isRouter && tab === 'ext' && (
+        {!isRouter && !isExternal && tab === 'ext' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ fontSize: 12, color: '#888' }}>自定义扩展属性 (key=value)</div>
             {Object.entries(node.extensions).map(([k, v]) => (

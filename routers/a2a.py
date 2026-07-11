@@ -98,6 +98,67 @@ def deploy_agents(body: DeployAgentsRequest):
     }
 
 
+class RegisterExternalRequest(BaseModel):
+    name: str
+    card: dict
+    rpc_url: str
+    agent_id: str
+    public_key: str
+    remote_name: str = ""
+    allowed_skills: list[str] = ["*"]
+    authorized: bool = False
+
+
+class AuthorizeExternalRequest(BaseModel):
+    authorized: bool = True
+    allowed_skills: list[str] | None = None
+
+
+class DiscoverExternalRequest(BaseModel):
+    rpc_url: str
+
+
+@router.post("/agents/register_external")
+def register_external_agent(body: RegisterExternalRequest):
+    AgentRegistry.register_external(
+        body.name,
+        body.card,
+        body.rpc_url,
+        body.agent_id,
+        body.public_key,
+        remote_name=body.remote_name,
+        allowed_skills=body.allowed_skills,
+        authorized=body.authorized,
+    )
+    return {
+        "success": True,
+        "name": body.name,
+        "external": True,
+        "authorized": body.authorized,
+    }
+
+
+@router.post("/agents/{name}/authorize")
+def authorize_external_agent(name: str, body: AuthorizeExternalRequest):
+    ok = AgentRegistry.authorize_external(name, body.authorized, body.allowed_skills)
+    if not ok:
+        raise HTTPException(404, "External agent not found")
+    return {"success": True, "name": name, "authorized": body.authorized}
+
+
+@router.post("/agents/discover")
+def discover_external_agent(body: DiscoverExternalRequest):
+    from fangyu.engine.a2a_remote import fetch_remote_card
+
+    rpc_url = body.rpc_url.rstrip("/")
+    if not rpc_url.endswith("/rpc"):
+        rpc_url = f"{rpc_url}/rpc"
+    card = fetch_remote_card(rpc_url)
+    if not card:
+        raise HTTPException(400, "无法从远程端点获取 AgentCard")
+    return {"success": True, "rpc_url": rpc_url, "card": card}
+
+
 @router.post("/agents/register")
 def register_agent(body: RegisterAgentRequest):
     AgentRegistry.register(body.name, body.card, body.flow_mappings)

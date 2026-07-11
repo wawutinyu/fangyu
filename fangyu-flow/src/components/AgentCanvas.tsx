@@ -7,6 +7,7 @@ import ReactFlow, {
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 import AgentNode from './AgentNode'
+import ExternalAgentNode from './ExternalAgentNode'
 import RouterNode from './RouterNode'
 import GroupNode from './GroupNode'
 import { useAppSelector, useAppDispatch } from '../store/hooks'
@@ -16,7 +17,7 @@ import type { AgentCard, TrustConfig } from '../utils/a2aProtocol'
 import { buildAgentSocietyDemo } from '../utils/demoAgents'
 import { downloadAgentBundle } from '../utils/exportAgentBundle'
 
-const nodeTypes = { 'a2a-agent': AgentNode, 'a2a-router': RouterNode, 'a2a-group': GroupNode }
+const nodeTypes = { 'a2a-agent': AgentNode, 'a2a-external': ExternalAgentNode, 'a2a-router': RouterNode, 'a2a-group': GroupNode }
 
 const defaultAgentCard: AgentCard = {
   name: '新智能体', version: '1.0.0',
@@ -36,6 +37,9 @@ let _routerIdCounter = 0
 function genRouterId() { return `router_${++_routerIdCounter}` }
 let _groupIdCounter = 0
 function genGroupId() { return `group_${++_groupIdCounter}` }
+
+let _externalIdCounter = 0
+function genExternalId() { return `ext_${++_externalIdCounter}` }
 
 export default function AgentCanvas() {
   const dispatch = useAppDispatch()
@@ -126,6 +130,32 @@ export default function AgentCanvas() {
     setNodes(nds => [...nds, { id: node.id, type: 'a2a-group', position: node.position, data: { ...node, childIds: [] } }])
   }, [dispatch, setNodes])
 
+  const addNewExternal = useCallback(() => {
+    const id = genExternalId()
+    const node: AgentCanvasNode = {
+      id, label: `外部 Agent ${_externalIdCounter}`, type: 'a2a-external',
+      position: { x: 250 + Math.random() * 300, y: 100 + Math.random() * 200 },
+      agentCard: {
+        name: `外部 Agent ${_externalIdCounter}`,
+        version: '1.0.0',
+        capabilities: { streaming: false, pushNotifications: false },
+        skills: [{ id: 'default', name: 'default' }],
+        defaultInterface: { type: 'a2a' },
+        metadata: { external: true },
+      },
+      externalConfig: {
+        rpcUrl: 'http://127.0.0.1:9001/rpc',
+        agentId: '',
+        publicKey: '',
+        remoteName: '',
+        authorized: false,
+        allowedSkills: ['*'],
+      },
+    }
+    dispatch(addAgentNode(node))
+    setNodes(nds => [...nds, { id: node.id, type: 'a2a-external', position: node.position, data: node }])
+  }, [dispatch, setNodes])
+
   const selectedNodeId = useAppSelector(s => s.agent.selectedNodeId)
   const selectedEdgeId = useAppSelector(s => s.agent.selectedEdgeId)
 
@@ -186,6 +216,10 @@ export default function AgentCanvas() {
           padding: '4px 14px', background: '#722ed1', color: '#fff',
           border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12,
         }}>+ 智能体</button>
+        <button onClick={addNewExternal} style={{
+          padding: '4px 14px', background: '#fa8c16', color: '#fff',
+          border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12,
+        }}>+ 外部 Agent</button>
         <button onClick={addNewRouter} style={{
           padding: '4px 14px', background: '#fa8c16', color: '#fff',
           border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12,

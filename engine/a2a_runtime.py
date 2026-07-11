@@ -7,6 +7,7 @@ _agent_cards: dict[str, dict] = {}
 _agent_flow_mappings: dict[str, dict[str, dict]] = {}
 _agent_trust: dict[str, dict] = {}
 _agent_factories: dict[str, Callable] = {}
+_agent_external: dict[str, dict] = {}
 _tasks: dict[str, dict] = {}
 _task_lock = threading.Lock()
 _subscribers: dict[str, list[Callable]] = {}
@@ -14,6 +15,68 @@ _sub_lock = threading.Lock()
 
 
 class AgentRegistry:
+
+    @classmethod
+    def register_external(
+        cls,
+        name: str,
+        card: dict,
+        rpc_url: str,
+        agent_id: str,
+        public_key: str,
+        *,
+        remote_name: str = "",
+        allowed_skills: list[str] | None = None,
+        authorized: bool = False,
+    ):
+        meta = {**(card.get("metadata") or {}), "external": True, "authorized": authorized}
+        _agent_cards[name] = {**card, "metadata": meta}
+        _agent_external[name] = {
+            "rpc_url": rpc_url,
+            "agent_id": agent_id,
+            "public_key": public_key,
+            "remote_name": remote_name or card.get("name") or name,
+            "allowed_skills": allowed_skills or ["*"],
+            "authorized": authorized,
+        }
+        _agent_trust[name] = {
+            "enabled": True,
+            "agent_id": agent_id,
+            "public_key": public_key,
+        }
+        from .trust_runtime import TrustRegistry
+        from fangyu.a2a.trust.registry import TrustRegistry as A2ATrustRegistry
+        skills = allowed_skills or ["*"]
+        TrustRegistry.register(agent_id, public_key, skills)
+        A2ATrustRegistry.register(agent_id, public_key, skills)
+
+    @classmethod
+    def authorize_external(cls, name: str, authorized: bool = True, allowed_skills: list[str] | None = None) -> bool:
+        ext = _agent_external.get(name)
+        if not ext:
+            return False
+        ext["authorized"] = authorized
+        if allowed_skills is not None:
+            ext["allowed_skills"] = allowed_skills
+        card = _agent_cards.get(name)
+        if card:
+            meta = card.setdefault("metadata", {})
+            meta["authorized"] = authorized
+        agent_id = ext.get("agent_id")
+        if agent_id and allowed_skills is not None:
+            from .trust_runtime import TrustRegistry
+            from fangyu.a2a.trust.registry import TrustRegistry as A2ATrustRegistry
+            TrustRegistry.register(agent_id, ext["public_key"], allowed_skills)
+            A2ATrustRegistry.register(agent_id, ext["public_key"], allowed_skills)
+        return True
+
+    @classmethod
+    def is_external(cls, name: str) -> bool:
+        return name in _agent_external
+
+    @classmethod
+    def get_external(cls, name: str) -> Optional[dict]:
+        return _agent_external.get(name)
 
     @classmethod
     def register(cls, name: str, card: dict, flow_mappings: dict[str, dict] = None, factory: Callable = None, trust: dict = None):
@@ -31,10 +94,21 @@ class AgentRegistry:
         _agent_flow_mappings.pop(name, None)
         _agent_trust.pop(name, None)
         _agent_factories.pop(name, None)
+        _agent_external.pop(name, None)
 
     @classmethod
     def list_agents(cls) -> list[dict]:
-        return [{"name": k, "card": v} for k, v in _agent_cards.items()]
+        out = []
+        for k, v in _agent_cards.items():
+            ext = _agent_external.get(k, {})
+            out.append({
+                "name": k,
+                "card": v,
+                "external": k in _agent_external,
+                "authorized": ext.get("authorized", False),
+                "rpc_url": ext.get("rpc_url"),
+            })
+        return out
 
     @classmethod
     def get_card(cls, name: str) -> Optional[dict]:
@@ -100,6 +174,34 @@ class AgentBus:
         for part in message.get("parts", []):
             if part.get("type") == "text":
                 text = part.get("text", "")
+
+        ext = AgentRegistry.get_external(agent_name)
+        if ext:
+            from .trust_runtime import TrustViolation
+            if not ext.get("authorized"):
+                raise TrustViolation(
+                    "not_authorized",
+                    f"外部 Agent '{agent_name}' 尚未授权，请在编排面板中批准接入",
+                    context={"agent": agent_name, "skill_id": skill_id},
+                )
+            allowed = ext.get("allowed_skills") or ["*"]
+            if "*" not in allowed and skill_id and skill_id not in allowed:
+                raise TrustViolation(
+                    "not_authorized",
+                    f"外部 Agent '{agent_name}' 未授权技能 '{skill_id}'",
+                    context={"agent": agent_name, "skill_id": skill_id},
+                )
+            from .a2a_remote import remote_send_message
+            remote_task = remote_send_message(ext, message, task_id=task.get("id", ""))
+            if remote_task.get("history"):
+                task["history"] = remote_task["history"]
+            output = extract_task_output(remote_task)
+            if output:
+                task.setdefault("history", []).append({
+                    "role": "agent",
+                    "parts": [{"type": "text", "text": output}],
+                })
+            return {"output": remote_task.get("artifact") or remote_task.get("output"), "history": task.get("history", [])}
 
         flow = AgentRegistry.resolve_skill_flow(agent_name, skill_id)
         trust = AgentRegistry.get_trust(agent_name)

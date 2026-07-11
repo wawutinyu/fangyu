@@ -54,7 +54,7 @@ export function buildPipelineFromCanvas(nodes: AgentCanvasNode[]): OrchestrateSt
 
   const steps: OrchestrateStep[] = []
   for (const rule of sorted) {
-    const agent = nodes.find(n => n.id === rule.targetAgentId && n.type === 'a2a-agent')
+    const agent = nodes.find(n => n.id === rule.targetAgentId && (n.type === 'a2a-agent' || n.type === 'a2a-external'))
     if (!agent) continue
     steps.push({
       agent: rule.targetAgentId,
