@@ -32,6 +32,7 @@ npm install && npm run dev    # → http://localhost:5173
 
 ## 相关文档
 
+- [用户手册](../docs/USER_GUIDE.md)
 - [根目录 README](../README.md)
 - [跨机器 A2A](../docs/A2A_REMOTE.md)
 - [Electron 冒烟](../docs/ELECTRON_SMOKE.md)
