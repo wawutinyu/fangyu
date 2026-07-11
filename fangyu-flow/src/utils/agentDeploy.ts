@@ -1,5 +1,6 @@
 import type { AgentCanvasNode } from '../store/agentSlice'
 import type { AgentCard } from './a2aProtocol'
+import { buildActionLoopFlow } from './actionLoopFlow'
 import { getReactFlowInstance } from '../components/FlowCanvas'
 import { convertToExportFormat } from './flowHelper'
 
@@ -37,28 +38,10 @@ function resolveSkillFlow(agent: AgentCanvasNode, skillId: string) {
   return buildDefaultSkillFlow(agent.agentCard!, skillId)
 }
 
-/** 为 Agent 技能生成默认子流程：start → code(action) → output */
+/** 为 Agent 技能生成默认 Action Loop 子流程 */
 export function buildDefaultSkillFlow(card: AgentCard, skillId: string) {
   const skill = card.skills.find(s => s.id === skillId)
-  const code = `result = 'processed: ' + str(_input.get('query') or _input.get('message') or '')`
-  return {
-    nodes: [
-      { id: 's', data: { originType: 'start', config: {}, label: '开始' } },
-      {
-        id: 'act',
-        data: {
-          originType: 'code',
-          label: skill?.name || '执行',
-          config: { code },
-        },
-      },
-      { id: 'o', data: { originType: 'output', config: {}, label: '输出' } },
-    ],
-    edges: [
-      { id: 'e1', source: 's', target: 'act', data: {} },
-      { id: 'e2', source: 'act', target: 'o', data: {} },
-    ],
-  }
+  return buildActionLoopFlow(skillId, skill?.name || 'action')
 }
 
 export async function deployAgentsToBackend(agents: AgentCanvasNode[]): Promise<{ success: boolean; count: number }> {

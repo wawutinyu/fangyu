@@ -266,4 +266,27 @@ export const demoFlows: Record<string, { label: string; desc?: string; data: unk
       global_meta: { session_id: '', user_id: '' },
     },
   },
+  actionWorker: {
+    label: 'Action Worker',
+    desc: 'observe → plan → act → verify（workspace 持久化）',
+    data: {
+      flow_id: '', flow_name: 'Action Worker',
+      nodes: [
+        { id: 's', type: 'start', name: '开始', category: '流程控制', config: {}, position: { x: 60, y: 220 } },
+        { id: 'observe', type: 'code', name: 'observe', category: '代码', config: { code: "goal = _input.get('query') or _input.get('message') or 'demo task'\ntry:\n    files = ws_list('.')\nexcept NameError:\n    files = []\nresult = {'phase': 'observe', 'goal': goal, 'files': files}" }, position: { x: 220, y: 220 } },
+        { id: 'plan', type: 'code', name: 'plan', category: '代码', config: { code: "src = _input if isinstance(_input, dict) else {}\ngoal = src.get('goal') or (src.get('result') or {}).get('goal') or 'task'\naction = 'verify_only' if 'result.txt' in (src.get('files') or []) else 'write_result'\nresult = {'phase': 'plan', 'goal': goal, 'action': action}" }, position: { x: 400, y: 220 } },
+        { id: 'act', type: 'code', name: 'act', category: '代码', config: { code: "src = _input if isinstance(_input, dict) else {}\naction = src.get('action') or ''\ngoal = src.get('goal') or ''\ntry:\n    if action == 'write_result':\n        ws_write('result.txt', f'done: {goal}')\n        result = {'phase': 'act', 'acted': True}\n    else:\n        result = {'phase': 'act', 'acted': False}\nexcept NameError:\n    result = {'phase': 'act', 'acted': False}" }, position: { x: 580, y: 220 } },
+        { id: 'verify', type: 'code', name: 'verify', category: '代码', config: { code: "try:\n    files = ws_list('.')\nexcept NameError:\n    files = []\nok = 'result.txt' in files\nresult = {'phase': 'verify', 'verified': ok, 'status': 'completed' if ok else 'pending'}" }, position: { x: 760, y: 220 } },
+        { id: 'o', type: 'output', name: '输出', category: '流程控制', config: {}, position: { x: 940, y: 220 } },
+      ],
+      links: [
+        { id: 'e1', sourceNodeId: 's', targetNodeId: 'observe', linkType: 'serial', mappings: {} },
+        { id: 'e2', sourceNodeId: 'observe', targetNodeId: 'plan', linkType: 'serial', mappings: {} },
+        { id: 'e3', sourceNodeId: 'plan', targetNodeId: 'act', linkType: 'serial', mappings: {} },
+        { id: 'e4', sourceNodeId: 'act', targetNodeId: 'verify', linkType: 'serial', mappings: {} },
+        { id: 'e5', sourceNodeId: 'verify', targetNodeId: 'o', linkType: 'serial', mappings: {} },
+      ],
+      global_meta: { session_id: '', user_id: '' },
+    },
+  },
 }

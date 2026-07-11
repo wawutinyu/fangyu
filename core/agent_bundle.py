@@ -25,26 +25,9 @@ def _utc_now() -> str:
 
 
 def _default_worker_flow(skill_name: str = "default") -> dict[str, Any]:
-    """Action-first 默认 skill：code 干活，非纯 LLM 聊天。"""
-    return {
-        "nodes": [
-            {"id": "s", "data": {"originType": "start", "label": "start", "config": {}}},
-            {
-                "id": "act",
-                "data": {
-                    "originType": "code",
-                    "label": "act",
-                    "config": {"code": "result = 'processed: ' + str(_input.get('query') or _input.get('message') or '')"},
-                },
-            },
-            {"id": "o", "data": {"originType": "output", "label": "output", "config": {}}},
-        ],
-        "edges": [
-            {"source": "s", "target": "act", "data": {}},
-            {"source": "act", "target": "o", "data": {}},
-        ],
-        "meta": {"skill_id": skill_name, "kind": "action"},
-    }
+    """Action Loop 默认 skill：observe → plan → act → verify。"""
+    from fangyu.core.action_loop import get_action_loop_flow
+    return get_action_loop_flow(skill_name, skill_name)
 
 
 def normalize_flow(flow: dict[str, Any]) -> dict[str, Any]:
@@ -198,6 +181,9 @@ def create_agent_bundle(
     (root / "constitution.json").write_text(json.dumps(constitution, ensure_ascii=False, indent=2), encoding="utf-8")
     (root / "config").mkdir(exist_ok=True)
     (root / "config" / "interfaces.json").write_text(json.dumps(interfaces, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    (root / "workspace").mkdir(exist_ok=True)
+    (root / "workspace" / ".fangyu").mkdir(exist_ok=True)
 
     _write_start_scripts(root)
     return root

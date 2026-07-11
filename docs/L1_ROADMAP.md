@@ -327,6 +327,16 @@ Worker-only Agent：`user.enabled = false`，runtime 不启动 Chat UI。
 | 真 MQTT Adapter | `adapters/mqtt_client.py` + `fangyu[mqtt]` | ✅ |
 | 真 OPC-UA Adapter | 真实 client（非 sim） | ⏸ 暂缓（sim 够用，Phase 6+ 按需） |
 | Bundle MQTT 事件触发 | subscribe → 自动执行 skill（daemon 增强） | ⏳ 下一步 |
+
+### Phase 5.5 — 单 Agent 行动闭环（**当前**）
+
+| 任务 | 说明 | 状态 |
+|------|------|------|
+| Action Loop 模板 | observe → plan → act → verify 默认 skill | ✅ |
+| Bundle workspace | `workspace/` 挂载 + `ws_read/write/list` | ✅ |
+| 任务状态持久化 | `.fangyu/state.json` | ✅ |
+| Flow 画布 demo | `actionWorker` 模板 | ✅ |
+| LLM 规划节点 | plan 步骤可选接 llm 节点 | ⏳ 下一步 |
 | 开发者文档 | [集成 Cookbook](INTEGRATION_COOKBOOK.md) | ✅ |
 
 **验收：** 一个**未参与本项目开发的工程师**，按文档可在 1 小时内完成 Bundle 导出 + 独立运行 + 远程 RPC。

@@ -17,13 +17,22 @@ SAFE_BUILTINS = {
 FORBIDDEN = ['__import__', 'open', 'eval', 'compile', 'globals', 'locals', 'vars', 'dir', 'getattr', 'setattr', 'delattr', 'hasattr']
 
 
-def _run_code(code: str, input_data: dict, params: dict) -> dict:
+def _run_code(code: str, input_data: dict, params: dict, extra_globals: dict | None = None) -> dict:
     logs = []
 
     def safe_print(*args, **kwargs):
         logs.append(' '.join(str(a) for a in args))
 
-    restricted_globals = {**SAFE_BUILTINS, '__builtins__': {}, 'print': safe_print, 'input': input_data, 'params': params, '_input': input_data, 'data': input_data}
+    restricted_globals = {
+        **SAFE_BUILTINS,
+        '__builtins__': {},
+        'print': safe_print,
+        'input': input_data,
+        'params': params,
+        '_input': input_data,
+        'data': input_data,
+        **(extra_globals or {}),
+    }
     restricted_locals = {}
 
     for word in FORBIDDEN:
@@ -43,7 +52,7 @@ def _run_code(code: str, input_data: dict, params: dict) -> dict:
         return {'result': None, 'error': f'{type(e).__name__}: {e}', 'logs': logs}
 
 
-async def run_code(code: str, input_data: dict = None, params: dict = None, timeout: int = 10) -> dict:
+async def run_code(code: str, input_data: dict = None, params: dict = None, timeout: int = 10, extra_globals: dict | None = None) -> dict:
     if input_data is None:
         input_data = {}
     if params is None:
@@ -51,7 +60,7 @@ async def run_code(code: str, input_data: dict = None, params: dict = None, time
 
     try:
         result = await asyncio.wait_for(
-            asyncio.get_event_loop().run_in_executor(None, _run_code, code, input_data, params),
+            asyncio.get_event_loop().run_in_executor(None, _run_code, code, input_data, params, extra_globals),
             timeout=timeout,
         )
         return result

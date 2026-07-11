@@ -92,14 +92,26 @@ async def _exec_code(ctx: NodeContext) -> dict[str, Any]:
         elif isinstance(input_val, dict):
             input_data = {**input_data, **input_val}
     elif isinstance(input_val, str):
-        input_data = input_val
+        if ext.get("industrial_event") or ext.get("industrial"):
+            input_data = {**ext, "input": input_val, "message": input_val, "query": input_val}
+        elif input_val in (ext.get("query"), ext.get("message"), ext.get("input")):
+            input_data = {
+                **ext,
+                "input": input_val,
+                "message": ext.get("message", input_val),
+                "query": ext.get("query", input_val),
+            }
+        else:
+            input_data = input_val
     elif isinstance(input_val, dict):
         input_data = {**ext, **input_val}
     else:
         input_data = {**ext, **ctx.inputs}
+    from fangyu.engine.workspace import workspace_helpers
     result = await run_code(
         code=code, input_data=input_data,
         params=ctx.inputs.get("params", {}), timeout=max(1, min(30, timeout // 1000)),
+        extra_globals=workspace_helpers(),
     )
     return {"result": result.get("result"), "error": result.get("error"), "logs": result.get("logs", [])}
 

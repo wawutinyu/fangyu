@@ -93,8 +93,10 @@ def create_bundle_app(bundle_path: str) -> tuple[FastAPI, str]:
     from fangyu.core.agent_bundle import get_public_identity
     from fangyu.engine.bundle_daemon import daemon_status, record_task
     from fangyu.engine.executor import register_executors
+    from fangyu.engine.workspace import init_bundle_workspace
     register_executors()
     bundle = load_agent_bundle(bundle_path)
+    init_bundle_workspace(bundle["root"])
     trust_policy = _setup_trust_registry(bundle)
     require_envelope = bool(trust_policy.get("require_envelope", False))
     agent_name = _register_bundle(bundle)
@@ -112,6 +114,7 @@ def create_bundle_app(bundle_path: str) -> tuple[FastAPI, str]:
             "skills": list(bundle["skills"].keys()),
             "require_envelope": require_envelope,
             "agent_kind": bundle["manifest"].get("capabilities", {}).get("agent_kind", "worker"),
+            "workspace": str((bundle["root"] / "workspace").resolve()),
             **daemon_status(),
         }
 
