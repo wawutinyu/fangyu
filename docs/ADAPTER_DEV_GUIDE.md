@@ -92,6 +92,7 @@ AdapterRegistry.register(MyModbusAdapter())
 | 名称 | 模块 | 说明 |
 |------|------|------|
 | `mqtt_sim` | `adapters/mqtt_sim.py` | 内存 MQTT topic 总线 |
+| `mqtt` | `adapters/mqtt_client.py` | **真实 MQTT broker**（需 `pip install fangyu[mqtt]`） |
 | `opcua_sim` | `adapters/opcua_sim.py` | 内存 OPC-UA 节点 |
 | `plc_sim` | `adapters/plc_sim.py` | 产线 PLC 寄存器 + 告警 |
 
@@ -109,6 +110,7 @@ AdapterRegistry.register(MyModbusAdapter())
 | POST | `/api/v1/adapters/emit` | `{adapter, target, body}` → 外部写入 |
 | POST | `/api/v1/adapters/plc/register_worker` | 注册产线 Worker |
 | POST | `/api/v1/adapters/plc/dispatch` | PLC 事件 → Worker → 可选 PLC 回调 |
+| POST | `/api/v1/adapters/mqtt/dispatch` | MQTT 事件 → Worker |
 
 ### 产线 Demo
 

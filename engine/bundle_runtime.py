@@ -90,12 +90,15 @@ def _verify_envelope(envelope_raw: str | None, body_json: str, require: bool) ->
 
 
 def create_bundle_app(bundle_path: str) -> tuple[FastAPI, str]:
+    from fangyu.core.agent_bundle import get_public_identity
+    from fangyu.engine.bundle_daemon import daemon_status, record_task
     from fangyu.engine.executor import register_executors
     register_executors()
     bundle = load_agent_bundle(bundle_path)
     trust_policy = _setup_trust_registry(bundle)
     require_envelope = bool(trust_policy.get("require_envelope", False))
     agent_name = _register_bundle(bundle)
+    public_identity = get_public_identity(bundle)
     bus = AgentBus(enable_trust=True)
     app = FastAPI(title=f"fangyu bundle: {agent_name}")
 
@@ -105,10 +108,16 @@ def create_bundle_app(bundle_path: str) -> tuple[FastAPI, str]:
             "status": "ok",
             "agent": agent_name,
             "agent_id": bundle["manifest"]["agent_id"],
+            "public_key": public_identity["public_key"],
             "skills": list(bundle["skills"].keys()),
             "require_envelope": require_envelope,
             "agent_kind": bundle["manifest"].get("capabilities", {}).get("agent_kind", "worker"),
+            **daemon_status(),
         }
+
+    @app.get("/identity/public")
+    def identity_public():
+        return get_public_identity(bundle)
 
     @app.get("/card")
     def get_card():
@@ -136,6 +145,7 @@ def create_bundle_app(bundle_path: str) -> tuple[FastAPI, str]:
                 message = params.get("message") or {}
                 task_id = params.get("taskId") or params.get("task_id") or ""
                 task = bus.send_message(target, message, task_id)
+                record_task()
                 return _rpc_ok(req_id, task)
             if method == "a2a.get_task":
                 task_id = params.get("taskId") or params.get("task_id") or ""
@@ -168,10 +178,24 @@ def _rpc_err(req_id, code: int, message: str):
     return {"jsonrpc": "2.0", "id": req_id, "error": {"code": code, "message": message}}
 
 
-def run_bundle_server(bundle_path: str, host: str = "127.0.0.1", port: int = 9001) -> None:
+def run_bundle_server(
+    bundle_path: str,
+    host: str = "127.0.0.1",
+    port: int = 9001,
+    *,
+    daemon: bool = False,
+) -> None:
     import uvicorn
+    from fangyu.core.agent_bundle import get_run_instructions
+
     app, agent_name = create_bundle_app(bundle_path)
-    print(f"fangyu Agent Bundle → {agent_name}")
-    print(f"  health  http://{host}:{port}/health")
-    print(f"  rpc     http://{host}:{port}/rpc")
+    instructions = get_run_instructions(bundle_path, host=host, port=port)
+    mode = "daemon" if daemon else "server"
+    print(f"fangyu Agent Bundle [{mode}] → {agent_name}")
+    print(f"  health    http://{host}:{port}/health")
+    print(f"  identity  http://{host}:{port}/identity/public")
+    print(f"  rpc       http://{host}:{port}/rpc")
+    if daemon:
+        print("  mode      常驻等待 A2A 消息触发 skill 执行")
+    print(f"  runbook   {instructions['rpc_example']}")
     uvicorn.run(app, host=host, port=port, log_level="info")

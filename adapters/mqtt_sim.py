@@ -47,6 +47,7 @@ class MqttSimAdapter(BaseAdapter):
                 "tag": raw.get("tag") or topic.split("/")[-1],
                 "value": body.get("value") if isinstance(body, dict) else body,
                 "unit": body.get("unit") if isinstance(body, dict) else raw.get("unit"),
+                "alarm": body.get("alarm") if isinstance(body, dict) else raw.get("alarm", False),
                 "device_id": raw.get("device_id") or "mqtt_sim",
                 "raw": body,
             },

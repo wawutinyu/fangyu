@@ -82,12 +82,21 @@ async def _exec_code(ctx: NodeContext) -> dict[str, Any]:
     code = ctx.config.get("code", "")
     timeout = ctx.config.get("timeout", 10000)
     input_val = ctx.inputs.get("input")
-    if isinstance(input_val, str):
+    ext = ctx.external_inputs or {}
+    if ext.get("industrial_event") or ext.get("industrial"):
+        input_data = {**ext, **ctx.inputs}
+        if isinstance(input_val, str):
+            input_data.setdefault("message", input_val)
+            input_data.setdefault("query", input_val)
+            input_data.setdefault("input", input_val)
+        elif isinstance(input_val, dict):
+            input_data = {**input_data, **input_val}
+    elif isinstance(input_val, str):
         input_data = input_val
     elif isinstance(input_val, dict):
-        input_data = {**ctx.external_inputs, **input_val}
+        input_data = {**ext, **input_val}
     else:
-        input_data = {**ctx.external_inputs, **ctx.inputs}
+        input_data = {**ext, **ctx.inputs}
     result = await run_code(
         code=code, input_data=input_data,
         params=ctx.inputs.get("params", {}), timeout=max(1, min(30, timeout // 1000)),

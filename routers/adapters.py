@@ -32,6 +32,14 @@ class PlcDispatchBody(BaseModel):
     value: float | None = None
 
 
+class MqttDispatchBody(BaseModel):
+    agent_name: str
+    skill_id: str = "industrial"
+    topic: str = "plc/line1/temperature"
+    payload: dict | None = None
+    use_sim: bool = False
+
+
 class RegisterWorkerBody(BaseModel):
     name: str = "LineWorker"
 
@@ -154,4 +162,44 @@ def plc_dispatch_to_worker(body: PlcDispatchBody):
         "worker_output": output,
         "plc_command": cmd,
         "registers": plc.registers,
+    }
+
+
+@router.post("/mqtt/dispatch")
+def mqtt_dispatch_to_worker(body: MqttDispatchBody):
+    """MQTT 事件 → ingest → Worker Agent skill（支持 mqtt 真实客户端或 mqtt_sim）。"""
+    from fangyu.engine.executor import register_executors
+    register_executors()
+
+    adapter_name = "mqtt_sim" if body.use_sim else "mqtt"
+    adapter = AdapterRegistry.get(adapter_name)
+    if not adapter:
+        adapter = AdapterRegistry.get("mqtt_sim")
+        adapter_name = "mqtt_sim"
+    if not adapter:
+        raise HTTPException(503, "MQTT adapter not available")
+
+    raw = {"topic": body.topic, "payload": body.payload or {}}
+    if body.payload is None and adapter_name == "mqtt_sim":
+        adapter.publish(body.topic, {"value": 42.0, "unit": "C"})
+        raw["payload"] = {"value": 42.0, "unit": "C"}
+    elif body.payload is None:
+        raise HTTPException(400, "payload required for real mqtt adapter")
+
+    payload = adapter.ingest(raw)
+    if not AgentRegistry.get_card(body.agent_name):
+        register_plc_worker(RegisterWorkerBody(name=body.agent_name))
+
+    message = build_message_from_payload(payload, skill_id=body.skill_id)
+    bus = AgentBus(enable_trust=False)
+    task = bus.send_message(body.agent_name, message)
+    output = extract_task_output(task)
+
+    return {
+        "success": task["status"]["state"] == "completed",
+        "adapter": adapter_name,
+        "topic": body.topic,
+        "payload": payload.to_dict(),
+        "task_id": task.get("id"),
+        "worker_output": output,
     }

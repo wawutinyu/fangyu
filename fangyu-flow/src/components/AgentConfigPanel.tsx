@@ -138,7 +138,13 @@ export default function AgentConfigPanel() {
     try {
       const result = await discoverExternalAgent(url)
       updateCard(result.card)
-      updateExternal({ rpcUrl: result.rpc_url, remoteName: result.card.name || '' })
+      const patch: Partial<NonNullable<typeof node.externalConfig>> = {
+        rpcUrl: result.rpc_url,
+        remoteName: result.card.name || '',
+      }
+      if (result.identity?.agent_id) patch.agentId = result.identity.agent_id
+      if (result.identity?.public_key) patch.publicKey = result.identity.public_key
+      updateExternal(patch)
     } catch (e: unknown) {
       alert(`发现失败: ${e instanceof Error ? e.message : String(e)}`)
     }
@@ -241,8 +247,14 @@ export default function AgentConfigPanel() {
               授权接入（允许编排调用此外部 Agent）
             </label>
             <div style={{ fontSize: 11, color: '#888', background: '#fff7e6', padding: 8, borderRadius: 6 }}>
-              外部 Agent 需填写 agent_id + 公钥（从 bundle 的 identity.json 获取），并完成授权后才会被协作链调用。
+              「发现远程」会自动填充 agent_id 与公钥（来自 Bundle /identity/public）。
+              勾选授权后，协作链即可调用此外部 Agent。
             </div>
+            {node.externalConfig?.agentId && node.externalConfig?.publicKey && (
+              <div style={{ fontSize: 11, color: '#52c41a', background: '#f6ffed', padding: 8, borderRadius: 6 }}>
+                ✓ 身份已就绪 — {node.externalConfig.agentId.slice(0, 20)}…
+              </div>
+            )}
           </div>
         )}
 

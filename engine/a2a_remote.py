@@ -54,6 +54,26 @@ def remote_send_message(
     return _rpc_post(rpc_url, body, headers)
 
 
+def fetch_remote_identity(rpc_url: str) -> dict:
+    """从 bundle /identity/public 或 /health 获取公钥身份。"""
+    base = rpc_url.rsplit("/rpc", 1)[0]
+    for path in ("/identity/public", "/health"):
+        try:
+            with urllib.request.urlopen(f"{base}{path}", timeout=10) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            agent_id = data.get("agent_id")
+            public_key = data.get("public_key")
+            if agent_id and public_key:
+                return {
+                    "agent_id": agent_id,
+                    "public_key": public_key,
+                    "require_envelope": bool(data.get("require_envelope", False)),
+                }
+        except Exception:
+            continue
+    return {}
+
+
 def fetch_remote_card(rpc_url: str) -> dict:
     """从 bundle /card 或 RPC get_agent_card 拉取 AgentCard。"""
     base = rpc_url.rsplit("/rpc", 1)[0]

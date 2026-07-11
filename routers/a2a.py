@@ -148,7 +148,7 @@ def authorize_external_agent(name: str, body: AuthorizeExternalRequest):
 
 @router.post("/agents/discover")
 def discover_external_agent(body: DiscoverExternalRequest):
-    from fangyu.engine.a2a_remote import fetch_remote_card
+    from fangyu.engine.a2a_remote import fetch_remote_card, fetch_remote_identity
 
     rpc_url = body.rpc_url.rstrip("/")
     if not rpc_url.endswith("/rpc"):
@@ -156,7 +156,8 @@ def discover_external_agent(body: DiscoverExternalRequest):
     card = fetch_remote_card(rpc_url)
     if not card:
         raise HTTPException(400, "无法从远程端点获取 AgentCard")
-    return {"success": True, "rpc_url": rpc_url, "card": card}
+    identity = fetch_remote_identity(rpc_url)
+    return {"success": True, "rpc_url": rpc_url, "card": card, "identity": identity or None}
 
 
 @router.post("/agents/register")

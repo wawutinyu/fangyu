@@ -259,7 +259,7 @@ Worker-only Agent：`user.enabled = false`，runtime 不启动 Chat UI。
 
 ## 七、分阶段落地路线
 
-### Phase 1 — Agent Bundle MVP（4–6 周）
+### Phase 1 — Agent Bundle MVP ✅ 已完成
 
 **交付：** 导出一个 **worker Agent bundle**，本机启动后可 A2A 被调用。
 
@@ -276,7 +276,7 @@ Worker-only Agent：`user.enabled = false`，runtime 不启动 Chat UI。
 
 ---
 
-### Phase 2 — Worker / Interface 分型 + 加密通信闭环（3–4 周）
+### Phase 2 — Worker / Interface 分型 + 加密通信闭环 ✅ 已完成
 
 | 任务 | 说明 |
 |------|------|
@@ -288,7 +288,7 @@ Worker-only Agent：`user.enabled = false`，runtime 不启动 Chat UI。
 
 ---
 
-### Phase 3 — 编排本厂 + 授权外来 Agent（3–4 周）
+### Phase 3 — 编排本厂 + 授权外来 Agent ✅ 已完成
 
 | 任务 | 说明 |
 |------|------|
@@ -300,14 +300,55 @@ Worker-only Agent：`user.enabled = false`，runtime 不启动 Chat UI。
 
 ---
 
-### Phase 4 — 多模态 & 物理 Adapter 接口（中长期）
+### Phase 4 — 多模态 & 物理 Adapter 接口 ✅ 已完成
+
+| 任务 | 说明 | 状态 |
+|------|------|------|
+| Payload `content_type` 扩展 | image、file ref、industrial | ✅ |
+| Adapter 插件接口 | mqtt/opcua/plc 模拟 | ✅ |
+| 产线 demo | worker Agent ↔ 模拟 PLC | ✅ |
+| 文档 | [Adapter 开发指南](ADAPTER_DEV_GUIDE.md) | ✅ |
+
+---
+
+### Phase 5 — 开发者基础设施打磨（**当前阶段**）
+
+> **受众：开发者 / 集成商。** 把 L0–L1 做成「能依赖、能集成、能交付」的 infra，不追求大众零门槛。
+
+**技术方案：** [Phase 5 技术方案](PHASE5_TECH_SPEC.md) · [安全模型 v1](SECURITY_MODEL.md)
+
+| 任务 | 说明 | 状态 |
+|------|------|------|
+| 开发者 Happy Path | Flow→Bundle→`bundle run`→跨机 A2A，≤5 步、无手改 JSON | ✅ |
+| 长运行 Worker | daemon：等 A2A → 执行 skill subgraph | ✅ |
+| 安全模型拍板 | 私钥交付、envelope 全链路、吊销 — 文档化 | ✅ |
+| SDK / CLI 统一 | `fangyu bundle run\|rpc\|validate\|trust` | ✅ |
+| 外部 Agent DX | discover 自动填身份 + 一键授权 | ✅ |
+| 真 MQTT Adapter | `adapters/mqtt_client.py` + `fangyu[mqtt]` | ✅ |
+| 真 OPC-UA Adapter | 真实 client（非 sim） | ⏸ 暂缓（sim 够用，Phase 6+ 按需） |
+| Bundle MQTT 事件触发 | subscribe → 自动执行 skill（daemon 增强） | ⏳ 下一步 |
+| 开发者文档 | [集成 Cookbook](INTEGRATION_COOKBOOK.md) | ✅ |
+
+**验收：** 一个**未参与本项目开发的工程师**，按文档可在 1 小时内完成 Bundle 导出 + 独立运行 + 远程 RPC。
+
+---
+
+### Phase 6 — AI 助手层 + 场景模板（**后续，infra 闭环后**）
+
+> **受众：普通人 + 开发者。** 在 Phase 5 的 L0 之上叠 L2/L3，行业通过模板覆盖，不 fork 代码。
 
 | 任务 | 说明 |
 |------|------|
-| Payload `content_type` 扩展 | image、file ref |
-| Adapter 插件接口 | `fangyu.adapters.mqtt` / `opcua` |
-| 产线 demo | worker Agent ↔ 模拟 PLC |
-| 文档 | 第三方 adapter 开发指南 |
+| Intent → Flow | 自然语言描述目标 → 生成 action-first flow + 宪法扫描 |
+| Intent → Agent 网 | 描述协作关系 → 自动生成 Agent 画布 + 路由 |
+| Setup Copilot | 外部 Agent：粘贴 URL → 人话确认信任 → 一键授权 |
+| 违宪 / 失败可解释 | 协作失败、ATP 拒绝 → 白话 + 建议下一步 |
+| 场景模板库 | 产线巡检、文档助手等 — 一键实例化 Bundle + 策略包 |
+| 模板市场（可选） | 社区/官方模板分发 |
+
+**验收：** 非开发者用户仅通过对话 + 按钮，完成「创建一个 Worker 并导出运行」（无需理解 agent_id/公钥）。
+
+**前置条件：** Phase 5 开发者 Happy Path 全绿；否则 AI 层只会生成不可靠的配置。
 
 ---
 
@@ -345,4 +386,4 @@ Worker-only Agent：`user.enabled = false`，runtime 不启动 Chat UI。
 
 ---
 
-*文档版本：L1 主线 v1 — 产品关切 + 技术落地方案。后续迭代在此文件修订。*
+*文档版本：L1 主线 v2 — Phase 1–4 已完成；Phase 5 开发者 infra 为当前阶段。*

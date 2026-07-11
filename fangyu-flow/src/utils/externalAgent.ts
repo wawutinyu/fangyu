@@ -10,7 +10,11 @@ export interface ExternalAgentConfig {
   allowedSkills: string[]
 }
 
-export async function discoverExternalAgent(rpcUrl: string): Promise<{ rpc_url: string; card: AgentCard }> {
+export async function discoverExternalAgent(rpcUrl: string): Promise<{
+  rpc_url: string
+  card: AgentCard
+  identity?: { agent_id: string; public_key: string; require_envelope?: boolean }
+}> {
   const resp = await fetch('/api/v1/a2a/agents/discover', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

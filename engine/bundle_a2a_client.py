@@ -8,6 +8,7 @@ from typing import Any
 
 from fangyu.a2a.trust.envelope import MessageEnvelope
 from fangyu.a2a.trust.identity import AgentIdentity
+from fangyu.core.agent_bundle import resolve_agent_identity
 
 
 def sign_rpc_body(body: dict, agent_id: str, identity: AgentIdentity) -> dict:
@@ -49,5 +50,4 @@ def identity_from_bundle(bundle: dict[str, Any]) -> tuple[str, AgentIdentity]:
     """从已加载 bundle 还原 AgentIdentity。"""
     ident_doc = bundle["identity"]
     agent_id = ident_doc["agent_id"]
-    raw = bytes.fromhex(ident_doc["private_key_hex"])
-    return agent_id, AgentIdentity.from_private_bytes(raw)
+    return agent_id, resolve_agent_identity(bundle)

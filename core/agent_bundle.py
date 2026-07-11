@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import uuid
 from datetime import datetime, timezone
@@ -86,6 +87,7 @@ def create_agent_bundle(
     require_envelope: bool = True,
     trusted_peers: list[dict[str, str]] | None = None,
     identity: AgentIdentity | None = None,
+    embed_private_key: bool = True,
 ) -> Path:
     """创建 Agent Bundle 目录。"""
     root = Path(dest)
@@ -168,13 +170,17 @@ def create_agent_bundle(
         "agent_id": agent_id,
         "algorithm": "Ed25519",
         "public_key": ident.public_key,
-        "private_key_hex": ident.private_key_bytes.hex(),
         "constitution": {
             "version": constitution.get("version", "1.0"),
             "payload": const_payload,
             "signature": const_sig,
         },
     }
+    if embed_private_key:
+        identity_doc["private_key_hex"] = ident.private_key_bytes.hex()
+    else:
+        identity_doc["private_key_delivery"] = "environment"
+        identity_doc["private_key_env"] = "FANGYU_AGENT_PRIVATE_KEY"
 
     interfaces = {
         "a2a_listen": {"host": "127.0.0.1", "port": a2a_port, "path": "/rpc"},
@@ -284,6 +290,80 @@ def bundle_to_flow_mappings(bundle: dict[str, Any]) -> dict[str, dict[str, Any]]
     for skill_id, flow in bundle["skills"].items():
         out[skill_id] = {"nodes": flow.get("nodes", []), "edges": flow.get("edges", [])}
     return out
+
+
+def resolve_agent_identity(bundle: dict[str, Any]) -> AgentIdentity:
+    """从 bundle + 环境变量解析 AgentIdentity（优先 FANGYU_AGENT_PRIVATE_KEY）。"""
+    ident_doc = bundle["identity"]
+    env_key = os.getenv("FANGYU_AGENT_PRIVATE_KEY", "").strip()
+    if env_key:
+        return AgentIdentity.from_private_bytes(bytes.fromhex(env_key))
+    embedded = ident_doc.get("private_key_hex")
+    if embedded:
+        return AgentIdentity.from_private_bytes(bytes.fromhex(embedded))
+    env_name = ident_doc.get("private_key_env") or "FANGYU_AGENT_PRIVATE_KEY"
+    raise BundleError(
+        f"Bundle 未嵌入私钥；请设置环境变量 {env_name}（hex 格式 Ed25519 私钥）"
+    )
+
+
+def get_public_identity(bundle: dict[str, Any] | str | Path) -> dict[str, str]:
+    """从 bundle 提取公钥侧身份（不含私钥）。"""
+    if not isinstance(bundle, dict):
+        bundle = load_agent_bundle(bundle)
+    ident = bundle["identity"]
+    trust = (bundle.get("interfaces") or {}).get("trust_policy") or {}
+    return {
+        "agent_id": ident["agent_id"],
+        "public_key": ident["public_key"],
+        "require_envelope": bool(trust.get("require_envelope", False)),
+    }
+
+
+def add_trusted_peer(
+    bundle_dir: str | Path,
+    peer_agent_id: str,
+    peer_public_key: str,
+    *,
+    allowed_skills: list[str] | None = None,
+) -> None:
+    """向 Bundle 的 trust_policy.trusted_peers 添加对端（幂等）。"""
+    root = Path(bundle_dir)
+    iface_path = root / "config" / "interfaces.json"
+    if not iface_path.exists():
+        raise BundleError(f"缺少 config/interfaces.json: {root}")
+    cfg = json.loads(iface_path.read_text(encoding="utf-8"))
+    policy = cfg.setdefault("trust_policy", {})
+    peers: list[dict] = list(policy.get("trusted_peers") or [])
+    entry = {
+        "agent_id": peer_agent_id,
+        "public_key": peer_public_key,
+        "allowed_skills": allowed_skills or ["*"],
+    }
+    peers = [p for p in peers if p.get("agent_id") != peer_agent_id]
+    peers.append(entry)
+    policy["trusted_peers"] = peers
+    iface_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def get_run_instructions(bundle_dir: str | Path, *, host: str = "127.0.0.1", port: int | None = None) -> dict[str, str]:
+    """生成 Bundle 运行指引（Happy Path Runbook）。"""
+    bundle = load_agent_bundle(bundle_dir)
+    name = bundle["manifest"].get("name") or "agent"
+    listen = (bundle.get("interfaces") or {}).get("a2a_listen") or {}
+    p = port if port is not None else int(listen.get("port") or 9001)
+    h = host or listen.get("host") or "127.0.0.1"
+    rpc_url = f"http://{h}:{p}/rpc"
+    root = Path(bundle_dir)
+    return {
+        "name": name,
+        "agent_id": bundle["manifest"]["agent_id"],
+        "run": f'py -3 -m fangyu bundle run "{root}" --port {p}',
+        "health": f"http://{h}:{p}/health",
+        "rpc": rpc_url,
+        "validate": f'py -3 -m fangyu bundle validate "{root}"',
+        "rpc_example": f'py -3 -m fangyu bundle rpc "{root}" --url {rpc_url} -m "hello"',
+    }
 
 
 def export_bundle_zip(src: str | Path, dest_zip: str | Path) -> Path:

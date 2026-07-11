@@ -55,11 +55,33 @@ export function buildBundleExportPayload(agent: AgentCanvasNode, options: Export
   }
 }
 
+export interface BundleRunbook {
+  name: string
+  run: string
+  health: string
+  rpc: string
+  validate: string
+  rpcExample: string
+}
+
+export function buildRunbook(name: string, a2aPort: number = 9001): BundleRunbook {
+  const bundleDir = `./${name}.bundle`
+  const rpc = `http://127.0.0.1:${a2aPort}/rpc`
+  return {
+    name,
+    run: `py -3 -m fangyu bundle run "${bundleDir}" --port ${a2aPort} --daemon`,
+    health: `http://127.0.0.1:${a2aPort}/health`,
+    rpc,
+    validate: `py -3 -m fangyu bundle validate "${bundleDir}"`,
+    rpcExample: `py -3 -m fangyu bundle rpc "${bundleDir}" --url ${rpc} -m "hello"`,
+  }
+}
+
 /** 导出单个 Agent 为 .bundle.zip（调用后端 API） */
 export async function downloadAgentBundle(
   agent: AgentCanvasNode,
   options: ExportAgentBundleOptions = {},
-): Promise<void> {
+): Promise<BundleRunbook> {
   const payload = buildBundleExportPayload(agent, options)
 
   const resp = await fetch('/api/v1/bundle/export', {
@@ -78,4 +100,5 @@ export async function downloadAgentBundle(
   a.download = `${payload.name}.bundle.zip`
   a.click()
   URL.revokeObjectURL(url)
+  return buildRunbook(payload.name, payload.a2a_port)
 }

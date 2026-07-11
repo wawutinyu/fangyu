@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect } from 'react'
+import { useCallback, useRef, useEffect, useState } from 'react'
 import ReactFlow, {
   Background, Controls,
   useNodesState, useEdgesState,
@@ -15,7 +15,7 @@ import { addAgentNode, addAgentEdge, selectAgentNode, selectAgentEdge, moveAgent
 import type { AgentCanvasNode } from '../store/agentSlice'
 import type { AgentCard, TrustConfig } from '../utils/a2aProtocol'
 import { buildAgentSocietyDemo } from '../utils/demoAgents'
-import { downloadAgentBundle } from '../utils/exportAgentBundle'
+import { downloadAgentBundle, type BundleRunbook } from '../utils/exportAgentBundle'
 
 const nodeTypes = { 'a2a-agent': AgentNode, 'a2a-external': ExternalAgentNode, 'a2a-router': RouterNode, 'a2a-group': GroupNode }
 
@@ -45,6 +45,7 @@ export default function AgentCanvas() {
   const dispatch = useAppDispatch()
   const storeNodes = useAppSelector(s => s.agent.nodes)
   const storeEdges = useAppSelector(s => s.agent.edges)
+  const [runbook, setRunbook] = useState<BundleRunbook | null>(null)
 
   const [nodes, setNodes, onNodesChange] = useNodesState(storeNodes.map(n => ({
     id: n.id,
@@ -202,7 +203,8 @@ export default function AgentCanvas() {
       return
     }
     try {
-      await downloadAgentBundle(agent, { requireEnvelope: true })
+      const book = await downloadAgentBundle(agent, { requireEnvelope: true })
+      setRunbook(book)
     } catch (e: unknown) {
       alert(`导出 Bundle 失败: ${e instanceof Error ? e.message : String(e)}`)
     }
@@ -210,6 +212,40 @@ export default function AgentCanvas() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {runbook && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }} onClick={() => setRunbook(null)}>
+          <div style={{
+            background: '#fff', borderRadius: 10, padding: 20, maxWidth: 560, width: '90%',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>Bundle 已导出 — 运行指引</div>
+            <div style={{ fontSize: 12, color: '#666', marginBottom: 12 }}>
+              解压 <code>{runbook.name}.bundle.zip</code> 后按下列命令启动独立 Agent（无需手改 JSON）
+            </div>
+            {([
+              ['1. 校验', runbook.validate],
+              ['2. 启动 daemon', runbook.run],
+              ['3. 健康检查', runbook.health],
+              ['4. 调用 RPC', runbook.rpcExample],
+            ] as const).map(([label, cmd]) => (
+              <div key={label} style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>{label}</div>
+                <code style={{
+                  display: 'block', background: '#f5f5f5', padding: '8px 10px',
+                  borderRadius: 6, fontSize: 11, wordBreak: 'break-all',
+                }}>{cmd}</code>
+              </div>
+            ))}
+            <button onClick={() => setRunbook(null)} style={{
+              marginTop: 8, padding: '6px 16px', background: '#531dab', color: '#fff',
+              border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12,
+            }}>知道了</button>
+          </div>
+        </div>
+      )}
       <div style={{ padding: '8px 16px', borderBottom: '1px solid #eee', display: 'flex', gap: 8, alignItems: 'center' }}>
         <span style={{ fontSize: 14, fontWeight: 600 }}>Agent 编排画布</span>
         <button onClick={addNewAgent} style={{

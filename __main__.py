@@ -3,14 +3,18 @@ import sys, json, asyncio, os
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "bundle":
+        from .engine.bundle_cli import main as bundle_main
+        sys.exit(bundle_main(sys.argv[2:]))
     if "--run-bundle" in sys.argv:
         idx = sys.argv.index("--run-bundle")
         if idx + 1 >= len(sys.argv):
-            print("Usage: python -m fangyu --run-bundle <bundle_dir> [--host 127.0.0.1] [--port 9001]")
+            print("Usage: python -m fangyu --run-bundle <bundle_dir> [--host 127.0.0.1] [--port 9001] [--daemon]")
             sys.exit(1)
         bundle_path = sys.argv[idx + 1]
         host = os.getenv("BUNDLE_HOST", "127.0.0.1")
         port = int(os.getenv("BUNDLE_PORT", "9001"))
+        daemon = "--daemon" in sys.argv
         args = sys.argv[idx + 2:]
         for i, a in enumerate(args):
             if a == "--host" and i + 1 < len(args):
@@ -20,7 +24,7 @@ def main():
         from .engine.executor import register_executors
         register_executors()
         from .engine.bundle_runtime import run_bundle_server
-        run_bundle_server(bundle_path, host=host, port=port)
+        run_bundle_server(bundle_path, host=host, port=port, daemon=daemon)
         return
     if "--server" in sys.argv or "-s" in sys.argv:
         import uvicorn
@@ -33,7 +37,7 @@ def main():
     from .engine.scheduler import run_flow
     print("Fangyu — AI Flow Canvas Engine v0.1")
     if "--help" in sys.argv or "-h" in sys.argv:
-        print("Usage: python -m fangyu [--server] [--run-bundle <dir>] [--flow flow.json] [--input key=val ...]")
+        print("Usage: python -m fangyu [--server] [--run-bundle <dir>] [bundle run|rpc|validate|trust ...] [--flow flow.json]")
         return
     flow_path = None
     external_inputs = {}

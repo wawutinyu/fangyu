@@ -22,6 +22,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pyinstaller>=6.0.0"]
+mqtt = ["paho-mqtt>=2.0.0"]
 
 [project.scripts]
 fangyu = "fangyu.__main__:main"
