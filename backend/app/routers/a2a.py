@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 
-from app.services.a2a_runtime import AgentRegistry, AgentBus
+from fangyu.engine.a2a_runtime import AgentRegistry, AgentBus
 
 router = APIRouter(prefix="/api/v1/a2a", tags=["a2a"])
 _bus = AgentBus()

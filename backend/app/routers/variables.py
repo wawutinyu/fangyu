@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Any
 
-from ..services.variable import (
+from fangyu.engine.variable import (
     variable_get, variable_set, variable_delete, variable_list, variable_persist,
 )
 

@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from ..services.skill import (
+from fangyu.engine.skill import (
     create_skill, edit_skill, delete_skill, list_skills, get_skill_content, learn_from_llm,
     skill_write_file, skill_remove_file,
 )

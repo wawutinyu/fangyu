@@ -6,8 +6,8 @@ from sqlalchemy import select, delete
 
 from ..models.database import get_session
 from ..models.knowledge import KnowledgeDoc, KnowledgeChunk
-from ..services.knowledge import save_upload_file, extract_and_chunk, search_chunks
-from ..services.embedding import get_embeddings_batch
+from fangyu.engine.knowledge import save_upload_file, extract_and_chunk, search_chunks
+from fangyu.engine.embedding import get_embeddings_batch
 
 router = APIRouter(prefix="/api/v1/knowledge", tags=["知识库"])
 

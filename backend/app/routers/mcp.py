@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from ..services.mcp import (
+from fangyu.engine.mcp import (
     get_internal_tools, get_internal_resources, call_internal_tool,
     list_external_servers, get_external_server, connect_external_server,
     disconnect_external_server,

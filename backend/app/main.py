@@ -86,7 +86,7 @@ async def lifespan(app: FastAPI):
     """
     # -------------------- 启动 --------------------
     await init_db()   # 建表（幂等，重复调用安全）
-    from .services.mcp import _init_internal_tools
+    from fangyu.engine.mcp import _init_internal_tools
     await _init_internal_tools()
     yield
     # -------------------- 关闭 --------------------

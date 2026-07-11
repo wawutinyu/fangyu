@@ -7,7 +7,7 @@ from sqlalchemy import select
 from ..models.database import get_session
 from ..models.setting import Setting
 from ..core.config import settings as env_settings
-from ..services.llm import chat_completion, chat_completion_stream, get_provider, PROVIDER_BASE_URL
+from fangyu.engine.llm import chat_completion, chat_completion_stream, get_provider, PROVIDER_BASE_URL
 
 router = APIRouter(prefix="/api/v1/llm", tags=["LLM 代理"])
 

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
-from ..services.search import index_message, search_messages
+from fangyu.engine.search import index_message, search_messages
 
 router = APIRouter(prefix="/api/v1/search", tags=["搜索"])
 

@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from ..services.tool_registry import register_tool, unregister_tool, list_tools, execute_tool, register_from_llm_output
+from fangyu.engine.tool_registry import register_tool, unregister_tool, list_tools, execute_tool, register_from_llm_output
 
 router = APIRouter(prefix="/api/v1/tools", tags=["工具注册"])
 

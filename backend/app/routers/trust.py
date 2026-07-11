@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 
-from app.services.trust_runtime import TrustRegistry, AgentIdentity, MessageEnvelope
+from fangyu.engine.trust_runtime import TrustRegistry, AgentIdentity, MessageEnvelope
 
 router = APIRouter(prefix="/api/v1/trust", tags=["trust"])
 

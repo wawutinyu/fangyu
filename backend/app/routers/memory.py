@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
-from ..services.memory import (
+from fangyu.engine.memory import (
     memory_read, memory_write, memory_delete, memory_replace, memory_list, memory_search, memory_extract_facts,
 )
 

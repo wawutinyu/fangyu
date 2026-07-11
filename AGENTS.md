@@ -6,46 +6,51 @@
 
 ```
 .
-├── frontend/               # React 19 + Vite 8 + React Flow v11
+├── fangyu/                 # ★ 独立可分发包（纯功能代码，零测试）
+│   ├── __init__.py         # 包入口
+│   ├── __main__.py         # CLI: python -m fangyu
+│   ├── pyproject.toml      # pip install fangyu/
+│   ├── a2a/                # 共享协议契约（前后端唯一交集）
+│   │   ├── protocol.py     # Task, Message, AgentCard — A2A v1.0 数据模型
+│   │   ├── bus.py, registry.py, transport_http.py
+│   │   └── trust/          # ATP 子协议（Ed25519 签名/验签/防重放）
+│   ├── engine/             # 后端引擎（依赖 a2a/ 协议）
+│   │   ├── scheduler.py    # DAG 拓扑排序执行器
+│   │   ├── executor.py     # 执行器注册与调度
+│   │   ├── sandbox.py      # 沙箱 Python 执行
+│   │   ├── llm.py          # LLM API 客户端
+│   │   ├── memory/         # 持久化记忆
+│   │   ├── knowledge.py    # 知识库检索
+│   │   ├── embedding.py    # 向量嵌入（SentenceTransformer）
+│   │   ├── a2a_runtime.py  # AgentBus + AgentRegistry 运行时
+│   │   ├── trust_runtime.py# ATP 信任运行时
+│   │   └── ...             # 20+ 执行器模块
+│   └── frontend/           # 前端 TypeScript 工具（依赖 a2a/ 协议）
+│       ├── codeGenerator.ts  # Python 代码生成（输出 from fangyu.a2a）
+│       ├── nodeRegistry.ts   # 节点注册表（20 种合并类型）
+│       └── ...               # flowHelper, exportFlow, a2aProtocol 等
+│
+├── backend/                # FastAPI 接入层（依赖 fangyu.engine）
+│   ├── app/
+│   │   ├── main.py         # 导入 from fangyu.engine.xxx
+│   │   ├── routers/        # API 路由（导入 from fangyu.engine.xxx）
+│   │   └── models/
+│   └── data/
+│
+├── frontend/               # React UI 层（依赖 fangyu/frontend/）
 │   ├── src/
 │   │   ├── components/     # TSX 组件
-│   │   │   ├── App.tsx            # 主布局
-│   │   │   ├── AtomNode.tsx       # 通用节点渲染（含多端口）
-│   │   │   ├── CompositeNode.tsx  # 组合节点
-│   │   │   ├── ConfigPanel.tsx    # 右侧配置面板
-│   │   │   ├── FlowCanvas.tsx     # 核心画布
-│   │   │   ├── NodeLibrary.tsx    # 左侧组件库
-│   │   │   ├── BottomPanel.tsx    # 底部标签页容器（可拖拽）
-│   │   │   ├── ChatInterface.tsx  # 运行预览（底部标签页）
-│   │   │   ├── SettingsPanel.tsx  # API Key 设置
-│   │   │   ├── SaveHistory.tsx    # 保存历史
-│   │   │   ├── ToolRegistry.tsx   # 工具注册表（底部标签页）
-│   │   │   ├── SkillManager.tsx   # 技能库（底部标签页）
-│   │   │   ├── KnowledgePanel.tsx # 知识库管理（底部标签页）
-│   │   │   ├── MonitorPanel.tsx   # 执行日志查看（底部标签页）
-│   │   │   └── SubFlowEditor.tsx  # 子图编辑器（弹窗）
-│   │   ├── store/          # Redux Toolkit (flowSlice/settingsSlice/saveSlice)
-│   │   ├── utils/          # nodeRegistry.ts / flowHelper.ts / executor.ts
-│   │   └── styles/
-│   ├── index.html
-│   ├── package.json
-│   └── vite.config.ts      # 代理 /api → localhost:8000
+│   │   ├── store/          # Redux Toolkit（含 73 个单元测试）
+│   │   └── ...
+│   └── ...
 │
-├── backend/                # Python 3.14 + FastAPI + SQLite (aiosqlite)
-│   ├── app/
-│   │   ├── main.py
-│   │   ├── core/config.py
-│   │   ├── models/         # database / knowledge / execution_log / setting
-│   │   ├── routers/        # flow / llm / settings / knowledge / project / monitor / tools / skills
-│   │   └── services/       # executor / llm / memory / embedding / sandbox / tool_registry / skill / variable / search / knowledge
-│   ├── data/               # SQLite DB、工具注册表、技能文件
-│   └── requirements.txt
+├── tests/                  # 所有测试（fangyu/ 外面）
+│   ├── unit/               # 单元测试
+│   ├── integration/        # 集成测试
+│   └── e2e/                # Playwright e2e（34 个）
 │
-├── tests/
-│   └── test_all_features.py   # 全功能测试（10 项）
-├── ROADMAP.md              # 后续规划
 ├── AGENTS.md
-└── dev.bat                 # 一键启动
+└── dev.bat
 ```
 
 ## 开发启动
