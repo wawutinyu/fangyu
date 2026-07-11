@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fangyu"
+version = "0.1.0"
+description = "AI Flow Canvas Engine — standalone DAG executor with A2A/ATP protocol"
+requires-python = ">=3.10"
+dependencies = [
+    "cryptography>=41.0.0",
+    "fastapi>=0.115.0",
+    "httpx>=0.25.0",
+    "pydantic>=2.10.0",
+    "sqlalchemy>=2.0.36",
+    "aiosqlite>=0.20.0",
+    "python-multipart>=0.0.17",
+    "python-dotenv>=1.0.1",
+    "uvicorn[standard]>=0.32.0",
+    "sentence-transformers>=2.2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pyinstaller>=6.0.0"]
+
+[project.scripts]
+fangyu = "fangyu.__main__:main"
+
+[tool.setuptools]
+package-dir = {"fangyu" = "."}
+packages = [
+    "fangyu",
+    "fangyu.a2a",
+    "fangyu.a2a.trust",
+    "fangyu.core",
+    "fangyu.engine",
+    "fangyu.models",
+    "fangyu.routers",
+]

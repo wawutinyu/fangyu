@@ -1,72 +1,59 @@
-# AI Flow Canvas
+# fangyu
 
-a visual flow editor with DAG execution, A2A agent orchestration, and ATP trust protocol for building AI workflows.
+AI 工作流编排平台 — 可视化画布 + DAG 执行引擎 + A2A 协议 + ATP 信任层。
 
-## Architecture
+**fangyu/ 就是项目根目录。**
+
+## 完整产品组成
+
+| 模块 | 位置 | 说明 |
+|------|------|------|
+| **fangyu-flow** | `fangyu-flow/` | React 画布 — Flow 编排 + Agent 编排 |
+| **执行引擎** | `engine/` | DAG 调度 + 25 种节点执行器 |
+| **API 服务** | `server.py` + `routers/` | FastAPI 接口 |
+| **A2A 协议** | `a2a/` | Task/Message/AgentCard + ATP 信任层 |
+
+## 目录结构
 
 ```
-frontend/         → React + Vite + Redux + ReactFlow
-backend/          → FastAPI + uvicorn (flow execution engine)
-tests/            → Python A2A/ATP runtime tests
+fangyu/                  ← 项目根
+├── __init__.py
+├── __main__.py          # CLI: py -m fangyu
+├── server.py            # FastAPI 入口
+├── pyproject.toml
+├── dev.bat              # 一键启动
+├── a2a/
+├── engine/
+├── models/
+├── routers/
+├── core/
+├── fangyu-flow/         # 画布 UI（React + ReactFlow）
+│   ├── src/
+│   ├── package.json
+│   └── vite.config.ts
+└── data/
 ```
 
-### Two Canvases
-
-| Canvas | Technology | Purpose |
-|---|---|---|
-| Flow | DAG + ReactFlow | Visual pipeline editor — chain LLM, search, condition, loop, code execution nodes |
-| Agent | A2A Protocol | Agent orchestration with subscribe-based communication, Ed25519 trust signing |
-
-### Protocol Stack
-
-- **A2A v1.0** (full) — Task/Message/Part/Artifact/AgentCard, SendMessage/GetTask/ListTasks/Subscribe
-- **ATP** (Agent Trust Protocol) — Ed25519 signatures, TrustRegistry (authz + revocation), TrustAnchor, nonce replay protection
-
-### Export
-
-- Generates runnable Python code with the full a2a/ + trust/ module tree
-- Compiles to standalone .exe via PyInstaller
-- `--enable-a2a` / `--disable-a2a` CLI toggle
-
-## Quick Start
-
-### Frontend
+## 安装与启动
 
 ```bash
-cd frontend
+# 一键启动（Windows）
+dev.bat
+
+# 或手动启动：
+
+# 1. Python 后端
+py -m pip install -e .
+py -m fangyu --server          # → http://localhost:8000
+
+# 2. 画布前端 fangyu-flow
+cd fangyu-flow
 npm install
-npm run dev      # → http://localhost:5173
+npm run dev                    # → http://localhost:5173
 ```
 
-### Backend
+## 隔离原则
 
-```bash
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
-```
+**属于 fangyu 的：** fangyu-flow 画布、执行引擎、API、协议层 — 全部产品代码。
 
-### Tests
-
-```bash
-# Frontend (vitest)
-cd frontend && npx vitest run
-
-# E2E (Playwright)
-cd frontend && npx playwright test
-
-# Python A2A
-python -m pytest tests/ -v
-
-# Backend API (start backend first)
-python tests/check_all_features_api.py
-```
-
-## Test Status
-
-- **179 tests total**: 127 vitest unit + 34 Playwright e2e + 18 Python pytest
-- Full CI: TypeScript check → oxlint → vitest → build → Playwright → pytest → backend API
-
-## License
-
-MIT
+**不混进来的：** 仅开发期测试脚本、CI 配置等工程杂项。

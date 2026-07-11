@@ -7,11 +7,11 @@ on:
     branches: [main, master]
 
 jobs:
-  frontend:
+  fangyu-flow:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: frontend
+        working-directory: fangyu-flow
 
     steps:
       - uses: actions/checkout@v4
@@ -19,70 +19,62 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          cache: npm
+          cache-dependency-path: fangyu-flow/package-lock.json
 
       - run: npm ci
 
       - name: TypeScript check
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
       - name: Lint
-        run: npx oxlint .
+        run: npm run lint
 
-      - name: Vitest (unit)
-        run: npx vitest run
+      - name: Vitest
+        run: npm test
 
       - name: Build
         run: npm run build
 
-      - name: Install Playwright browsers
+      - name: Install Playwright
         run: npx playwright install chromium
 
-      - name: E2E tests
-        run: npx playwright test
+      - name: E2E
+        run: npm run test:e2e
 
-  python-a2a:
+  python:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: .
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.14'
+          python-version: '3.12'
 
-      - run: pip install cryptography pytest
+      - name: Install fangyu
+        run: pip install -e ".[dev]" pytest cryptography
 
-      - name: Python A2A/ATP runtime tests
-        run: python -m pytest tests/ -v
+      - name: Python tests
+        run: python -m pytest tests/python/ -v
 
-  backend-api:
+  api:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.14'
+          python-version: '3.12'
 
-      - name: Install backend dependencies
+      - name: Install fangyu
+        run: pip install -e .
+
+      - name: Start API server
         run: |
-          pip install -r requirements.txt
-          pip install uvicorn httpx
+          HOST=127.0.0.1 PORT=8000 nohup python -m fangyu --server &
+          sleep 5
 
-      - name: Start backend server
-        run: |
-          nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 &
-          sleep 3
-
-      - name: Run API integration tests
-        working-directory: ..
-        run: python tests/check_all_features_api.py
+      - name: API integration tests
+        run: python tests/python/check_all_features_api.py

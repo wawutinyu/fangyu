@@ -5,36 +5,29 @@ __pycache__/
 .venv/
 venv/
 *.sqlite3
+data/*.db
 
-# Node
-node_modules/
-dist/
-dist-ssr/
+# Node / fangyu-flow
+fangyu-flow/node_modules/
+fangyu-flow/dist/
+fangyu-flow/dist-ssr/
+fangyu-flow/test-results/
+fangyu-flow/release/
 *.local
 
 # Environment
 .env
-backend/.env
 
-# Editor
+# Editor / OS
 .vscode/*
 !.vscode/extensions.json
 .idea/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# OS
 .DS_Store
 Thumbs.db
+*.log
 
-# Runtime data
-backend/data/*.db
-
-# Electron build output
-frontend/release/
-*.exe
-
-vite.log
+# Build
+dist/
+build/
+.eggs/
+*.egg
