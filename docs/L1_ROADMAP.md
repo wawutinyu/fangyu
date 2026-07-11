@@ -336,7 +336,7 @@ Worker-only Agent：`user.enabled = false`，runtime 不启动 Chat UI。
 | Bundle workspace | `workspace/` 挂载 + `ws_read/write/list` | ✅ |
 | 任务状态持久化 | `.fangyu/state.json` | ✅ |
 | Flow 画布 demo | `actionWorker` 模板 | ✅ |
-| LLM 规划节点 | plan 步骤可选接 llm 节点 | ⏳ 下一步 |
+| LLM 规划节点 | plan 步骤可选接 llm 节点 | ✅ |
 | 开发者文档 | [集成 Cookbook](INTEGRATION_COOKBOOK.md) | ✅ |
 
 **验收：** 一个**未参与本项目开发的工程师**，按文档可在 1 小时内完成 Bundle 导出 + 独立运行 + 远程 RPC。

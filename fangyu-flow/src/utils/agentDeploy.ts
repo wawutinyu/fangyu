@@ -39,9 +39,9 @@ function resolveSkillFlow(agent: AgentCanvasNode, skillId: string) {
 }
 
 /** 为 Agent 技能生成默认 Action Loop 子流程 */
-export function buildDefaultSkillFlow(card: AgentCard, skillId: string) {
+export function buildDefaultSkillFlow(card: AgentCard, skillId: string, options?: { useLlmPlan?: boolean }) {
   const skill = card.skills.find(s => s.id === skillId)
-  return buildActionLoopFlow(skillId, skill?.name || 'action')
+  return buildActionLoopFlow(skillId, skill?.name || 'action', { useLlmPlan: options?.useLlmPlan })
 }
 
 export async function deployAgentsToBackend(agents: AgentCanvasNode[]): Promise<{ success: boolean; count: number }> {

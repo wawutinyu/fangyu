@@ -1,4 +1,5 @@
 import asyncio
+import json
 import sys
 import traceback
 
@@ -11,7 +12,7 @@ SAFE_BUILTINS = {
     'ord': ord, 'pow': pow, 'range': range, 'repr': repr, 'reversed': reversed,
     'round': round, 'set': set, 'slice': slice, 'sorted': sorted, 'str': str,
     'sum': sum, 'tuple': tuple, 'type': type, 'zip': zip, 'True': True, 'False': False,
-    'None': None, 'print': print,
+    'None': None, 'print': print, 'json': json,
 }
 
 FORBIDDEN = ['__import__', 'open', 'eval', 'compile', 'globals', 'locals', 'vars', 'dir', 'getattr', 'setattr', 'delattr', 'hasattr']

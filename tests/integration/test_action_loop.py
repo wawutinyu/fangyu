@@ -1,4 +1,7 @@
 """Action Loop + workspace 集成测试"""
+import asyncio
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -7,8 +10,7 @@ from fangyu.core.agent_bundle import create_agent_bundle
 from fangyu.engine.bundle_runtime import create_bundle_app
 from fangyu.engine.executor import register_executors
 from fangyu.engine.scheduler import run_flow
-from fangyu.engine.workspace import init_bundle_workspace
-import asyncio
+from fangyu.engine.workspace import get_active_workspace, init_bundle_workspace
 
 
 @pytest.fixture()
@@ -28,7 +30,6 @@ def test_action_loop_flow_writes_workspace(tmp_path):
         external_inputs={"query": "build report"},
     ))
     assert result["success"] is True
-    from fangyu.engine.workspace import get_active_workspace
     ws = get_active_workspace()
     assert ws is not None
     assert ws.read("result.txt") == "done: build report"
@@ -63,3 +64,24 @@ def test_bundle_action_loop_via_rpc(worker_bundle):
 
     health = client.get("/health").json()
     assert "workspace" in health
+
+
+@patch("fangyu.engine.exec_ai.chat_completion", new_callable=AsyncMock)
+def test_action_loop_llm_plan(mock_chat, tmp_path):
+    register_executors()
+    init_bundle_workspace(tmp_path)
+    mock_chat.return_value = {
+        "result": '{"action":"write_result","goal":"llm goal","reason":"first run"}',
+        "usage": {},
+    }
+    flow = get_action_loop_flow(use_llm_plan=True)
+    result = asyncio.run(run_flow(
+        nodes=flow["nodes"],
+        edges=flow["edges"],
+        external_inputs={"query": "llm goal"},
+    ))
+    assert result["success"] is True
+    ws = get_active_workspace()
+    assert ws.read("result.txt") == "done: llm goal"
+    plan_step = next(r for r in result["results"] if r["nodeId"] == "plan")
+    assert plan_step["outputs"]["result"]["mode"] == "llm"
