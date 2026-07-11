@@ -1,0 +1,16 @@
+{
+  "name": "text_process_upper",
+  "external_inputs": {"text": "abc"},
+  "nodes": [
+    {"id": "s", "label": "start", "originType": "start"},
+    {"id": "t", "label": "text-process", "originType": "text-process", "config": {"operation": "upper"}},
+    {"id": "o", "label": "output", "originType": "output"}
+  ],
+  "edges": [
+    {"source": "s", "target": "t"},
+    {"source": "t", "target": "o"}
+  ],
+  "checks": [
+    {"label": "output", "field": "result", "value": "ABC"}
+  ]
+}

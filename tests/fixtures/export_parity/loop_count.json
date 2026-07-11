@@ -1,0 +1,28 @@
+{
+  "name": "loop_count",
+  "external_inputs": {},
+  "nodes": [
+    {"id": "s", "label": "start", "originType": "start"},
+    {"id": "arr", "label": "code", "originType": "code", "config": {"code": "result = [1, 2]"}},
+    {
+      "id": "loop",
+      "label": "loop",
+      "originType": "loop",
+      "config": {"max_iterations": 5},
+      "inner_nodes": [
+        {"id": "li", "originType": "input", "config": {"default_value": "item"}},
+        {"id": "lo", "originType": "output", "config": {}}
+      ],
+      "inner_links": [
+        {"sourceNodeId": "li", "targetNodeId": "lo", "linkType": "serial", "mappings": {}}
+      ]
+    }
+  ],
+  "edges": [
+    {"source": "s", "target": "arr"},
+    {"source": "arr", "target": "loop"}
+  ],
+  "checks": [
+    {"label": "loop", "field": "count", "value": 2}
+  ]
+}

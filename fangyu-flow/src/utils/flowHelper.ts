@@ -40,7 +40,11 @@ export function generateId(prefix = 'node'): string {
 export function convertToExportFormat(nodes: Node[], edges: Edge[]): ExportFormat {
   const exportNodes: ExportNode[] = nodes.map(n => ({
     id: n.id,
-    type: (n.data?.originType as string) || n.type || 'atom-node',
+    type: (n.data?.originType as string)
+      || (n.type === 'composite-node' ? 'composite'
+        : n.type === 'loop-node' ? 'loop'
+        : n.type)
+      || 'atom-node',
     name: (n.data?.name as string) || '',
     category: (n.data?.category as string) || '',
     is_group: n.type === 'composite-node',

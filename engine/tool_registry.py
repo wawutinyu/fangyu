@@ -6,6 +6,15 @@ from typing import Any
 REGISTRY_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "tools"
 REGISTRY_FILE = REGISTRY_DIR / "registry.json"
 
+DANGEROUS_TOOL_NAMES = frozenset({"shell_execution", "file_operations"})
+
+
+def _tool_enabled(name: str) -> bool:
+    from ..core.config import settings
+    if name in DANGEROUS_TOOL_NAMES:
+        return settings.ALLOW_DANGEROUS_TOOLS
+    return True
+
 
 def _ensure():
     REGISTRY_DIR.mkdir(parents=True, exist_ok=True)
@@ -61,9 +70,13 @@ def get_tool(name: str) -> dict | None:
 
 
 async def execute_tool(name: str, args: dict, global_vars: dict) -> Any:
+    from ..core.constitution import check_tool_allowed
+    check_tool_allowed(name)
     tool = get_tool(name)
     if not tool:
         raise ValueError(f"工具 '{name}' 未注册")
+    if not tool.get("enabled", True):
+        raise ValueError(f"工具 '{name}' 已禁用（设置 ALLOW_DANGEROUS_TOOLS=true 可启用 shell/文件类工具）")
 
     impl = tool.get("implementation", {})
     impl_type = impl.get("type", "prompt")
@@ -292,7 +305,13 @@ def register_builtins():
     _ensure()
     existing = _load()
     for tool in BUILTIN_TOOLS:
-        existing[tool["name"]] = {**tool, "enabled": True, "builtin": True}
+        name = tool["name"]
+        existing[name] = {
+            **tool,
+            "enabled": _tool_enabled(name),
+            "builtin": True,
+            "dangerous": name in DANGEROUS_TOOL_NAMES,
+        }
     _save(existing)
 
 

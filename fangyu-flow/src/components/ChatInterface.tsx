@@ -4,9 +4,29 @@ import { Executor } from '../utils/executor'
 import type { ExecutorLog } from '../utils/executor'
 import { convertToExportFormat } from '../utils/flowHelper'
 import { useAppSelector } from '../store/hooks'
+import { deployAgentsToBackend } from '../utils/agentDeploy'
+import {
+  buildPipelineFromCanvas,
+  hasCollaborationPipeline,
+  orchestrateAgents,
+  type CollabStepResult,
+} from '../utils/agentOrchestrate'
+import { ViolationPanel, formatViolationSummary, type ViolationPayload } from './ViolationPanel'
+import { warningsToViolationPayload } from '../utils/constitutionWarnings'
 
 
-interface ChatMessage { role: string; content: string; logs?: ExecutorLog[]; _showLogs?: boolean; _pendingSkill?: string; _pendingSkillDesc?: string }
+interface ChatMessage {
+  role: string
+  content: string
+  logs?: ExecutorLog[]
+  _showLogs?: boolean
+  _pendingSkill?: string
+  _pendingSkillDesc?: string
+  _collabSteps?: CollabStepResult[]
+  _showCollab?: boolean
+  _violation?: ViolationPayload
+  _showViolation?: boolean
+}
 
 const STORAGE_KEY = 'ai-flow-chat-messages'
 
@@ -22,9 +42,13 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(loadMessages)
   const [running, setRunning] = useState(false)
   const [chatMode, setChatMode] = useState<'flow' | 'agent'>('flow')
+  const [agentCollabMode, setAgentCollabMode] = useState(true)
   const msgListRef = useRef<HTMLDivElement>(null)
   const agentNodes = useAppSelector(s => s.agent.nodes)
   const [selectedAgent, setSelectedAgent] = useState('')
+
+  const collabPipeline = buildPipelineFromCanvas(agentNodes)
+  const canCollab = hasCollaborationPipeline(agentNodes)
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(messages))
@@ -39,25 +63,69 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
   }, [])
 
   const sendToAgent = useCallback(async (text: string) => {
-    const target = selectedAgent || agents[0]?.id
-    if (!target) { setRunning(false); return }
     try {
+      await deployAgentsToBackend(agentNodes)
+
+      if (agentCollabMode && collabPipeline && collabPipeline.length >= 2) {
+        const result = await orchestrateAgents(text, collabPipeline, 'append')
+        if (!result.success) {
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: result.violation ? formatViolationSummary(result.violation) : (result.error || '协作执行失败'),
+            _collabSteps: result.steps,
+            _showCollab: true,
+            _violation: result.violation,
+            _showViolation: !!result.violation,
+          }])
+          return
+        }
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: result.final_output || '(无输出)',
+          _collabSteps: result.steps,
+          _showCollab: true,
+        }])
+        return
+      }
+
+      const target = selectedAgent || agents[0]?.id
+      if (!target) {
+        setMessages(prev => [...prev, { role: 'assistant', content: '请先在 Agent 画布添加 Agent 节点' }])
+        return
+      }
+      const agent = agents.find(a => a.id === target)
+      const skillId = agent?.agentCard?.skills?.[0]?.id || 'default'
       const resp = await fetch('/api/v1/a2a/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           target_agent: target,
-          message: { role: 'user', parts: [{ type: 'text', text }] },
+          message: {
+            role: 'user',
+            parts: [{ type: 'text', text }],
+            metadata: { skill_id: skillId },
+          },
         }),
       })
       const task = await resp.json()
-      const lastAgentMsg = task.history?.filter((m: any) => m.role === 'agent').pop()
-      const output = lastAgentMsg?.parts?.[0]?.text || task.artifact?.parts?.[0]?.text || '(无输出)'
-      setMessages(prev => [...prev, { role: 'assistant', content: output }])
+      if (task.violation) {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: formatViolationSummary(task.violation),
+          _violation: task.violation,
+          _showViolation: true,
+        }])
+        return
+      }
+      const lastAgentMsg = task.history?.filter((m: { role: string }) => m.role === 'agent').pop()
+      const output = lastAgentMsg?.parts?.[0]?.text
+        || task.output?.results?.slice(-1)?.[0]?.outputs?.result
+        || '(无输出)'
+      setMessages(prev => [...prev, { role: 'assistant', content: String(output) }])
     } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Agent 通信失败' }])
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Agent 通信失败，请确认后端已启动' }])
     }
-  }, [selectedAgent, agents])
+  }, [selectedAgent, agents, agentNodes, agentCollabMode, collabPipeline])
 
   const sendMessage = useCallback(async () => {
     const text = inputText.trim()
@@ -108,13 +176,30 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
 
     try {
       const result = await executor.run()
+      if (!result.success && result.violation) {
+        addMsg(formatViolationSummary(result.violation), {
+          _violation: result.violation,
+          _showViolation: true,
+        })
+        setRunning(false)
+        scrollToBottom()
+        return
+      }
       const logs = result.logs || []
       const allOutputs = result.results || []
       const lastLLM = allOutputs.find(r => r.type === 'llm' && r.outputs?.result)
       const lastNonLLM = [...allOutputs].reverse().find(r => !['start', 'end', 'output'].includes(r.type) && r.outputs?.result)
       const output = lastLLM?.outputs?.result as string || lastNonLLM?.outputs?.result as string || ''
+      const warnPayload = result.constitution_warnings?.length
+        ? warningsToViolationPayload(result.constitution_warnings)
+        : undefined
 
-      addMsg(output || '(流程执行完成，无输出)', { logs, _showLogs: logs.length > 0 })
+      addMsg(output || '(流程执行完成，无输出)', {
+        logs,
+        _showLogs: logs.length > 0,
+        _violation: warnPayload,
+        _showViolation: !!warnPayload,
+      })
 
       fetch('/api/v1/search/index', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: 'user', content: text }) }).catch(() => {})
       if (output) {
@@ -142,7 +227,15 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
           padding: '2px 10px', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11,
           background: chatMode === 'agent' ? '#722ed1' : 'transparent', color: chatMode === 'agent' ? '#fff' : '#888',
         }} disabled={agents.length === 0}>Agent 聊天</button>
-        {chatMode === 'agent' && agents.length > 0 && (
+        {chatMode === 'agent' && canCollab && (
+          <button onClick={() => setAgentCollabMode(v => !v)} style={{
+            padding: '2px 10px', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11,
+            background: agentCollabMode ? '#13c2c2' : 'transparent', color: agentCollabMode ? '#fff' : '#888',
+          }} title={`链式协作 ${collabPipeline?.length || 0} 步`}>
+            {agentCollabMode ? `协作模式 (${collabPipeline?.length})` : '单 Agent'}
+          </button>
+        )}
+        {chatMode === 'agent' && agents.length > 0 && !agentCollabMode && (
           <select value={selectedAgent || agents[0]?.id || ''} onChange={e => setSelectedAgent(e.target.value)}
             style={{ marginLeft: 4, fontSize: 11, padding: '1px 4px', border: '1px solid #ddd', borderRadius: 4 }}>
             {agents.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
@@ -154,7 +247,11 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, height: '100%', minHeight: 80 }}>
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#bfbeba" strokeWidth="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             <span style={{ fontSize: 12, color: '#bfbeba' }}>
-              {chatMode === 'flow' ? '输入消息运行流程，/learn <描述> 学习技能' : '选择 Agent 并发送消息'}
+              {chatMode === 'flow'
+                ? '输入消息运行流程，/learn <描述> 学习技能'
+                : agentCollabMode && canCollab
+                  ? `协作模式：${collabPipeline?.map(s => s.label).join(' → ') || ''}`
+                  : '选择 Agent 并发送消息'}
             </span>
           </div>
         )}
@@ -170,6 +267,45 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 2 }}>{msg.role === 'user' ? '你' : 'AI'}</div>
               <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text-primary)', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{msg.content}</div>
+              <ViolationPanel
+                violation={msg._violation}
+                expanded={msg._showViolation !== false}
+                onToggle={() => setMessages(prev => prev.map((m, idx) => idx === i ? { ...m, _showViolation: !m._showViolation } : m))}
+              />
+              {msg._collabSteps && msg._collabSteps.length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 11, color: '#13c2c2', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                    onClick={() => setMessages(prev => prev.map((m, idx) => idx === i ? { ...m, _showCollab: !m._showCollab } : m))}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    协作过程 ({msg._collabSteps.length} 步)
+                  </div>
+                  {msg._showCollab && (
+                    <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {msg._collabSteps.map(step => (
+                        <div key={`${step.index}-${step.agent}`} style={{
+                          background: '#f0fffe', border: '1px solid #b5f5ec', borderRadius: 6, padding: '8px 10px',
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: '#08979c' }}>
+                              {step.index + 1}. {step.label}
+                            </span>
+                            <span style={{ fontSize: 10, color: '#888' }}>
+                              {step.state}{step.duration_ms ? ` · ${step.duration_ms}ms` : ''}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 11, color: '#666', marginBottom: 2 }}>技能: {step.skill_id}</div>
+                          <div style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--text-primary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                            {step.output || '(无输出)'}
+                          </div>
+                          {step.violation && (
+                            <ViolationPanel violation={step.violation} expanded />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               {msg._pendingSkill && (
                 <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
                   <button style={{ padding: '4px 14px', fontSize: 12, border: 'none', borderRadius: 6, background: '#37352f', color: '#fff', cursor: 'pointer' }}

@@ -1,0 +1,17 @@
+{
+  "name": "transform_mapping",
+  "external_inputs": {},
+  "nodes": [
+    {"id": "i", "label": "input", "originType": "input", "config": {"default_value": {"name": "alice", "age": 20}}},
+    {"id": "t", "label": "transform", "originType": "transform", "config": {"mapping": {"username": "name", "years": "age"}}},
+    {"id": "o", "label": "output", "originType": "output"}
+  ],
+  "edges": [
+    {"source": "i", "target": "t"},
+    {"source": "t", "target": "o"}
+  ],
+  "checks": [
+    {"label": "output", "field": "result.username", "value": "alice"},
+    {"label": "output", "field": "result.years", "value": 20}
+  ]
+}

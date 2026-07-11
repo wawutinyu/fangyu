@@ -1,7 +1,8 @@
 import { getNodeMeta } from './nodeRegistry'
 import { getExecutionOrder } from './flowHelper'
 import { VariablePool } from './variablePool'
-import type { FlowNode, FlowEdge } from '../types'
+import { safeEval, safeEvalBool } from './safeExpr'
+import type { FlowNode, FlowEdge, InnerNodeDef, InnerLinkDef } from '../types'
 
 const FETCH_TIMEOUT = 8000
 
@@ -79,6 +80,7 @@ export async function runLocalFlow(
 
   const pool = new VariablePool()
   const outputs = new Map<string, Record<string, unknown>>()
+  const globalVars: Record<string, unknown> = {}
 
   for (const nodeId of order) {
     const node = nodeMap.get(nodeId)
@@ -196,7 +198,7 @@ export async function runLocalFlow(
         }
         nodeOutput = { input: response?.value ?? config.default_value ?? '' }
       } else {
-        nodeOutput = await simulateNode(originType, config, inputData)
+        nodeOutput = await simulateNode(originType, config, inputData, node, globalVars)
       }
 
       // Passthrough: carry forward upstream data + node's own output
@@ -228,23 +230,118 @@ export async function runLocalFlow(
   }
 }
 
+async function runSubGraph(
+  innerNodes: InnerNodeDef[],
+  innerLinks: InnerLinkDef[],
+  baseInputs: Record<string, unknown>,
+  globalVars: Record<string, unknown>,
+): Promise<Record<string, Record<string, unknown>>> {
+  const flowNodes: FlowNode[] = innerNodes.map(n => ({
+    id: n.id,
+    type: 'atom-node',
+    position: { x: 0, y: 0 },
+    data: {
+      originType: n.originType,
+      label: n.label || n.name || n.originType,
+      config: n.config || {},
+    },
+  }))
+  const flowEdges: FlowEdge[] = innerLinks.map((l, i) => ({
+    id: `inner-${i}`,
+    source: l.sourceNodeId,
+    target: l.targetNodeId,
+    type: 'flow-edge',
+    data: { linkType: l.linkType || 'serial', mappings: l.mappings || {} },
+  }))
+  const nodeMap = new Map(flowNodes.map(n => [n.id, n]))
+  const order = getExecutionOrder(flowNodes.map(n => n.id), flowEdges)
+  const subOutputs = new Map<string, Record<string, unknown>>()
+
+  for (const nodeId of order) {
+    const n = nodeMap.get(nodeId)
+    if (!n) continue
+    const inputData: Record<string, unknown> = {}
+    for (const link of innerLinks) {
+      if (link.targetNodeId === nodeId) {
+        const src = subOutputs.get(link.sourceNodeId)
+        if (src) Object.assign(inputData, src)
+      }
+    }
+    const hasInnerUpstream = innerLinks.some(l => l.targetNodeId === nodeId)
+    if (!hasInnerUpstream) {
+      Object.assign(inputData, baseInputs)
+    }
+    const ot = n.data.originType || ''
+    const cfg = n.data.config || {}
+    if (ot === 'start' || ot === 'trigger') {
+      subOutputs.set(nodeId, { ...inputData, trigger: true })
+    } else if (ot === 'input') {
+      subOutputs.set(nodeId, { input: inputData.input ?? cfg.default_value ?? '' })
+    } else if (ot === 'output') {
+      subOutputs.set(nodeId, { result: inputData.input ?? inputData.result })
+    } else {
+      subOutputs.set(nodeId, await simulateNode(ot, cfg, inputData, n, globalVars))
+    }
+  }
+  return Object.fromEntries(subOutputs)
+}
+
 async function simulateNode(
   originType: string,
   config: Record<string, unknown>,
   inputData: Record<string, unknown>,
+  node?: FlowNode,
+  globalVars: Record<string, unknown> = {},
 ): Promise<Record<string, unknown>> {
   switch (originType) {
+    case 'switch': {
+      const expr = (config.expression as string) || 'input'
+      const inputVal = inputData.input ?? inputData.result ?? inputData
+      try {
+        const value = safeEval(expr, { input: inputVal, inputs: inputData })
+        return { result: value, branch: `branch_${value}` }
+      } catch {
+        return { result: inputVal, branch: `branch_${inputVal}` }
+      }
+    }
+    case 'loop': {
+      let arr = inputData.array ?? inputData.result ?? config.items ?? []
+      if (!Array.isArray(arr)) arr = [arr]
+      const maxIter = Number(config.max_iterations) || 100
+      const loopVar = (config.loop_var as string) || 'item'
+      const innerNodes = node?.data?.inner_nodes || []
+      const innerLinks = node?.data?.inner_links || []
+      const results: Record<string, unknown>[] = []
+      for (let i = 0; i < Math.min(arr.length, maxIter); i++) {
+        const item = arr[i]
+        const entry: Record<string, unknown> = { index: i, [loopVar]: item }
+        if (innerNodes.length > 0) {
+          entry.body_outputs = await runSubGraph(
+            innerNodes,
+            innerLinks,
+            { ...inputData, item, index: i, [loopVar]: item },
+            globalVars,
+          )
+        }
+        results.push(entry)
+      }
+      return { result: results, count: results.length }
+    }
+    case 'composite':
+    case 'composite-node': {
+      const innerNodes = node?.data?.inner_nodes || []
+      const innerLinks = node?.data?.inner_links || []
+      if (innerNodes.length === 0) {
+        return { output: inputData.input ?? inputData.result, success: true }
+      }
+      const outputs = await runSubGraph(innerNodes, innerLinks, inputData, globalVars)
+      return { outputs, success: true }
+    }
     case 'condition': {
       const expr = (config.expression as string) || 'true'
-      try {
-        const keys = Object.keys(inputData)
-        const vals = Object.values(inputData)
-        const fn = new Function(...keys, `return Boolean(${expr})`)
-        const result = fn(...vals)
-        return { result, true: result, false: !result }
-      } catch {
-        return { result: false, error: 'condition eval failed' }
-      }
+      const inputVal = inputData.input ?? inputData.result ?? inputData
+      const result = safeEvalBool(expr, { input: inputVal, inputs: inputData })
+      return { result, branch: result ? 'true' : 'false', true: result, false: !result }
     }
     case 'code': {
       const code = (config.code as string) || 'return input'
@@ -278,24 +375,56 @@ async function simulateNode(
       const userMessage = inputCtx
         ? `上下文：\n${inputCtx}\n\n用户问题：${prompt}`
         : String(prompt)
-      // Use mock directly to avoid headless Chromium network issues
+      try {
+        const res = await fetchWithTimeout('/api/v1/llm/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model,
+            messages: [
+              ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
+              { role: 'user', content: userMessage },
+            ],
+          }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          const content = data.result ?? data.content ?? ''
+          _lastLLMOutput = content
+          return { result: content, usage: data.usage || {} }
+        }
+      } catch { /* fallback to mock when backend unavailable */ }
       _lastLLMOutput = `[mock] LLM answer for: ${prompt.slice(0, 100)}`
       return { result: _lastLLMOutput, usage: {} }
-      _lastLLMOutput = prompt
-      return { result: `[echo] ${prompt}`, usage: { total_tokens: 0 } }
     }
     case 'json-parse': {
-      const input = typeof inputData === 'string' ? inputData : JSON.stringify(inputData)
-      try { return { result: JSON.parse(input) } }
-      catch { return { result: inputData, error: 'invalid json' } }
+      const source = inputData.source ?? config.source ?? inputData.result ?? inputData.input ?? inputData
+      const raw = typeof source === 'string' ? source : JSON.stringify(source)
+      try { return { result: JSON.parse(raw), error: null } }
+      catch (e) { return { result: null, error: String(e) } }
     }
     case 'transform': {
+      const mapping = config.mapping as Record<string, string> | undefined
+      if (mapping && Object.keys(mapping).length > 0) {
+        const src = (inputData.source ?? inputData.input ?? inputData.result ?? inputData) as Record<string, unknown>
+        const base = typeof src === 'object' && src !== null ? src : { result: src }
+        const mapped: Record<string, unknown> = {}
+        for (const [k, path] of Object.entries(mapping)) {
+          let cur: unknown = base
+          for (const part of String(path).split('.')) {
+            cur = (cur as Record<string, unknown>)?.[part]
+          }
+          mapped[k] = cur
+        }
+        return { result: mapped }
+      }
       const expr = (config.expression as string) || ''
       if (!expr) return { result: inputData }
       try {
-        const fn = new Function('data', `return (${expr})`)
-        const result = fn(inputData)
-        return { result }
+        const src = inputData.source ?? inputData.input ?? inputData
+        const data = typeof src === 'object' && src !== null ? src : { result: src }
+        const result = safeEval(expr, { data, input: inputData })
+        return typeof result === 'object' && result !== null ? { result } : { result }
       } catch (err) {
         return { error: String(err) }
       }
@@ -330,9 +459,24 @@ async function simulateNode(
       }
     }
     case 'knowledge': {
-      const query = (inputData as Record<string, unknown>)?.query as string || (inputData as Record<string, unknown>)?.input as string || ''
+      const query = (inputData as Record<string, unknown>)?.query as string
+        || (inputData as Record<string, unknown>)?.input as string || ''
       const topK = (config.top_k as number) || 5
       if (!query) return { error: 'query is required' }
+      try {
+        const res = await fetchWithTimeout('/api/v1/knowledge/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, top_k: topK }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          return {
+            result: data.results || [],
+            context: data.context || '',
+          }
+        }
+      } catch { /* fallback */ }
       return { result: [], context: '' }
     }
     case 'tool-call': {
@@ -402,6 +546,125 @@ async function simulateNode(
         return { error: String(err) }
       }
     }
+    case 'text-process': {
+      const op = (config.operation as string) || 'trim'
+      const text = String(inputData.text ?? inputData.input ?? '')
+      if (op === 'concat') return { result: text + String(config.separator ?? '') }
+      if (op === 'split') return { result: text.split(String(config.separator ?? ',')) }
+      if (op === 'replace') {
+        const pattern = String(config.pattern ?? '')
+        const replacement = String(config.replacement ?? '')
+        return { result: text.replace(new RegExp(pattern, 'g'), replacement) }
+      }
+      if (op === 'trim') return { result: text.trim() }
+      if (op === 'uppercase' || op === 'upper') return { result: text.toUpperCase() }
+      if (op === 'lowercase' || op === 'lower') return { result: text.toLowerCase() }
+      return { result: text }
+    }
+    case 'variable-set': {
+      const varName = String(config.var_name ?? 'var')
+      const value = (config.var_value && inputData.value == null)
+        ? config.var_value
+        : inputData.value
+      globalVars[varName] = value
+      return { result: value, [`var_${varName}`]: value }
+    }
+    case 'variable-get': {
+      const varName = String(config.var_name ?? 'var')
+      return { value: globalVars[varName] }
+    }
+    case 'prompt-assembly': {
+      const stable = String(config.stable ?? '')
+      const context = String(inputData.context ?? config.context ?? '')
+      const volatile = String(inputData.volatile ?? config.volatile ?? '')
+      let assembled = ''
+      if (stable) assembled += stable + '\n'
+      if (context) assembled += '\n---\n' + context + '\n'
+      if (volatile) assembled += '\n---\n' + volatile + '\n'
+      const out = assembled.trim()
+      return { assembled: out, prompt: out }
+    }
+    case 'search': {
+      const query = String(inputData.query ?? inputData.input ?? config.query ?? '')
+      if (!query) return { results: [], summary: '' }
+      try {
+        const res = await fetchWithTimeout('/api/v1/search/web', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, top_k: config.top_k ?? 5 }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          return { results: data.results || [], summary: data.summary || '' }
+        }
+      } catch { /* fallback */ }
+      return { results: [{ title: query, snippet: `[mock search] ${query}`, url: '' }], summary: query }
+    }
+    case 'memory-read': {
+      const scope = String(config.scope ?? 'user')
+      const key = String(inputData.key ?? config.memory_key ?? '')
+      if (!key) return { value: null }
+      try {
+        const res = await fetchWithTimeout(`/api/v1/memory/read?scope=${encodeURIComponent(scope)}&key=${encodeURIComponent(key)}`)
+        if (res.ok) {
+          const data = await res.json()
+          return { value: data.value }
+        }
+      } catch { /* fallback */ }
+      return { value: null }
+    }
+    case 'memory-write': {
+      const scope = String(config.scope ?? 'user')
+      const key = String(inputData.key ?? config.memory_key ?? '')
+      const val = inputData.value ?? config.memory_value ?? ''
+      if (!key) return { success: false }
+      try {
+        await fetchWithTimeout('/api/v1/memory/write', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scope, key, value: String(val) }),
+        })
+      } catch { /* ignore */ }
+      return { success: true }
+    }
+    case 'extract-memory': {
+      const text = String(inputData.text ?? config.text ?? inputData.input ?? '')
+      try {
+        const res = await fetchWithTimeout('/api/v1/memory/extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, max_facts: config.max_facts ?? 3, scope: config.scope ?? 'user' }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          return { facts: data.facts || [], count: data.count ?? (data.facts?.length || 0) }
+        }
+      } catch { /* fallback */ }
+      const fact = text.trim()
+      return fact
+        ? { facts: [{ key: 'fact_local', value: fact }], count: 1 }
+        : { facts: [], count: 0 }
+    }
+    case 'search-sessions': {
+      const query = String(inputData.query ?? config.query ?? '')
+      const limit = Number(config.limit ?? 10)
+      try {
+        const res = await fetchWithTimeout(
+          `/api/v1/search/messages?q=${encodeURIComponent(query)}&limit=${limit}`,
+        )
+        if (res.ok) {
+          const data = await res.json()
+          return { results: data.results || [], count: (data.results || []).length }
+        }
+      } catch { /* fallback */ }
+      return { results: [], count: 0 }
+    }
+    case 'start':
+    case 'end':
+    case 'trigger':
+      return { result: inputData.result ?? inputData, triggered: originType === 'trigger' }
+    case 'output':
+      return { result: inputData.input ?? inputData.result ?? inputData }
     default:
       return { result: `[${originType}] executed` }
   }

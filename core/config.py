@@ -26,6 +26,7 @@ class Settings:
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     DEEPSEEK_API_KEY: str = os.getenv("DEEPSEEK_API_KEY", "")
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
+    ALLOW_DANGEROUS_TOOLS: bool = os.getenv("ALLOW_DANGEROUS_TOOLS", "false").lower() in ("1", "true", "yes")
 
 
 settings = Settings()

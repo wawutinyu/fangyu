@@ -10,9 +10,10 @@ import AgentNode from './AgentNode'
 import RouterNode from './RouterNode'
 import GroupNode from './GroupNode'
 import { useAppSelector, useAppDispatch } from '../store/hooks'
-import { addAgentNode, addAgentEdge, selectAgentNode, selectAgentEdge, moveAgentNode, removeAgentNode, removeAgentEdge, updateAgentEdge } from '../store/agentSlice'
+import { addAgentNode, addAgentEdge, selectAgentNode, selectAgentEdge, moveAgentNode, removeAgentNode, removeAgentEdge, updateAgentEdge, loadAgents, clearAgents } from '../store/agentSlice'
 import type { AgentCanvasNode } from '../store/agentSlice'
 import type { AgentCard, TrustConfig } from '../utils/a2aProtocol'
+import { buildAgentSocietyDemo } from '../utils/demoAgents'
 
 const nodeTypes = { 'a2a-agent': AgentNode, 'a2a-router': RouterNode, 'a2a-group': GroupNode }
 
@@ -121,6 +122,20 @@ export default function AgentCanvas() {
   const selectedNodeId = useAppSelector(s => s.agent.selectedNodeId)
   const selectedEdgeId = useAppSelector(s => s.agent.selectedEdgeId)
 
+  const loadDemo = useCallback(() => {
+    if (storeNodes.length > 0 && !window.confirm('将清空当前 Agent 画布并加载 Demo，是否继续？')) return
+    dispatch(clearAgents())
+    const demo = buildAgentSocietyDemo()
+    dispatch(loadAgents(demo))
+    setNodes(demo.nodes.map(n => ({ id: n.id, type: n.type || 'a2a-agent', position: n.position, data: n })))
+    setEdges(demo.edges.map(e => ({
+      id: e.id, source: e.source, target: e.target,
+      type: 'smoothstep', animated: true,
+      style: { stroke: '#722ed1', strokeDasharray: '6 3' },
+      label: e.label || 'subscribe',
+    })))
+  }, [dispatch, setNodes, setEdges, storeNodes.length])
+
   const deleteSelected = useCallback(() => {
     if (selectedNodeId) {
       dispatch(removeAgentNode(selectedNodeId))
@@ -159,6 +174,10 @@ export default function AgentCanvas() {
           padding: '4px 14px', background: '#d3adf7', color: '#722ed1',
           border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12,
         }}>+ 编组</button>
+        <button onClick={loadDemo} style={{
+          padding: '4px 14px', background: '#13c2c2', color: '#fff',
+          border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12,
+        }}>加载 AI 社会 Demo</button>
         {selectedNodeId && <span style={{ fontSize: 12, color: '#888' }}>已选: {selectedNodeId}</span>}
         {(selectedNodeId || selectedEdgeId) && (
           <button onClick={deleteSelected} style={{

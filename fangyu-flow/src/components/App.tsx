@@ -19,6 +19,7 @@ import { openFlowConfig } from '../store/flowSlice'
 import { toggleHistory, saveFlowApi, fetchAllProjects, createProjectApi } from '../store/saveSlice'
 import { convertToExportFormat } from '../utils/flowHelper'
 import { demoFlows } from '../utils/demoFlows'
+import { normalizeFlowResult, warningsToViolationPayload } from '../utils/constitutionWarnings'
 
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -88,8 +89,21 @@ export default function App() {
           body: JSON.stringify({ nodes: flowNodes, edges: flowEdges, external_inputs: {}, global_vars: { flow_id: demoId } }),
         })
         const result = await resp.json()
+        const normalized = normalizeFlowResult(result)
         if (result.success) {
-          handle.showResults(result.results.map((r: { nodeId: string; nodeName: string; outputs?: Record<string, unknown> }) => ({ nodeId: r.nodeId, nodeName: r.nodeName, output: r.outputs || {} })))
+          const warnPayload = normalized.constitution_warnings?.length
+            ? warningsToViolationPayload(normalized.constitution_warnings)
+            : null
+          handle.showResults(
+            result.results.map((r: { nodeId: string; nodeName: string; outputs?: Record<string, unknown> }) => ({
+              nodeId: r.nodeId,
+              nodeName: r.nodeName,
+              output: r.outputs || {},
+            })),
+            { constitutionWarnings: warnPayload },
+          )
+        } else if (normalized.violation) {
+          handle.showResults([], { constitutionWarnings: normalized.violation })
         } else {
           alert(`运行失败：${result.error || '请先配置 API Key'}`)
         }

@@ -8,6 +8,7 @@ export interface AgentCanvasNode {
   position: { x: number; y: number }
   agentCard?: AgentCard
   trust?: TrustConfig
+  skillFlows?: Record<string, { nodes: unknown[]; edges: unknown[] }>
   timeout?: number
   retryCount?: number
   lifecycle?: 'sync' | 'async' | 'streaming'
@@ -79,6 +80,17 @@ const agentSlice = createSlice({
       const n = state.nodes.find(n => n.id === action.payload.nodeId)
       if (n) { n.routingRules = action.payload.rules; n.defaultTarget = action.payload.defaultTarget }
     },
+    updateSkillFlow(state, action: PayloadAction<{ nodeId: string; skillId: string; flow: { nodes: unknown[]; edges: unknown[] } }>) {
+      const n = state.nodes.find(n => n.id === action.payload.nodeId)
+      if (n) {
+        if (!n.skillFlows) n.skillFlows = {}
+        n.skillFlows[action.payload.skillId] = action.payload.flow
+      }
+    },
+    clearSkillFlow(state, action: PayloadAction<{ nodeId: string; skillId: string }>) {
+      const n = state.nodes.find(n => n.id === action.payload.nodeId)
+      if (n?.skillFlows) delete n.skillFlows[action.payload.skillId]
+    },
     loadAgents(state, action: PayloadAction<{ nodes: AgentCanvasNode[]; edges: AgentCanvasEdge[] }>) {
       state.nodes = action.payload.nodes; state.edges = action.payload.edges
     },
@@ -90,6 +102,6 @@ export const {
   addAgentNode, updateAgentNode, removeAgentNode, moveAgentNode,
   addAgentEdge, removeAgentEdge, updateAgentEdge, selectAgentNode, selectAgentEdge,
   clearAgentSelection, updateAgentCard, updateAgentTrust,
-  updateRoutingRules, loadAgents, clearAgents,
+  updateRoutingRules, loadAgents, clearAgents, updateSkillFlow, clearSkillFlow,
 } = agentSlice.actions
 export default agentSlice.reducer

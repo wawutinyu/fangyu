@@ -1,0 +1,16 @@
+{
+  "name": "json_parse_config",
+  "external_inputs": {},
+  "nodes": [
+    {"id": "s", "label": "start", "originType": "start"},
+    {"id": "j", "label": "json-parse", "originType": "json-parse", "config": {"source": "{\"k\": 1}"}},
+    {"id": "o", "label": "output", "originType": "output"}
+  ],
+  "edges": [
+    {"source": "s", "target": "j"},
+    {"source": "j", "target": "o"}
+  ],
+  "checks": [
+    {"label": "json-parse", "field": "result", "value": {"k": 1}}
+  ]
+}

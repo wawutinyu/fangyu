@@ -22,6 +22,13 @@ jobs:
           cache: npm
           cache-dependency-path: fangyu-flow/package-lock.json
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install fangyu (for export↔engine parity)
+        run: pip install -e "..[dev]" pytest cryptography
+
       - run: npm ci
 
       - name: TypeScript check
@@ -30,8 +37,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Vitest
-        run: npm test
+      - name: Vitest fast (excl. parity subprocess)
+        run: npm run test:fast
+
+      - name: Vitest export parity
+        run: npm run test:slow
 
       - name: Build
         run: npm run build
@@ -44,19 +54,22 @@ jobs:
 
   python:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.12', '3.14']
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python-version }}
 
       - name: Install fangyu
         run: pip install -e ".[dev]" pytest cryptography
 
-      - name: Python tests
-        run: python -m pytest tests/python/ -v
+      - name: Python unit tests
+        run: python -m pytest tests/unit/ -q
 
   api:
     runs-on: ubuntu-latest
@@ -77,4 +90,4 @@ jobs:
           sleep 5
 
       - name: API integration tests
-        run: python tests/python/check_all_features_api.py
+        run: python tests/integration/check_all_features_api.py

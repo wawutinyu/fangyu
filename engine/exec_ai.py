@@ -91,15 +91,17 @@ async def _exec_code(ctx: NodeContext) -> dict[str, Any]:
 
 async def _exec_knowledge(ctx: NodeContext) -> dict[str, Any]:
     query = ctx.inputs.get("query", "")
-    top_k = ctx.config.get("top_k", 5)
+    top_k = int(ctx.config.get("top_k", 5))
     min_score = float(ctx.config.get("min_score", 0.0))
+    chunks = ctx.global_vars.get("_knowledge_chunks") or ctx.config.get("chunks") or []
+    if not isinstance(chunks, list):
+        chunks = []
     try:
-        results = search_chunks(query, top_k, min_score)
-        if isinstance(results, list):
-            if min_score > 0:
-                results = [r for r in results if r.get("score", 1.0) >= min_score]
-            return {"results": results, "context": ""}
-        return {"results": results.get("results", results) if isinstance(results, dict) else [], "context": ""}
+        results = await search_chunks(chunks, str(query), top_k)
+        if min_score > 0:
+            results = [r for r in results if r.get("score", 1.0) >= min_score]
+        context = "\n\n".join(f'[{i + 1}] {m.get("content", "")}' for i, m in enumerate(results))
+        return {"results": results, "context": context}
     except Exception:
         return {"results": [], "context": "[知识库检索失败]"}
 

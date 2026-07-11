@@ -67,8 +67,8 @@ describe('generatePythonCode', () => {
     const edges = [makeEdge('e1', 'n1', 'n2')]
     const code = generatePythonCode(nodes, edges)
     expect(code).toContain('input > 10')
-    expect(code).toContain('"true": True')
-    expect(code).toContain('"false": False')
+    expect(code).toContain('_cond_pass')
+    expect(code).toContain('"branch"')
   })
 
   it('generates http node', () => {

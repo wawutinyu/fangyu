@@ -5,6 +5,11 @@ from typing import Any
 
 from .executor import register_executor, NodeContext
 from .scheduler import run_flow
+from .safe_expr import safe_eval, safe_eval_bool, safe_eval_int
+
+
+def _non_null_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in inputs.items() if v is not None}
 
 
 async def _exec_loop(ctx: NodeContext) -> dict[str, Any]:
@@ -48,7 +53,7 @@ async def _exec_loop(ctx: NodeContext) -> dict[str, Any]:
             inner_result = await run_flow(
                 nodes=inner_nodes,
                 edges=inner_edges,
-                external_inputs={"item": item, "index": i, **ctx.inputs},
+                external_inputs=_non_null_inputs({**ctx.external_inputs, **ctx.inputs, "item": item, "index": i}),
                 global_vars=ctx.global_vars,
             )
             inner_outputs = {}
@@ -74,24 +79,18 @@ async def _exec_condition(ctx: NodeContext) -> dict[str, Any]:
     resolved = ctx.inputs.get("input")
     eval_ctx = {"input": resolved, "inputs": ctx.inputs, "_outputs": ctx.all_outputs}
     if branch_count > 2:
-        try:
-            idx = int(eval(expr, {"__builtins__": {}}, eval_ctx))
-            idx = max(0, min(idx, branch_count - 1))
-        except Exception:
-            idx = 0
+        idx = safe_eval_int(expr, eval_ctx, default=0)
+        idx = max(0, min(idx, branch_count - 1))
         return {"result": idx, "branch": f"branch_{idx}"}
-    try:
-        result = bool(eval(expr, {"__builtins__": {}}, eval_ctx))
-    except Exception:
-        result = True if resolved else False
-    return {"result": result, "branch": "true" if result else "false"}
+    result = safe_eval_bool(expr, eval_ctx, default=bool(resolved))
+    return {"result": result, "branch": "true" if result else "false", "true": result, "false": not result}
 
 
 async def _exec_switch(ctx: NodeContext) -> dict[str, Any]:
     expr = ctx.config.get("expression", "input")
     resolved = ctx.inputs.get("input")
     try:
-        value = eval(expr, {"__builtins__": {}}, {
+        value = safe_eval(expr, {
             "input": resolved, "inputs": ctx.inputs, "_outputs": ctx.all_outputs,
         })
     except Exception:
@@ -117,7 +116,12 @@ async def _exec_composite(ctx: NodeContext) -> dict[str, Any]:
         {"source": e["sourceNodeId"], "target": e["targetNodeId"], "data": {"linkType": e.get("linkType", "serial"), "mappings": e.get("mappings", {})}}
         for e in inner_links_raw
     ]
-    inner_result = await run_flow(nodes=inner_nodes, edges=inner_edges, external_inputs=ctx.inputs, global_vars=ctx.global_vars)
+    inner_result = await run_flow(
+        nodes=inner_nodes,
+        edges=inner_edges,
+        external_inputs=_non_null_inputs({**ctx.external_inputs, **ctx.inputs}),
+        global_vars=ctx.global_vars,
+    )
     inner_outputs = {}
     for r in inner_result.get("results", []):
         inner_outputs[r["nodeId"]] = r.get("outputs", {})
@@ -137,14 +141,18 @@ async def _exec_trigger(ctx: NodeContext) -> dict[str, Any]:
 
 
 async def _exec_input(ctx: NodeContext) -> dict[str, Any]:
+    merged: dict[str, Any] = {}
     for k, v in ctx.inputs.items():
-        if v is None and ctx.config.get(k):
-            ctx.inputs[k] = ctx.config[k]
-        elif v is None and ctx.config.get("default_value"):
-            ctx.inputs[k] = ctx.config["default_value"]
-    if not ctx.inputs and ctx.config.get("default_value"):
-        ctx.inputs["input"] = ctx.config["default_value"]
-    return {**ctx.inputs, **ctx.external_inputs}
+        if v is not None:
+            merged[k] = v
+        elif ctx.config.get(k) is not None:
+            merged[k] = ctx.config[k]
+    if ctx.config.get("default_value") and "input" not in merged:
+        merged["input"] = ctx.config["default_value"]
+    for k, v in ctx.external_inputs.items():
+        if v is not None and k not in merged:
+            merged[k] = v
+    return merged
 
 
 async def _exec_output(ctx: NodeContext) -> dict[str, Any]:
@@ -158,6 +166,7 @@ def register():
     register_executor("switch", _exec_switch)
     register_executor("loop", _exec_loop_wrapper)
     register_executor("composite", _exec_composite)
+    register_executor("composite-node", _exec_composite)
     register_executor("approval", _exec_approval)
     register_executor("trigger", _exec_trigger)
     register_executor("input", _exec_input)

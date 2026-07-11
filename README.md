@@ -1,38 +1,36 @@
 # fangyu
 
-AI 工作流编排平台 — 可视化画布 + DAG 执行引擎 + A2A 协议 + ATP 信任层。
+AI 社会的基础设施 — 可视化编排 + DAG 执行引擎 + A2A 协议 + ATP 信任层。
 
 **fangyu/ 就是项目根目录。**
 
-## 完整产品组成
+## 项目目的
 
-| 模块 | 位置 | 说明 |
-|------|------|------|
-| **fangyu-flow** | `fangyu-flow/` | React 画布 — Flow 编排 + Agent 编排 |
-| **执行引擎** | `engine/` | DAG 调度 + 25 种节点执行器 |
-| **API 服务** | `server.py` + `routers/` | FastAPI 接口 |
-| **A2A 协议** | `a2a/` | Task/Message/AgentCard + ATP 信任层 |
+用本平台构建一个完整的 **AI 社会**：
 
-## 目录结构
+- 每个导出的智能体都是与人类交互的**独立节点**
+- 通过 **A2A 协议**相互协作
+- 受共同的**法律与道德规范**约束
+- 最终价值目标：**为人类服务**
 
-```
-fangyu/                  ← 项目根
-├── __init__.py
-├── __main__.py          # CLI: py -m fangyu
-├── server.py            # FastAPI 入口
-├── pyproject.toml
-├── dev.bat              # 一键启动
-├── a2a/
-├── engine/
-├── models/
-├── routers/
-├── core/
-├── fangyu-flow/         # 画布 UI（React + ReactFlow）
-│   ├── src/
-│   ├── package.json
-│   └── vite.config.ts
-└── data/
-```
+## 当前能力一览
+
+| 能力 | 状态 |
+|------|------|
+| Flow / Agent 双画布 | ✅ |
+| 28 种节点执行引擎 | ✅ |
+| 导出 Python 代码（export↔engine parity，10 fixture） | ✅ |
+| 安全表达式（AST 白名单，无 eval） | ✅ |
+| 宪法可组合策略 + warn/deny + 策略模板 | ✅ |
+| 画布违宪警告 UI | ✅ |
+| 审计链 hash 防篡改 | ✅ |
+| 多 Agent 链式协作 + 跨 RPC demo | ✅ |
+| CI Python 3.12/3.14 + fast/slow 测试 | ✅ |
+
+详见：
+
+- [跨机器 A2A](docs/A2A_REMOTE.md)
+- [Electron 冒烟验证](docs/ELECTRON_SMOKE.md)
 
 ## 安装与启动
 
@@ -40,20 +38,39 @@ fangyu/                  ← 项目根
 # 一键启动（Windows）
 dev.bat
 
-# 或手动启动：
-
-# 1. Python 后端
+# 或手动：
 py -m pip install -e .
 py -m fangyu --server          # → http://localhost:8000
 
-# 2. 画布前端 fangyu-flow
-cd fangyu-flow
-npm install
-npm run dev                    # → http://localhost:5173
+cd fangyu-flow && npm install && npm run dev   # → http://localhost:5173
 ```
 
-## 隔离原则
+## 演示脚本
 
-**属于 fangyu 的：** fangyu-flow 画布、执行引擎、API、协议层 — 全部产品代码。
+```bash
+# 跨机器单 Agent RPC
+py -3 scripts/a2a_remote_demo.py --base http://127.0.0.1:8000
 
-**不混进来的：** 仅开发期测试脚本、CI 配置等工程杂项。
+# 跨进程多 Agent 链式协作
+py -3 scripts/a2a_multi_agent_demo.py --base http://127.0.0.1:8000
+```
+
+## 测试
+
+```bash
+py -3 -m pytest tests/unit/ -q
+cd fangyu-flow && npm run test:fast && npm run test:slow
+```
+
+## 目录结构
+
+```
+fangyu/
+├── engine/          # DAG 执行引擎
+├── core/            # 宪法 + 审计链
+├── a2a/             # A2A 协议 + ATP 信任
+├── routers/         # FastAPI
+├── fangyu-flow/     # React 画布
+├── scripts/         # A2A demo
+└── data/            # constitution.json, audit.log
+```

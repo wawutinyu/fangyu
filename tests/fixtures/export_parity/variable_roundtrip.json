@@ -1,0 +1,18 @@
+{
+  "name": "variable_roundtrip",
+  "external_inputs": {},
+  "nodes": [
+    {"id": "s", "label": "start", "originType": "start"},
+    {"id": "set", "label": "variable-set", "originType": "variable-set", "config": {"var_name": "foo", "var_value": "bar"}},
+    {"id": "get", "label": "variable-get", "originType": "variable-get", "config": {"var_name": "foo"}},
+    {"id": "o", "label": "output", "originType": "output"}
+  ],
+  "edges": [
+    {"source": "s", "target": "set"},
+    {"source": "set", "target": "get"},
+    {"source": "get", "target": "o"}
+  ],
+  "checks": [
+    {"label": "variable-get", "field": "value", "value": "bar"}
+  ]
+}

@@ -4,10 +4,13 @@ from typing import Any
 
 from .executor import register_executor, _resolve_path, NodeContext
 from .variable import variable_get as var_get, variable_set as var_set
+from .safe_expr import safe_eval
 
 
 async def _exec_json_parse(ctx: NodeContext) -> dict[str, Any]:
-    source = ctx.inputs.get("source", ctx.config.get("source", ""))
+    source = ctx.inputs.get("source")
+    if source is None:
+        source = ctx.config.get("source", "")
     strict = ctx.config.get("strict", True)
     try:
         return {"result": json.loads(source) if isinstance(source, str) else source, "error": None}
@@ -46,8 +49,10 @@ async def _exec_transform(ctx: NodeContext) -> dict[str, Any]:
         if not isinstance(upstream_data, dict):
             upstream_data = {"result": upstream_data}
         try:
-            result = eval(expr, {"__builtins__": {"len": len, "str": str, "int": int, "float": float, "list": list, "dict": dict, "range": range, "enumerate": enumerate, "zip": zip, "map": map, "filter": filter, "min": min, "max": max, "sum": sum, "sorted": sorted, "reversed": reversed, "True": True, "False": False, "None": None}}, {
-                "data": upstream_data, "input": ctx.inputs.get("source", ctx.inputs), "_outputs": ctx.all_outputs,
+            result = safe_eval(expr, {
+                "data": upstream_data,
+                "input": ctx.inputs.get("source", ctx.inputs),
+                "_outputs": ctx.all_outputs,
             })
             if not isinstance(result, dict):
                 result = {"result": result}
@@ -69,10 +74,10 @@ async def _exec_text_process(ctx: NodeContext) -> dict[str, Any]:
     if op == "concat":
         return {"result": text + ctx.config.get("separator", "")}
     elif op == "split":
-        return {"result": text.split(config.get("separator", ","))}
+        return {"result": text.split(ctx.config.get("separator", ","))}
     elif op == "replace":
-        pattern = config.get("pattern", "")
-        replacement = config.get("replacement", "")
+        pattern = ctx.config.get("pattern", "")
+        replacement = ctx.config.get("replacement", "")
         return {"result": re.sub(pattern, replacement, text)}
     elif op == "trim":
         return {"result": text.strip()}

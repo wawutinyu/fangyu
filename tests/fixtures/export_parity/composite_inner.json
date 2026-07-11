@@ -1,0 +1,28 @@
+{
+  "name": "composite_inner",
+  "external_inputs": {},
+  "nodes": [
+    {"id": "s", "label": "start", "originType": "start"},
+    {
+      "id": "g",
+      "label": "composite",
+      "originType": "composite",
+      "inner_nodes": [
+        {"id": "i0", "originType": "input", "config": {"default_value": "inner-val"}},
+        {"id": "i1", "originType": "output", "config": {}}
+      ],
+      "inner_links": [
+        {"sourceNodeId": "i0", "targetNodeId": "i1", "linkType": "serial", "mappings": {}}
+      ]
+    },
+    {"id": "o", "label": "output", "originType": "output"}
+  ],
+  "edges": [
+    {"source": "s", "target": "g"},
+    {"source": "g", "target": "o"}
+  ],
+  "checks": [
+    {"label": "composite", "field": "outputs.i1.result", "value": "inner-val"},
+    {"label": "composite", "field": "success", "value": true}
+  ]
+}

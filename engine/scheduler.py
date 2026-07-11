@@ -4,6 +4,11 @@ from typing import Any
 from .context import NodeContext
 from .registry import _EXECUTORS, _get_meta
 
+_TYPE_ALIASES = {
+    "composite-node": "composite",
+    "loop-node": "loop",
+}
+
 _HTTP_CLIENT: Any | None = None
 
 
@@ -108,6 +113,25 @@ async def run_flow(nodes, edges, external_inputs=None, global_vars=None, on_even
     if not nodes:
         return {"success": False, "error": "画布为空", "results": [], "logs": []}
 
+    constitution_warnings: list = []
+    try:
+        from ..core.constitution import assert_flow_allowed, audit_event, ConstitutionViolation
+        ctx_name = str(global_vars.get("_constitution_context", "flow"))
+        constitution_warnings = assert_flow_allowed(nodes, context=ctx_name)
+        audit_event("flow_start", {"node_count": len(nodes), "context": ctx_name})
+    except ConstitutionViolation as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "constitution_violation": True,
+            "rule": e.rule,
+            "violations": e.context.get("violations", []),
+            "constitution_warnings": e.context.get("warnings", []),
+            "violation": e.to_dict(),
+            "results": [],
+            "logs": [],
+        }
+
     depth = global_vars.get("_flow_depth", 0)
     if depth > 10:
         return {"success": False, "error": f"递归过深 ({depth})", "results": [], "logs": []}
@@ -151,6 +175,7 @@ async def run_flow(nodes, edges, external_inputs=None, global_vars=None, on_even
             return
         nd = node_data.get("data", {}) or {}
         origin_type = nd.get("originType") or node_data.get("type") or "atom-node"
+        origin_type = _TYPE_ALIASES.get(origin_type, origin_type)
         meta = _get_meta(origin_type)
         node_name = nd.get("label") or node_data.get("name") or meta.get("name") or origin_type
         if not isinstance(nd, dict) or nd == {}:
@@ -239,4 +264,7 @@ async def run_flow(nodes, edges, external_inputs=None, global_vars=None, on_even
         await asyncio.sleep(0.2)
 
     _emit("flow_complete", {"success": True, "resultCount": len(results)})
-    return {"success": True, "results": results, "logs": logs}
+    out = {"success": True, "results": results, "logs": logs}
+    if constitution_warnings:
+        out["constitution_warnings"] = constitution_warnings
+    return out

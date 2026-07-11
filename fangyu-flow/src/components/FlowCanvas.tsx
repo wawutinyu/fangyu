@@ -27,8 +27,9 @@ import { Executor } from '../utils/executor'
 import { type PendingInteraction } from '../utils/localExecutor'
 import { generatePythonCode } from '../utils/codeGenerator'
 import { useHistory } from '../hooks/useHistory'
-import { useSimulation } from '../hooks/useSimulation'
+import { useSimulation, type ShowResultsOptions } from '../hooks/useSimulation'
 import { useNodeOperations } from '../hooks/useNodeOperations'
+import { ViolationPanel, type ViolationPayload } from './ViolationPanel'
 
 const nodeTypes = {
   'atom-node': AtomNode,
@@ -56,7 +57,10 @@ export interface FlowCanvasHandle {
   deleteSelected: () => void
   deleteNodeById: (id: string) => void
   deleteEdgeById: (id: string) => void
-  showResults: (results: Array<{ nodeId: string; nodeName: string; output: Record<string, unknown> }>) => void
+  showResults: (
+    results: Array<{ nodeId: string; nodeName: string; output: Record<string, unknown> }>,
+    options?: ShowResultsOptions,
+  ) => void
 }
 
 let rfInstance: ReactFlowInstance | null = null
@@ -72,6 +76,7 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
   const [, setSimProgress] = React.useState(0)
   const [toast, setToast] = React.useState<{ msg: string; type: string } | null>(null)
   const [simResults, setSimResults] = React.useState<{ nodeName: string; output: Record<string, unknown> }[] | null>(null)
+  const [simConstitutionWarnings, setSimConstitutionWarnings] = React.useState<ViolationPayload | null>(null)
   const rfInstanceRef = React.useRef<ReactFlowInstance | null>(null)
   const existingNodeTypes = useAppSelector(s => s.flow.nodes.map(n => n.data?.originType || ''))
   const edgeInsertableTypes = React.useMemo(() => {
@@ -97,7 +102,7 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
   }, [])
 
   const { runSimulation, showResults } = useSimulation(
-    nodes, edges, setLocalNodes, showToast, setPendingInteraction, setSimResults,
+    nodes, edges, setLocalNodes, showToast, setPendingInteraction, setSimResults, setSimConstitutionWarnings,
   )
 
   const {
@@ -162,7 +167,7 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
       setSimProgress(0)
       await runSimulation(autoResolveInput)
     },
-    showResults(results) { showResults(results) },
+    showResults(results, options) { showResults(results, options) },
     getNodesAndEdges() {
       return { nodes: nodesRef.current, edges: edgesRef.current }
     },
@@ -461,9 +466,18 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <span style={{ fontSize: 13, fontWeight: 600 }}>模拟运行结果</span>
             <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999', fontSize: 14 }}
-              onClick={() => setSimResults(null)}>✕</button>
+              onClick={() => { setSimResults(null); setSimConstitutionWarnings(null) }}>✕</button>
           </div>
-          {simResults.map((r, i) => (
+          {simConstitutionWarnings && (
+            <div style={{ marginBottom: 12 }}>
+              <ViolationPanel violation={simConstitutionWarnings} expanded />
+            </div>
+          )}
+          {simResults.length === 0 ? (
+            simConstitutionWarnings && (
+              <div style={{ fontSize: 12, color: '#666' }}>流程未执行（宪法拒绝）</div>
+            )
+          ) : simResults.map((r, i) => (
             <div key={i} style={{ marginBottom: 8, padding: 8, background: '#f8f8f6', borderRadius: 6 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: '#666', marginBottom: 4 }}>{r.nodeName}</div>
               <pre style={{ margin: 0, fontSize: 11, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#333' }}>

@@ -4,7 +4,8 @@ from typing import Optional, Callable
 
 # In-memory stores
 _agent_cards: dict[str, dict] = {}
-_agent_flow_mappings: dict[str, dict[str, str]] = {}
+_agent_flow_mappings: dict[str, dict[str, dict]] = {}
+_agent_trust: dict[str, dict] = {}
 _agent_factories: dict[str, Callable] = {}
 _tasks: dict[str, dict] = {}
 _task_lock = threading.Lock()
@@ -15,10 +16,12 @@ _sub_lock = threading.Lock()
 class AgentRegistry:
 
     @classmethod
-    def register(cls, name: str, card: dict, flow_mappings: dict[str, str] = None, factory: Callable = None):
+    def register(cls, name: str, card: dict, flow_mappings: dict[str, dict] = None, factory: Callable = None, trust: dict = None):
         _agent_cards[name] = card
         if flow_mappings:
             _agent_flow_mappings[name] = flow_mappings
+        if trust is not None:
+            _agent_trust[name] = trust
         if factory:
             _agent_factories[name] = factory
 
@@ -26,6 +29,7 @@ class AgentRegistry:
     def unregister(cls, name: str):
         _agent_cards.pop(name, None)
         _agent_flow_mappings.pop(name, None)
+        _agent_trust.pop(name, None)
         _agent_factories.pop(name, None)
 
     @classmethod
@@ -37,7 +41,11 @@ class AgentRegistry:
         return _agent_cards.get(name)
 
     @classmethod
-    def resolve_skill_flow(cls, agent_name: str, skill_id: str) -> Optional[str]:
+    def get_trust(cls, name: str) -> Optional[dict]:
+        return _agent_trust.get(name)
+
+    @classmethod
+    def resolve_skill_flow(cls, agent_name: str, skill_id: str) -> Optional[dict]:
         mappings = _agent_flow_mappings.get(agent_name, {})
         return mappings.get(skill_id)
 
@@ -68,8 +76,17 @@ class AgentBus:
                     task["history"] = result["history"]
                 if "artifact" in result:
                     task["artifact"] = result["artifact"]
-                task.setdefault("history", []).append({"role": "agent", "parts": [{"type": "text", "text": json.dumps(result.get("output", {}))}]})
+                elif result.get("output") is not None:
+                    task["artifact"] = {"output": result["output"]}
         except Exception as e:
+            from ..core.constitution import ConstitutionViolation, audit_event, violation_to_dict
+            from .trust_runtime import TrustViolation
+            if isinstance(e, (ConstitutionViolation, TrustViolation)):
+                task["violation"] = violation_to_dict(e)
+                audit_event(
+                    "constitution_violation" if isinstance(e, ConstitutionViolation) else "trust_violation",
+                    {"agent": target_agent, "error": str(e), **getattr(e, "context", {})},
+                )
             task["status"] = {"state": "failed", "message": str(e), "updatedAt": time.time()}
 
         with _task_lock:
@@ -79,29 +96,44 @@ class AgentBus:
 
     def _handle_task(self, agent_name: str, task: dict, message: dict) -> Optional[dict]:
         skill_id = (message.get("metadata") or {}).get("skill_id", "")
-        flow_id = AgentRegistry.resolve_skill_flow(agent_name, skill_id)
-        if not flow_id:
-            text = ""
-            for part in message.get("parts", []):
-                if part.get("type") == "text":
-                    text = part.get("text", "")
-            return {"output": {"result": f"[{agent_name}] 收到: {text}"}, "history": task.get("history", [])}
+        text = ""
+        for part in message.get("parts", []):
+            if part.get("type") == "text":
+                text = part.get("text", "")
+
+        flow = AgentRegistry.resolve_skill_flow(agent_name, skill_id)
+        trust = AgentRegistry.get_trust(agent_name)
+        from .trust_runtime import assert_agent_authorized
+        assert_agent_authorized(agent_name, skill_id or "default", trust)
+
+        if flow and isinstance(flow, dict) and flow.get("nodes"):
+            from ..core.constitution import assert_flow_allowed, check_agent_action
+            check_agent_action(agent=agent_name, skill_id=skill_id)
+            assert_flow_allowed(flow.get("nodes", []), context=f"a2a:{agent_name}:{skill_id}")
+
+        if not flow or not isinstance(flow, dict) or not flow.get("nodes"):
+            reply = f"[{agent_name}] 收到: {text}"
+            task.setdefault("history", []).append({
+                "role": "agent",
+                "parts": [{"type": "text", "text": reply}],
+            })
+            return {"output": {"result": reply}, "history": task.get("history", [])}
 
         from .scheduler import run_flow
         import asyncio
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            ext_inputs = {"message": text} if text else {}
-            result = loop.run_until_complete(run_flow(
-                nodes=flow_id.get("nodes", []),
-                edges=flow_id.get("edges", []),
-                external_inputs=ext_inputs,
-            ))
-            loop.close()
-            return {"output": result, "history": task.get("history", [])}
-        except Exception as e:
-            raise
+        ext_inputs = {"message": text, "query": text, "input": text} if text else {}
+        result = asyncio.run(run_flow(
+            nodes=flow.get("nodes", []),
+            edges=flow.get("edges", []),
+            external_inputs=ext_inputs,
+        ))
+        last = (result.get("results") or [])[-1] if result.get("results") else {}
+        summary = last.get("outputs", {}).get("result") or last.get("outputs", {})
+        task.setdefault("history", []).append({
+            "role": "agent",
+            "parts": [{"type": "text", "text": str(summary)}],
+        })
+        return {"output": result, "history": task.get("history", [])}
 
     def get_task(self, task_id: str) -> Optional[dict]:
         return _tasks.get(task_id)
@@ -131,3 +163,123 @@ class AgentBus:
                     cb(agent_name, task)
                 except Exception:
                     pass
+
+
+def extract_task_output(task: dict) -> str:
+    """从 Task 历史中提取 Agent 最终文本输出。"""
+    history = task.get("history") or []
+    for msg in reversed(history):
+        if msg.get("role") == "agent":
+            for part in msg.get("parts") or []:
+                if part.get("type") == "text" and part.get("text"):
+                    text = str(part["text"])
+                    if text.startswith("{") and '"results"' in text:
+                        try:
+                            payload = json.loads(text)
+                            last = (payload.get("results") or [])[-1] if isinstance(payload, dict) else {}
+                            summary = last.get("outputs", {}).get("result") if isinstance(last, dict) else None
+                            if summary is not None:
+                                return str(summary)
+                        except (json.JSONDecodeError, TypeError, AttributeError):
+                            pass
+                    return text
+    artifact = task.get("artifact") or {}
+    if isinstance(artifact, dict):
+        out = artifact.get("output") or artifact.get("result")
+        if out is not None:
+            return str(out)
+    return ""
+
+
+class AgentOrchestrator:
+    """多 Agent 链式协作：上一步输出作为下一步输入。"""
+
+    def __init__(self, bus: AgentBus | None = None):
+        self._bus = bus or AgentBus()
+
+    def run_pipeline(
+        self,
+        query: str,
+        steps: list[dict],
+        *,
+        pass_mode: str = "replace",
+    ) -> dict:
+        """
+        steps: [{"agent": str, "skill_id": str, "label": str?}, ...]
+        pass_mode: replace=每步只用上步输出; append=拼接原始问题与上步输出
+        """
+        if not steps:
+            return {"success": False, "error": "pipeline 为空", "steps": [], "final_output": ""}
+
+        pipeline_id = uuid.uuid4().hex[:12]
+        now = time.time()
+        collab_steps: list[dict] = []
+        current_text = query
+        original_query = query
+
+        for i, step in enumerate(steps):
+            agent_name = step.get("agent") or step.get("target_agent") or ""
+            skill_id = step.get("skill_id") or step.get("skill") or "default"
+            label = step.get("label") or agent_name
+            if not agent_name:
+                return {
+                    "success": False,
+                    "error": f"第 {i + 1} 步缺少 agent",
+                    "steps": collab_steps,
+                    "final_output": current_text,
+                    "pipeline_id": pipeline_id,
+                }
+
+            if pass_mode == "append" and i > 0:
+                message_text = f"原始问题：{original_query}\n\n上一步结果：\n{current_text}"
+            else:
+                message_text = current_text if i > 0 else query
+
+            message = {
+                "role": "user",
+                "parts": [{"type": "text", "text": message_text}],
+                "metadata": {"skill_id": skill_id, "pipeline_id": pipeline_id, "step_index": i},
+            }
+            started = time.time()
+            task = self._bus.send_message(
+                agent_name,
+                message,
+                metadata={"pipeline_id": pipeline_id, "step_index": i, "skill_id": skill_id},
+            )
+            state = (task.get("status") or {}).get("state", "")
+            output = extract_task_output(task)
+            collab_steps.append({
+                "index": i,
+                "agent": agent_name,
+                "label": label,
+                "skill_id": skill_id,
+                "input": message_text,
+                "output": output,
+                "state": state,
+                "task_id": task.get("id", ""),
+                "duration_ms": int((time.time() - started) * 1000),
+                "violation": task.get("violation"),
+            })
+
+            if state == "failed":
+                return {
+                    "success": False,
+                    "error": (task.get("status") or {}).get("message") or f"{label} 执行失败",
+                    "steps": collab_steps,
+                    "final_output": output or current_text,
+                    "pipeline_id": pipeline_id,
+                    "started_at": now,
+                    "violation": task.get("violation"),
+                }
+
+            if output:
+                current_text = output
+
+        return {
+            "success": True,
+            "steps": collab_steps,
+            "final_output": current_text,
+            "pipeline_id": pipeline_id,
+            "started_at": now,
+            "completed_at": time.time(),
+        }

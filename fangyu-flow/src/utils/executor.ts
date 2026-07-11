@@ -1,3 +1,6 @@
+import type { ViolationDetail } from '../components/ViolationPanel'
+import { normalizeFlowResult } from './constitutionWarnings'
+
 export interface ExecutorLog {
   nodeId: string
   nodeName: string
@@ -11,6 +14,14 @@ export interface ExecutorResult {
   results: { nodeId: string; nodeName: string; type: string; outputs?: Record<string, unknown>; error?: string }[]
   logs: ExecutorLog[]
   error?: string
+  violation?: {
+    type: string
+    severity?: 'warn' | 'deny'
+    rule?: string
+    message: string
+    violations?: ViolationDetail[]
+  }
+  constitution_warnings?: ViolationDetail[]
 }
 
 export class Executor {
@@ -119,7 +130,12 @@ export class Executor {
               } else if (evt.type === 'node_complete' || evt.type === 'node_error') {
                 this._onNodeProgress?.(evt.nodeId, evt.type === 'node_complete' ? 'done' : 'error')
               } else if (evt.type === 'flow_result') {
-                result = evt as ExecutorResult
+                const normalized = normalizeFlowResult(evt as Record<string, unknown>)
+                result = {
+                  ...(evt as ExecutorResult),
+                  violation: normalized.violation ?? (evt as ExecutorResult).violation,
+                  constitution_warnings: normalized.constitution_warnings,
+                }
               }
             } catch {
               // ignore parse errors

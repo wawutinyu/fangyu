@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "fangyu"
 version = "0.1.0"
-description = "AI Flow Canvas Engine — standalone DAG executor with A2A/ATP protocol"
+description = "AI society infrastructure — visual orchestration, DAG engine, A2A protocol, and ATP trust layer"
 requires-python = ">=3.10"
 dependencies = [
     "cryptography>=41.0.0",

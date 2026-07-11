@@ -61,6 +61,19 @@ async def delete_doc(doc_id: int, db: AsyncSession = Depends(get_session)):
     return {'success': True}
 
 
+@router.get("/export-chunks")
+async def export_chunks(db: AsyncSession = Depends(get_session)):
+    """导出全部知识块（供独立 .exe 内嵌）"""
+    result = await db.execute(select(KnowledgeChunk))
+    chunks = result.scalars().all()
+    return {
+        'chunks': [
+            {'content': c.content, 'metadata': {'doc_id': c.doc_id, 'idx': c.idx}}
+            for c in chunks
+        ],
+    }
+
+
 @router.post("/search")
 async def search(req: SearchRequest, db: AsyncSession = Depends(get_session)):
     result = await db.execute(select(KnowledgeChunk))

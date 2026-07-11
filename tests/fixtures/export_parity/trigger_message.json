@@ -1,0 +1,17 @@
+{
+  "name": "trigger_message",
+  "external_inputs": {"message": "hello"},
+  "nodes": [
+    {"id": "s", "label": "start", "originType": "start"},
+    {"id": "t", "label": "trigger", "originType": "trigger"},
+    {"id": "o", "label": "output", "originType": "output"}
+  ],
+  "edges": [
+    {"source": "s", "target": "t"},
+    {"source": "t", "target": "o"}
+  ],
+  "checks": [
+    {"label": "trigger", "field": "message", "value": "hello"},
+    {"label": "trigger", "field": "triggered", "value": true}
+  ]
+}

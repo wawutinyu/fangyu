@@ -80,6 +80,74 @@ class TrustRegistry:
         return "*" in allowed or skill_id in allowed
 
 
+class TrustViolation(ValueError):
+    """ATP 信任层拒绝。"""
+
+    def __init__(self, rule: str, message: str, *, context: dict | None = None):
+        self.rule = rule
+        self.context = context or {}
+        super().__init__(message)
+
+    def to_dict(self) -> dict:
+        return {
+            "type": "trust",
+            "rule": self.rule,
+            "message": str(self),
+            "agent": self.context.get("agent"),
+            "skill_id": self.context.get("skill_id"),
+        }
+
+
+def assert_agent_authorized(agent_id: str, skill_id: str, trust: dict | None = None) -> None:
+    """启用 ATP 时校验 Agent 是否已注册且有权执行 skill。"""
+    if not trust or not trust.get("enabled", False):
+        return
+    from ..core.constitution import audit_event
+
+    if agent_id in (trust.get("revocationList") or []):
+        audit_event("trust_violation", {"agent": agent_id, "skill_id": skill_id, "rule": "revoked"})
+        raise TrustViolation(
+            "revoked",
+            f"Agent '{agent_id}' 已被吊销，无法执行技能 '{skill_id}'",
+            context={"agent": agent_id, "skill_id": skill_id},
+        )
+    pubkey = TrustRegistry.get_public_key(agent_id)
+    if not pubkey:
+        audit_event("trust_violation", {"agent": agent_id, "skill_id": skill_id, "rule": "not_registered"})
+        raise TrustViolation(
+            "not_registered",
+            f"Agent '{agent_id}' 未注册到 ATP 信任层",
+            context={"agent": agent_id, "skill_id": skill_id},
+        )
+    if not TrustRegistry.authorize(agent_id, skill_id):
+        audit_event("trust_violation", {"agent": agent_id, "skill_id": skill_id, "rule": "not_authorized"})
+        raise TrustViolation(
+            "not_authorized",
+            f"Agent '{agent_id}' 无权执行技能 '{skill_id}'",
+            context={"agent": agent_id, "skill_id": skill_id},
+        )
+    audit_event("trust_authorized", {"agent": agent_id, "skill_id": skill_id})
+
+
+def sync_agent_trust(agent_id: str, card: dict, trust: dict | None = None) -> dict:
+    """部署时将 Agent 注册到 TrustRegistry。"""
+    skills = [s.get("id") for s in card.get("skills", []) if isinstance(s, dict) and s.get("id")]
+    allowed = skills if skills else ["*"]
+
+    if trust and trust.get("enabled") and agent_id in (trust.get("revocationList") or []):
+        TrustRegistry.revoke(agent_id)
+        return {"agent_id": agent_id, "revoked": True}
+
+    existing = TrustRegistry.get_public_key(agent_id)
+    if existing:
+        TrustRegistry.register(agent_id, existing, allowed)
+        return {"agent_id": agent_id, "public_key": existing, "allowed_skills": allowed}
+
+    identity = AgentIdentity.generate()
+    TrustRegistry.register(agent_id, identity.public_key, allowed)
+    return {"agent_id": agent_id, "public_key": identity.public_key, "allowed_skills": allowed}
+
+
 class MessageEnvelope:
     def __init__(self, payload: str, sender_id: str, timestamp: int, nonce: str, signature: str):
         self.payload = payload

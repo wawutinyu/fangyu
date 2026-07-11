@@ -5,6 +5,7 @@ from typing import Any
 from .executor import register_executor, _smart_template, NodeContext
 from .tool_registry import execute_tool, register_from_llm_output as parse_tools
 from .skill import get_skill_content, learn_from_llm as learn_skills
+from .sandbox import run_code
 
 
 async def _exec_http(ctx: NodeContext) -> dict[str, Any]:
@@ -99,9 +100,10 @@ async def _exec_execute_skill(ctx: NodeContext) -> dict[str, Any]:
         if m:
             skill_code = m.group(1)
     try:
-        safe_globals = {"__builtins__": {}, "inputs": params, "result": None}
-        exec(skill_code, safe_globals)
-        return {"result": safe_globals.get("result"), "success": True}
+        result = await run_code(skill_code, input_data=params if isinstance(params, dict) else {}, params=params if isinstance(params, dict) else {})
+        if result.get("error"):
+            return {"result": None, "error": result["error"], "success": False}
+        return {"result": result.get("result"), "success": True, "logs": result.get("logs", [])}
     except Exception as e:
         return {"result": None, "error": str(e), "success": False}
 

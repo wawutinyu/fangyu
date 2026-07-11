@@ -2,11 +2,17 @@ import { describe, it, expect, vi } from 'vitest'
 import { runLocalFlow, type PendingInteraction } from '../localExecutor'
 import type { Node, Edge } from 'reactflow'
 
-function makeNode(id: string, originType: string, label: string, config: Record<string, unknown> = {}): Node {
+function makeNode(
+  id: string,
+  originType: string,
+  label: string,
+  config: Record<string, unknown> = {},
+  extra: Record<string, unknown> = {},
+): Node {
   return {
     id, type: 'atom-node',
     position: { x: 0, y: 0 },
-    data: { originType, label, config },
+    data: { originType, label, config, ...extra },
   }
 }
 
@@ -81,7 +87,7 @@ describe('runLocalFlow', () => {
 
   it('simulates LLM node without pending', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(JSON.stringify({ content: 'Hello from LLM', usage: { total_tokens: 42 } }), { status: 200 })
+      new Response(JSON.stringify({ result: 'Hello from LLM', usage: { total_tokens: 42 } }), { status: 200 })
     )
     const nodes = [
       makeNode('in', 'input', '输入'),
@@ -266,7 +272,7 @@ describe('runLocalFlow', () => {
     ])
 
     expect(result.success).toBe(true)
-    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/skills/greet')
+    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/skills/greet', expect.anything())
     fetchSpy.mockRestore()
   })
 
@@ -316,7 +322,7 @@ describe('runLocalFlow', () => {
         return new Response(JSON.stringify({ results: [{ content: 'AI agents are...' }], context: 'AI context data' }), { status: 200 })
       }
       if (url === '/api/v1/llm/chat') {
-        return new Response(JSON.stringify({ content: 'Answer with context', usage: { total_tokens: 10 } }), { status: 200 })
+        return new Response(JSON.stringify({ result: 'Answer with context', usage: { total_tokens: 10 } }), { status: 200 })
       }
       return new Response('{}', { status: 404 })
     })
@@ -365,7 +371,63 @@ describe('runLocalFlow', () => {
     ])
 
     expect(result.success).toBe(true)
-    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/mcp/tools?server=__internal__')
+    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/mcp/tools?server=__internal__', expect.anything())
     fetchSpy.mockRestore()
+  })
+
+  it('executes switch node with expression', async () => {
+    const nodes = [
+      makeNode('in', 'input', '输入'),
+      makeNode('sw', 'switch', '分支', { expression: 'input' }),
+    ]
+    const edges = [makeEdge('e1', 'in', 'sw')]
+    const result = await runFlowWithResolvers(nodes, edges, [
+      p => p.resolve({ value: 'branch-a' }),
+    ])
+    expect(result.success).toBe(true)
+    const sw = result.results.find(r => r.nodeId === 'sw')
+    expect(sw?.output?.result).toBe('branch-a')
+    expect(sw?.output?.branch).toBe('branch_branch-a')
+  })
+
+  it('executes composite inner graph', async () => {
+    const nodes = [
+      makeNode('g', 'composite', '子图', {}, {
+        inner_nodes: [
+          { id: 'i0', originType: 'input', config: { default_value: 'inner-val' } },
+          { id: 'i1', originType: 'output', config: {} },
+        ],
+        inner_links: [{ sourceNodeId: 'i0', targetNodeId: 'i1', linkType: 'serial' }],
+      }),
+    ]
+    const result = await runLocalFlow(nodes, [], {
+      onProgress: () => {},
+      onPending: () => {},
+    })
+    expect(result.success).toBe(true)
+    const comp = result.results.find(r => r.nodeId === 'g')
+    const outputs = comp?.output?.outputs as Record<string, Record<string, unknown>>
+    expect(outputs?.i1?.result).toBe('inner-val')
+  })
+
+  it('executes loop with inner graph count', async () => {
+    const nodes = [
+      makeNode('in', 'input', '输入'),
+      makeNode('code', 'code', '数组', { code: 'return [1, 2, 3]' }),
+      makeNode('loop', 'loop', '循环', { max_iterations: 10 }, {
+        inner_nodes: [
+          { id: 'li', originType: 'input', config: { default_value: 'item' } },
+          { id: 'lo', originType: 'output', config: {} },
+        ],
+        inner_links: [{ sourceNodeId: 'li', targetNodeId: 'lo', linkType: 'serial' }],
+      }),
+    ]
+    const edges = [makeEdge('e1', 'in', 'code'), makeEdge('e2', 'code', 'loop')]
+    const result = await runFlowWithResolvers(nodes, edges, [
+      p => p.resolve({ value: 'x' }),
+    ])
+    expect(result.success).toBe(true)
+    const loop = result.results.find(r => r.nodeId === 'loop')
+    expect(loop?.output?.count).toBe(3)
   })
 })

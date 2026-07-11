@@ -1,7 +1,8 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useAppSelector, useAppDispatch } from '../store/hooks'
-import { updateAgentCard, updateAgentNode, updateAgentEdge, updateRoutingRules } from '../store/agentSlice'
+import { updateAgentCard, updateAgentNode, updateAgentEdge, updateRoutingRules, updateSkillFlow, clearSkillFlow } from '../store/agentSlice'
 import type { AgentSkill, RoutingRule } from '../utils/a2aProtocol'
+import { snapshotFlowFromCanvas } from '../utils/agentDeploy'
 
 export default function AgentConfigPanel() {
   const dispatch = useAppDispatch()
@@ -98,6 +99,19 @@ export default function AgentConfigPanel() {
     dispatch(updateRoutingRules({ nodeId: node.id, rules, defaultTarget: node.defaultTarget }))
   }
 
+  const bindSkillFlow = (skillId: string) => {
+    const flow = snapshotFlowFromCanvas()
+    if (!flow) {
+      alert('请先在「Flow 编排」画布中设计流程，再回来绑定技能。')
+      return
+    }
+    dispatch(updateSkillFlow({ nodeId: node.id, skillId, flow }))
+  }
+
+  const unbindSkillFlow = (skillId: string) => {
+    dispatch(clearSkillFlow({ nodeId: node.id, skillId }))
+  }
+
   const getAgentOptions = () => {
     return nodes.filter(n => n.type === 'a2a-agent' && n.id !== node.id)
       .map(n => ({ id: n.id, label: n.label }))
@@ -185,6 +199,23 @@ export default function AgentConfigPanel() {
                 <Field label="名称"><input value={s.name} onChange={e => updateSkill(i, { name: e.target.value })} /></Field>
                 <Field label="描述"><input value={s.description || ''} onChange={e => updateSkill(i, { description: e.target.value })} /></Field>
                 <Field label="标签"><input value={(s.tags || []).join(', ')} onChange={e => updateSkill(i, { tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) })} placeholder="逗号分隔" /></Field>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                  {node.skillFlows?.[s.id]?.nodes?.length ? (
+                    <span style={{ fontSize: 11, color: '#52c41a', alignSelf: 'center' }}>
+                      已绑定 Flow（{node.skillFlows[s.id].nodes.length} 节点）
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: 11, color: '#888', alignSelf: 'center' }}>未绑定（部署时用默认 LLM 流程）</span>
+                  )}
+                  <button onClick={() => bindSkillFlow(s.id)} style={{ padding: '2px 8px', border: '1px solid #722ed1', borderRadius: 4, background: 'transparent', color: '#722ed1', cursor: 'pointer', fontSize: 11 }}>
+                    绑定 Flow 画布
+                  </button>
+                  {node.skillFlows?.[s.id] && (
+                    <button onClick={() => unbindSkillFlow(s.id)} style={{ padding: '2px 8px', border: '1px solid #ccc', borderRadius: 4, background: 'transparent', color: '#888', cursor: 'pointer', fontSize: 11 }}>
+                      清除绑定
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
             <button onClick={addSkill} style={{ padding: '4px 12px', border: '1px dashed #722ed1', borderRadius: 6, background: 'transparent', color: '#722ed1', cursor: 'pointer', fontSize: 12 }}>+ 添加技能</button>

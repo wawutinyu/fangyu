@@ -42,10 +42,11 @@ export async function downloadFlowExport(
   onCompileProgress?: () => void,
   agentNodes?: AgentCanvasNode[],
 ): Promise<void> {
-  const bundle = getFlowExportBundle(nodes, edges, options, agentNodes)
-  const flowConfig = { nodes, edges, options }
-
   onCompileProgress?.()
+  const exportOptions = await fetchExportOptions(options)
+  const bundle = getFlowExportBundle(nodes, edges, exportOptions, agentNodes)
+  const flowConfig = { nodes, edges, options: exportOptions }
+
   const res = await fetch(`${backendUrl}${API_BASE}/compile-bundle`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -135,8 +136,41 @@ const REQUIREMENTS_TEMPLATE = `# AI Flow Canvas — 导出流程运行时依赖
 
 cryptography>=41.0.0
 pyinstaller>=6.0.0
-sentence-transformers>=3.0.0
 `
+
+async function fetchEmbeddedExportData(): Promise<Pick<GenerateOptions, 'embeddedKnowledge' | 'embeddedSkills'>> {
+  const embedded: Pick<GenerateOptions, 'embeddedKnowledge' | 'embeddedSkills'> = {}
+  try {
+    const res = await fetch('/api/v1/knowledge/export-chunks')
+    if (res.ok) {
+      const data = await res.json()
+      embedded.embeddedKnowledge = { chunks: data.chunks || [] }
+    }
+  } catch { /* offline export */ }
+  try {
+    const res = await fetch('/api/v1/skills/')
+    if (res.ok) {
+      const data = await res.json()
+      const skills: Record<string, string> = {}
+      for (const skill of data.skills || []) {
+        const detail = await fetch(`/api/v1/skills/${encodeURIComponent(skill.name)}`)
+        if (detail.ok) {
+          const s = await detail.json()
+          if (s.content) skills[skill.name] = s.content
+        }
+      }
+      embedded.embeddedSkills = skills
+    }
+  } catch { /* offline export */ }
+  return embedded
+}
+
+export async function fetchExportOptions(
+  options: GenerateOptions = {},
+): Promise<GenerateOptions> {
+  const embedded = await fetchEmbeddedExportData()
+  return { ...options, ...embedded }
+}
 
 export function getFlowExportBundle(
   nodes: Node[], edges: Edge[],

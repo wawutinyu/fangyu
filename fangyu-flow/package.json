@@ -12,6 +12,8 @@
     "electron:build": "vite build && electron-builder",
     "electron:start": "electron .",
     "test": "vitest run",
+    "test:fast": "vitest run --exclude '**/exportEngineParity.test.ts'",
+    "test:slow": "vitest run src/utils/__tests__/exportEngineParity.test.ts --testTimeout=120000",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",

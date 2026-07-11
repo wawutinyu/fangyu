@@ -1,0 +1,17 @@
+{
+  "name": "condition_true",
+  "external_inputs": {"input": "yes"},
+  "nodes": [
+    {"id": "s", "label": "start", "originType": "start"},
+    {"id": "c", "label": "condition", "originType": "condition", "config": {"expression": "input == 'yes'"}},
+    {"id": "o", "label": "output", "originType": "output"}
+  ],
+  "edges": [
+    {"source": "s", "target": "c"},
+    {"source": "c", "target": "o"}
+  ],
+  "checks": [
+    {"label": "condition", "field": "result", "value": true},
+    {"label": "condition", "field": "branch", "value": "true"}
+  ]
+}

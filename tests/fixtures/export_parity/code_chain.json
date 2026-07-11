@@ -1,0 +1,16 @@
+{
+  "name": "code_chain",
+  "external_inputs": {},
+  "nodes": [
+    {"id": "s", "label": "start", "originType": "start"},
+    {"id": "n", "label": "code", "originType": "code", "config": {"code": "result = 'ok'"}},
+    {"id": "o", "label": "output", "originType": "output"}
+  ],
+  "edges": [
+    {"source": "s", "target": "n"},
+    {"source": "n", "target": "o"}
+  ],
+  "checks": [
+    {"label": "output", "field": "result", "value": "ok"}
+  ]
+}
