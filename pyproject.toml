@@ -36,4 +36,5 @@ packages = [
     "fangyu.engine",
     "fangyu.models",
     "fangyu.routers",
+    "fangyu.adapters",
 ]

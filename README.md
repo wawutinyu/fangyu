@@ -25,14 +25,16 @@ AI 社会的基础设施 — 可视化编排 + DAG 执行引擎 + A2A 协议 + A
 | 画布违宪警告 UI | ✅ |
 | 审计链 hash 防篡改 | ✅ |
 | 多 Agent 链式协作 + 跨 RPC demo | ✅ |
-| CI Python 3.12/3.14 + fast/slow 测试 | ✅ |
+| Agent Bundle 导出 + 独立运行时 + 加密 A2A | ✅ |
+| 外部 Agent 联邦编排 | ✅ |
+| 多模态 Payload + 物理 Adapter 插件 | ✅ |
 
 详见：
 
 - **[L1 开发主线与技术方案](docs/L1_ROADMAP.md)** ← 后续开发北极星
 - [愿景与产品方向](docs/VISION_AND_PRODUCT.md)
 - [跨机器 A2A](docs/A2A_REMOTE.md)
-- [Electron 冒烟验证](docs/ELECTRON_SMOKE.md)
+- [Adapter 开发指南](docs/ADAPTER_DEV_GUIDE.md)
 
 ## 安装与启动
 
@@ -53,8 +55,8 @@ cd fangyu-flow && npm install && npm run dev   # → http://localhost:5173
 # 跨机器单 Agent RPC
 py -3 scripts/a2a_remote_demo.py --base http://127.0.0.1:8000
 
-# 跨进程多 Agent 链式协作
-py -3 scripts/a2a_multi_agent_demo.py --base http://127.0.0.1:8000
+# 产线 PLC → Worker Agent demo
+py -3 scripts/plc_demo.py --base http://127.0.0.1:8000
 ```
 
 ## 测试
@@ -71,7 +73,7 @@ fangyu/
 ├── engine/          # DAG 执行引擎
 ├── core/            # 宪法 + 审计链
 ├── a2a/             # A2A 协议 + ATP 信任
-├── routers/         # FastAPI
+├── adapters/        # 物理层 Adapter 插件 (MQTT/OPC-UA/PLC 模拟)
 ├── fangyu-flow/     # React 画布
 ├── scripts/         # A2A demo
 └── data/            # constitution.json, audit.log

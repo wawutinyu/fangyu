@@ -169,11 +169,11 @@ class AgentBus:
         return task
 
     def _handle_task(self, agent_name: str, task: dict, message: dict) -> Optional[dict]:
+        from fangyu.a2a.payload import message_to_inputs
+
         skill_id = (message.get("metadata") or {}).get("skill_id", "")
-        text = ""
-        for part in message.get("parts", []):
-            if part.get("type") == "text":
-                text = part.get("text", "")
+        inputs = message_to_inputs(message)
+        text = inputs.get("message") or inputs.get("query") or ""
 
         ext = AgentRegistry.get_external(agent_name)
         if ext:
@@ -223,7 +223,11 @@ class AgentBus:
 
         from .scheduler import run_flow
         import asyncio
-        ext_inputs = {"message": text, "query": text, "input": text} if text else {}
+        ext_inputs = dict(inputs)
+        if text:
+            ext_inputs.setdefault("message", text)
+            ext_inputs.setdefault("query", text)
+            ext_inputs.setdefault("input", text)
         result = asyncio.run(run_flow(
             nodes=flow.get("nodes", []),
             edges=flow.get("edges", []),

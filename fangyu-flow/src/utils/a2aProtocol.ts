@@ -38,6 +38,7 @@ export interface Message {
 export interface TextPart { type: 'text'; text: string }
 export interface FilePart { type: 'file'; file: { mimeType?: string; name?: string; bytes?: string; uri?: string } }
 export interface DataPart { type: 'data'; data: Record<string, unknown> }
+export interface ImagePart { type: 'file'; file: { mimeType: string; uri?: string; name?: string; bytes?: string } }
 export type Part = TextPart | FilePart | DataPart
 
 export interface Artifact {
