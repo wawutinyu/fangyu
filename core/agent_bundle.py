@@ -71,6 +71,7 @@ def create_agent_bundle(
     trusted_peers: list[dict[str, str]] | None = None,
     identity: AgentIdentity | None = None,
     embed_private_key: bool = True,
+    mqtt_triggers: list[dict[str, Any]] | None = None,
 ) -> Path:
     """创建 Agent Bundle 目录。"""
     root = Path(dest)
@@ -174,6 +175,8 @@ def create_agent_bundle(
             "trusted_peers": trusted_peers or [],
         },
     }
+    if mqtt_triggers:
+        interfaces["event_triggers"] = {"mqtt": mqtt_triggers}
 
     (root / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     (root / "agent.card.json").write_text(json.dumps(card, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -291,6 +294,27 @@ def resolve_agent_identity(bundle: dict[str, Any]) -> AgentIdentity:
     raise BundleError(
         f"Bundle 未嵌入私钥；请设置环境变量 {env_name}（hex 格式 Ed25519 私钥）"
     )
+
+
+def add_mqtt_trigger(
+    bundle_dir: str | Path,
+    topic: str,
+    *,
+    skill_id: str = "default",
+    use_sim: bool = True,
+) -> None:
+    """向 Bundle 添加 MQTT 事件触发（幂等按 topic）。"""
+    root = Path(bundle_dir)
+    iface_path = root / "config" / "interfaces.json"
+    if not iface_path.exists():
+        raise BundleError(f"缺少 config/interfaces.json: {root}")
+    cfg = json.loads(iface_path.read_text(encoding="utf-8"))
+    events = cfg.setdefault("event_triggers", {}).setdefault("mqtt", [])
+    entry = {"topic": topic, "skill_id": skill_id, "use_sim": use_sim}
+    events = [e for e in events if e.get("topic") != topic]
+    events.append(entry)
+    cfg["event_triggers"]["mqtt"] = events
+    iface_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def get_public_identity(bundle: dict[str, Any] | str | Path) -> dict[str, str]:

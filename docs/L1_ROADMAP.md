@@ -326,7 +326,7 @@ Worker-only Agent：`user.enabled = false`，runtime 不启动 Chat UI。
 | 外部 Agent DX | discover 自动填身份 + 一键授权 | ✅ |
 | 真 MQTT Adapter | `adapters/mqtt_client.py` + `fangyu[mqtt]` | ✅ |
 | 真 OPC-UA Adapter | 真实 client（非 sim） | ⏸ 暂缓（sim 够用，Phase 6+ 按需） |
-| Bundle MQTT 事件触发 | subscribe → 自动执行 skill（daemon 增强） | ⏳ 下一步 |
+| Bundle MQTT 事件触发 | subscribe → 自动执行 skill（daemon 增强） | ✅ |
 
 ### Phase 5.5 — 单 Agent 行动闭环（**当前**）
 

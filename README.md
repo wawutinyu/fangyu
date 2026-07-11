@@ -80,6 +80,9 @@ py -3 scripts/mqtt_demo.py --base http://127.0.0.1:8000
 
 # Action Loop + workspace（单 Agent 行动闭环）
 py -3 scripts/action_loop_demo.py
+
+# Bundle MQTT 事件触发（mqtt_sim → 自动跑 skill）
+py -3 scripts/bundle_mqtt_demo.py
 ```
 
 ## 测试

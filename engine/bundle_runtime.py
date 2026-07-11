@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -9,6 +10,7 @@ from pydantic import BaseModel
 
 from fangyu.core.agent_bundle import load_agent_bundle, bundle_to_flow_mappings
 from fangyu.engine.a2a_runtime import AgentRegistry, AgentBus
+from fangyu.engine.bundle_mqtt_trigger import get_bundle_mqtt_trigger, start_bundle_mqtt_triggers
 
 
 class JsonRpcRequest(BaseModel):
@@ -102,7 +104,16 @@ def create_bundle_app(bundle_path: str) -> tuple[FastAPI, str]:
     agent_name = _register_bundle(bundle)
     public_identity = get_public_identity(bundle)
     bus = AgentBus(enable_trust=True)
-    app = FastAPI(title=f"fangyu bundle: {agent_name}")
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):  # noqa: ARG001
+        trigger = start_bundle_mqtt_triggers(bundle, agent_name, bus)
+        if trigger.status()["triggers"]:
+            print(f"  mqtt      {len(trigger.status()['triggers'])} trigger(s) active")
+        yield
+        trigger.stop()
+
+    app = FastAPI(title=f"fangyu bundle: {agent_name}", lifespan=lifespan)
 
     @app.get("/health")
     def health():
@@ -115,6 +126,7 @@ def create_bundle_app(bundle_path: str) -> tuple[FastAPI, str]:
             "require_envelope": require_envelope,
             "agent_kind": bundle["manifest"].get("capabilities", {}).get("agent_kind", "worker"),
             "workspace": str((bundle["root"] / "workspace").resolve()),
+            "mqtt_triggers": get_bundle_mqtt_trigger().status() if get_bundle_mqtt_trigger() else {"started": False, "triggers": []},
             **daemon_status(),
         }
 
