@@ -23,6 +23,7 @@ from .routers import mcp as mcp_router
 from .routers import a2a as a2a_router
 from .routers import trust as trust_router
 from .routers import constitution as constitution_router
+from .routers import bundle as bundle_router
 
 
 @asynccontextmanager
@@ -66,6 +67,7 @@ app.include_router(mcp_router.router)
 app.include_router(a2a_router.router)
 app.include_router(trust_router.router)
 app.include_router(constitution_router.router)
+app.include_router(bundle_router.router)
 
 
 @app.get("/api/health")

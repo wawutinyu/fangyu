@@ -14,6 +14,7 @@ import { addAgentNode, addAgentEdge, selectAgentNode, selectAgentEdge, moveAgent
 import type { AgentCanvasNode } from '../store/agentSlice'
 import type { AgentCard, TrustConfig } from '../utils/a2aProtocol'
 import { buildAgentSocietyDemo } from '../utils/demoAgents'
+import { downloadAgentBundle } from '../utils/exportAgentBundle'
 
 const nodeTypes = { 'a2a-agent': AgentNode, 'a2a-router': RouterNode, 'a2a-group': GroupNode }
 
@@ -87,8 +88,14 @@ export default function AgentCanvas() {
     const id = genAgentId()
     const node: AgentCanvasNode = {
       id, label: `智能体 ${_agentIdCounter}`, type: 'a2a-agent',
+      agentKind: 'worker',
       position: { x: 100 + Math.random() * 300, y: 100 + Math.random() * 200 },
-      agentCard: { ...defaultAgentCard, name: `智能体 ${_agentIdCounter}` },
+      agentCard: {
+        ...defaultAgentCard,
+        name: `智能体 ${_agentIdCounter}`,
+        metadata: { agentKind: 'worker', workerOnly: true },
+        interfaces: { user: { enabled: false }, a2a: { enabled: true } },
+      },
       trust: { ...defaultTrust },
       timeout: 30000, retryCount: 0, lifecycle: 'sync',
       pushNotificationUrl: '', tenantId: '', extensions: {},
@@ -158,6 +165,19 @@ export default function AgentCanvas() {
     return () => window.removeEventListener('keydown', handler)
   }, [deleteSelected, selectedNodeId, selectedEdgeId])
 
+  const exportSelectedBundle = useCallback(async () => {
+    const agent = storeNodes.find(n => n.id === selectedNodeId && n.type === 'a2a-agent')
+    if (!agent?.agentCard) {
+      alert('请先选中一个智能体节点')
+      return
+    }
+    try {
+      await downloadAgentBundle(agent, { requireEnvelope: true })
+    } catch (e: unknown) {
+      alert(`导出 Bundle 失败: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }, [selectedNodeId, storeNodes])
+
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '8px 16px', borderBottom: '1px solid #eee', display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -178,6 +198,12 @@ export default function AgentCanvas() {
           padding: '4px 14px', background: '#13c2c2', color: '#fff',
           border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12,
         }}>加载 AI 社会 Demo</button>
+        {selectedNodeId && storeNodes.find(n => n.id === selectedNodeId)?.type === 'a2a-agent' && (
+          <button onClick={exportSelectedBundle} style={{
+            padding: '4px 14px', background: '#531dab', color: '#fff',
+            border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12,
+          }}>导出 Bundle</button>
+        )}
         {selectedNodeId && <span style={{ fontSize: 12, color: '#888' }}>已选: {selectedNodeId}</span>}
         {(selectedNodeId || selectedEdgeId) && (
           <button onClick={deleteSelected} style={{

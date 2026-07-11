@@ -29,6 +29,8 @@ AI 社会的基础设施 — 可视化编排 + DAG 执行引擎 + A2A 协议 + A
 
 详见：
 
+- **[L1 开发主线与技术方案](docs/L1_ROADMAP.md)** ← 后续开发北极星
+- [愿景与产品方向](docs/VISION_AND_PRODUCT.md)
 - [跨机器 A2A](docs/A2A_REMOTE.md)
 - [Electron 冒烟验证](docs/ELECTRON_SMOKE.md)
 

@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useAppSelector, useAppDispatch } from '../store/hooks'
 import { updateAgentCard, updateAgentNode, updateAgentEdge, updateRoutingRules, updateSkillFlow, clearSkillFlow } from '../store/agentSlice'
-import type { AgentSkill, RoutingRule } from '../utils/a2aProtocol'
+import type { AgentSkill, RoutingRule, AgentKind } from '../utils/a2aProtocol'
 import { snapshotFlowFromCanvas } from '../utils/agentDeploy'
 
 export default function AgentConfigPanel() {
@@ -180,6 +180,27 @@ export default function AgentConfigPanel() {
 
         {!isRouter && tab === 'card' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <Field label="Agent 类型">
+              <select
+                value={node.agentKind || (card.metadata?.agentKind as AgentKind) || 'worker'}
+                onChange={e => {
+                  const kind = e.target.value as AgentKind
+                  const userEnabled = kind === 'interface' || kind === 'hybrid'
+                  updateNodeData({ agentKind: kind })
+                  updateCard({
+                    metadata: { ...card.metadata, agentKind: kind, workerOnly: kind === 'worker' },
+                    interfaces: {
+                      user: { enabled: userEnabled },
+                      a2a: { enabled: true, url: card.interfaces?.a2a?.url },
+                    },
+                  })
+                }}
+              >
+                <option value="worker">Worker — 只 A2A，无用户 UI</option>
+                <option value="interface">Interface — 面向用户</option>
+                <option value="hybrid">Hybrid — 用户 + A2A</option>
+              </select>
+            </Field>
             <Field label="名称"><input value={card.name} onChange={e => updateCard({ name: e.target.value })} /></Field>
             <Field label="描述"><textarea value={card.description || ''} onChange={e => updateCard({ description: e.target.value })} rows={2} /></Field>
             <Field label="版本"><input value={card.version} onChange={e => updateCard({ version: e.target.value })} /></Field>

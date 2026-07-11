@@ -104,29 +104,31 @@ def assert_agent_authorized(agent_id: str, skill_id: str, trust: dict | None = N
         return
     from ..core.constitution import audit_event
 
-    if agent_id in (trust.get("revocationList") or []):
-        audit_event("trust_violation", {"agent": agent_id, "skill_id": skill_id, "rule": "revoked"})
+    lookup_id = trust.get("agent_id") or agent_id
+
+    if lookup_id in (trust.get("revocationList") or []):
+        audit_event("trust_violation", {"agent": lookup_id, "skill_id": skill_id, "rule": "revoked"})
         raise TrustViolation(
             "revoked",
-            f"Agent '{agent_id}' 已被吊销，无法执行技能 '{skill_id}'",
-            context={"agent": agent_id, "skill_id": skill_id},
+            f"Agent '{lookup_id}' 已被吊销，无法执行技能 '{skill_id}'",
+            context={"agent": lookup_id, "skill_id": skill_id},
         )
-    pubkey = TrustRegistry.get_public_key(agent_id)
+    pubkey = TrustRegistry.get_public_key(lookup_id)
     if not pubkey:
-        audit_event("trust_violation", {"agent": agent_id, "skill_id": skill_id, "rule": "not_registered"})
+        audit_event("trust_violation", {"agent": lookup_id, "skill_id": skill_id, "rule": "not_registered"})
         raise TrustViolation(
             "not_registered",
-            f"Agent '{agent_id}' 未注册到 ATP 信任层",
-            context={"agent": agent_id, "skill_id": skill_id},
+            f"Agent '{lookup_id}' 未注册到 ATP 信任层",
+            context={"agent": lookup_id, "skill_id": skill_id},
         )
-    if not TrustRegistry.authorize(agent_id, skill_id):
-        audit_event("trust_violation", {"agent": agent_id, "skill_id": skill_id, "rule": "not_authorized"})
+    if not TrustRegistry.authorize(lookup_id, skill_id):
+        audit_event("trust_violation", {"agent": lookup_id, "skill_id": skill_id, "rule": "not_authorized"})
         raise TrustViolation(
             "not_authorized",
-            f"Agent '{agent_id}' 无权执行技能 '{skill_id}'",
-            context={"agent": agent_id, "skill_id": skill_id},
+            f"Agent '{lookup_id}' 无权执行技能 '{skill_id}'",
+            context={"agent": lookup_id, "skill_id": skill_id},
         )
-    audit_event("trust_authorized", {"agent": agent_id, "skill_id": skill_id})
+    audit_event("trust_authorized", {"agent": lookup_id, "skill_id": skill_id})
 
 
 def sync_agent_trust(agent_id: str, card: dict, trust: dict | None = None) -> dict:

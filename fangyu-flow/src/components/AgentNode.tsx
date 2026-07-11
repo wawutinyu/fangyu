@@ -6,6 +6,9 @@ function AgentNode({ data }: NodeProps<AgentCanvasNode>) {
   const card = data.agentCard
   const skillCount = card.skills?.length || 0
   const trustEnabled = data.trust?.enabled
+  const kind = data.agentKind || (card.metadata?.agentKind as string) || 'worker'
+  const kindLabel = kind === 'worker' ? 'Worker' : kind === 'interface' ? 'Interface' : 'Hybrid'
+  const kindColor = kind === 'worker' ? '#722ed1' : kind === 'interface' ? '#1890ff' : '#13c2c2'
 
   return (
     <div style={{
@@ -17,6 +20,7 @@ function AgentNode({ data }: NodeProps<AgentCanvasNode>) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
         <span style={{ fontSize: 16, filter: 'grayscale(0.3)' }}>🤖</span>
         <strong style={{ fontSize: 14, color: '#222' }}>{data.label}</strong>
+        <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: kindColor, color: '#fff' }}>{kindLabel}</span>
         {trustEnabled && <span title="ATP 可信" style={{ fontSize: 11, color: '#52c41a' }}>🔒</span>}
       </div>
       <div style={{ fontSize: 11, color: '#888', lineHeight: 1.5 }}>

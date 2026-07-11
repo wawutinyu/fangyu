@@ -37,30 +37,26 @@ function resolveSkillFlow(agent: AgentCanvasNode, skillId: string) {
   return buildDefaultSkillFlow(agent.agentCard!, skillId)
 }
 
-/** 为 Agent 技能生成默认子流程：start → llm → output */
+/** 为 Agent 技能生成默认子流程：start → code(action) → output */
 export function buildDefaultSkillFlow(card: AgentCard, skillId: string) {
   const skill = card.skills.find(s => s.id === skillId)
-  const systemPrompt = skill?.description || card.description || '你是一个有帮助的 AI 助手。'
+  const code = `result = 'processed: ' + str(_input.get('query') or _input.get('message') or '')`
   return {
     nodes: [
       { id: 's', data: { originType: 'start', config: {}, label: '开始' } },
       {
-        id: 'llm',
+        id: 'act',
         data: {
-          originType: 'llm',
-          label: skill?.name || 'LLM',
-          config: {
-            model: 'deepseek-chat',
-            system_prompt: systemPrompt,
-            auto_inject_memory: false,
-          },
+          originType: 'code',
+          label: skill?.name || '执行',
+          config: { code },
         },
       },
       { id: 'o', data: { originType: 'output', config: {}, label: '输出' } },
     ],
     edges: [
-      { id: 'e1', source: 's', target: 'llm', data: {} },
-      { id: 'e2', source: 'llm', target: 'o', data: {} },
+      { id: 'e1', source: 's', target: 'act', data: {} },
+      { id: 'e2', source: 'act', target: 'o', data: {} },
     ],
   }
 }

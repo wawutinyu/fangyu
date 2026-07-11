@@ -58,13 +58,19 @@ export interface AgentSkill {
   inputMimeTypes?: string[]; outputMimeTypes?: string[]
   inputSchema?: Record<string, unknown>; outputSchema?: Record<string, unknown>
 }
-export interface AgentInterface { type: 'in-memory' | 'http' | 'grpc' | string; port?: number; path?: string; tenant?: string }
+export interface AgentInterface { type: 'in-memory' | 'http' | 'grpc' | 'a2a' | string; port?: number; path?: string; tenant?: string; url?: string; enabled?: boolean }
+export interface AgentInterfaces {
+  user?: { enabled: boolean; url?: string }
+  a2a?: { enabled: boolean; url?: string }
+}
+export type AgentKind = 'interface' | 'worker' | 'hybrid'
 export interface AgentCardSignature { algorithm: string; value: string; publicKey?: string }
 
 export interface AgentCard {
   name: string; description?: string; url?: string; provider?: AgentProvider
   version: string; documentationUrl?: string; capabilities: AgentCapabilities
   skills: AgentSkill[]; defaultInterface: AgentInterface
+  interfaces?: AgentInterfaces
   supportedInterfaces?: AgentInterface[]; authSchemes?: SecurityScheme[]
   signature?: AgentCardSignature; metadata?: Record<string, unknown>
 }

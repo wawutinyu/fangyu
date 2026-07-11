@@ -5,6 +5,7 @@ export interface AgentCanvasNode {
   id: string
   label: string
   type: 'a2a-agent' | 'a2a-router' | 'a2a-group'
+  agentKind?: 'interface' | 'worker' | 'hybrid'
   position: { x: number; y: number }
   agentCard?: AgentCard
   trust?: TrustConfig
