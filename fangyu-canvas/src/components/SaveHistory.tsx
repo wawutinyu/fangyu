@@ -7,11 +7,17 @@ import { convertToExportFormat } from '../utils/flowHelper'
 import { getReactFlowInstance } from './FlowCanvas'
 import { promoteSaveToAsset } from '../utils/assetApi'
 
+import type { ExportFormat } from '@fangyu/core/schema'
+import { dispatchFlowSnapshot } from '../utils/workerDispatch'
+import { pollTaskUntilDone } from '../utils/workerApi'
+
 interface SaveHistoryProps {
   onRestore: (data: unknown) => void
+  selectedWorkerId?: string | null
+  onDispatchTask?: (taskId: string) => void
 }
 
-export default function SaveHistory({ onRestore }: SaveHistoryProps) {
+export default function SaveHistory({ onRestore, selectedWorkerId, onDispatchTask }: SaveHistoryProps) {
   const { projects, currentProjectId, historyVisible } = useAppSelector(s => s.saves)
   const currentProject = useMemo(() => projects.find(p => p.id === currentProjectId), [projects, currentProjectId])
   const [diffIds, setDiffIds] = useState<string[]>([])
@@ -84,6 +90,26 @@ export default function SaveHistory({ onRestore }: SaveHistoryProps) {
   const handleDelete = (saveId: string) => {
     if (!confirm('删除此保存？')) return
     deleteSaveApi(saveId, store.dispatch)
+  }
+
+  const handleDispatchSave = async (save: { id: string; name: string; data: Record<string, unknown> }) => {
+    try {
+      const result = await dispatchFlowSnapshot({
+        exportData: save.data as unknown as ExportFormat,
+        snapshotName: save.name,
+        snapshotId: save.id,
+        workerId: selectedWorkerId,
+      })
+      onDispatchTask?.(result.task_id)
+      void pollTaskUntilDone(result.task_id).then((task) => {
+        onDispatchTask?.(task.id)
+        if (task.status === 'failed') {
+          window.alert(`任务失败：${task.error ?? '未知错误'}`)
+        }
+      }).catch(() => { /* ignore timeout */ })
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : String(err))
+    }
   }
 
   const handlePromoteToAsset = async (save: { id: string; name: string; data: Record<string, unknown> }) => {
@@ -215,6 +241,13 @@ export default function SaveHistory({ onRestore }: SaveHistoryProps) {
                     onClick={() => handleRestoreSave(s.data)}
                   >
                     回滚
+                  </button>
+                  <button
+                    style={{ fontSize: 10, padding: '2px 6px', border: '1px solid rgba(37,99,235,0.35)', borderRadius: 4, background: 'rgba(37,99,235,0.08)', cursor: 'pointer', color: '#2563eb' }}
+                    title="将此版本快照派发到行"
+                    onClick={() => void handleDispatchSave(s as { id: string; name: string; data: Record<string, unknown> })}
+                  >
+                    派发行
                   </button>
                   <button style={{ width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', cursor: 'pointer', color: '#1890ff', borderRadius: 4, fontSize: 10 }}
                     title="存为资产"

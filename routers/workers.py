@@ -15,7 +15,7 @@ from ..core.worker_registry import (
     register_worker,
 )
 
-WORKER_TASK_TYPES = frozenset({"shell", "run_flow", "read_file", "write_file"})
+WORKER_TASK_TYPES = frozenset({"shell", "run_flow", "read_file", "write_file", "adapter_invoke"})
 
 router = APIRouter(prefix="/api/v1/workers", tags=["方隅·行 Worker"])
 
@@ -24,7 +24,7 @@ class RegisterBody(BaseModel):
     name: str = Field(min_length=1, max_length=128)
     hostname: str = ""
     os: str = ""
-    capabilities: list[str] = Field(default_factory=lambda: ["shell", "run_flow", "read_file", "write_file"])
+    capabilities: list[str] = Field(default_factory=lambda: ["shell", "run_flow", "read_file", "write_file", "adapter_invoke"])
     worker_id: str | None = None
 
 
@@ -51,6 +51,11 @@ class TaskEventBody(BaseModel):
     event_type: str = Field(min_length=1)
     message: str = ""
     detail: dict | None = None
+
+
+class MqttFireBody(BaseModel):
+    topic: str = "fangyu/line1/event"
+    payload: dict | None = None
 
 
 @router.post("/register")
@@ -162,6 +167,30 @@ async def tasks_complete(task_id: str, body: CompleteTaskBody):
     if not task:
         raise HTTPException(404, "task not found or worker mismatch")
     return {"task": get_task(task_id)}
+
+
+@router.get("/triggers/mqtt/status")
+async def mqtt_trigger_status():
+    from ..core.worker_mqtt_bridge import get_worker_mqtt_bridge
+
+    return get_worker_mqtt_bridge().status()
+
+
+@router.post("/triggers/mqtt/start")
+async def mqtt_trigger_start():
+    from ..core.worker_mqtt_bridge import get_worker_mqtt_bridge
+
+    return get_worker_mqtt_bridge().start()
+
+
+@router.post("/triggers/mqtt/fire")
+async def mqtt_trigger_fire(body: MqttFireBody):
+    from ..core.worker_mqtt_bridge import get_worker_mqtt_bridge
+
+    try:
+        return get_worker_mqtt_bridge().fire_sim(body.topic, body.payload)
+    except Exception as exc:
+        raise HTTPException(500, str(exc)) from exc
 
 
 @router.get("/{worker_id}")

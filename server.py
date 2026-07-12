@@ -38,6 +38,8 @@ async def lifespan(app: FastAPI):
     from .core.asset_seed import maintain_asset_library
     from .core.worker_store import init_store
     init_store()
+    from .core.worker_mqtt_bridge import get_worker_mqtt_bridge
+    get_worker_mqtt_bridge().start()
     async with async_session() as session:
         await maintain_asset_library(session)
     yield

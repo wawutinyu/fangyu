@@ -1,7 +1,8 @@
 # Electron 过渡壳冒烟验证（可选）
 
-> **维护模式**：`fangyu-desktop` 为过渡方案，日常请用 **方隅·序**（`dev.bat`）+ **方隅·行**（`dev-worker.bat`）。  
-> 长期由 `fangyu-worker` 原生 App 替代。
+> **维护模式 / 计划退役**：`fangyu-desktop` 为过渡方案。  
+> **推荐日常**：`dev.bat`（方隅·序）+ `dev-worker-tray.bat`（方隅·行）。  
+> 当 Worker 具备稳定原生安装包且团队 4+ 周不依赖 Electron 后，将移除本包。
 
 ## 结构
 

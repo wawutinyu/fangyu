@@ -50,7 +50,7 @@ def register_worker(
         name=name,
         hostname=hostname,
         os_name=os_name,
-        capabilities=capabilities or ["shell", "run_flow", "read_file", "write_file"],
+        capabilities=capabilities or ["shell", "run_flow", "read_file", "write_file", "adapter_invoke"],
         worker_id=worker_id,
     )
 

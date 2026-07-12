@@ -10,6 +10,7 @@ data/*.db
 # Worker 持久化
 data/workers.db
 data/worker-local.json
+data/worker-mqtt-triggers.json
 
 # Node workspaces
 node_modules/

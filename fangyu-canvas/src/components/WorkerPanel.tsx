@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { WorkerInfo, WorkerTask, WorkerTaskEvent } from '@fangyu/core/schema'
-import { fetchTask, fetchTaskEvents, fetchTasks, fetchWorkers } from '../utils/workerApi'
+import { fetchTask, fetchTaskEvents, fetchTasks, fetchWorkers, fireMqttWorkerTrigger, fetchMqttTriggerStatus, dispatchAdapterTest } from '../utils/workerApi'
 
 interface Props {
   highlightTaskId?: string | null
@@ -34,6 +34,11 @@ function payloadSummary(task: WorkerTask): string {
   if (task.type === 'read_file' || task.type === 'write_file') {
     return typeof p.path === 'string' ? p.path : ''
   }
+  if (task.type === 'adapter_invoke') {
+    const action = typeof p.action === 'string' ? p.action : 'invoke'
+    const adapter = typeof p.adapter === 'string' ? p.adapter : ''
+    return adapter ? `${action}:${adapter}` : action
+  }
   return ''
 }
 
@@ -45,13 +50,16 @@ export default function WorkerPanel({ highlightTaskId }: Props) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [events, setEvents] = useState<WorkerTaskEvent[]>([])
   const [loading, setLoading] = useState(false)
+  const [mqttStatus, setMqttStatus] = useState<{ started?: boolean; triggers?: unknown[] } | null>(null)
+  const [quickBusy, setQuickBusy] = useState(false)
 
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      const [w, t] = await Promise.all([fetchWorkers(), fetchTasks(80)])
+      const [w, t, mqtt] = await Promise.all([fetchWorkers(), fetchTasks(80), fetchMqttTriggerStatus()])
       setWorkers(w)
       setTasks(t)
+      setMqttStatus(mqtt as { started?: boolean; triggers?: unknown[] })
     } catch { /* ignore */ }
     setLoading(false)
   }, [])
@@ -107,6 +115,33 @@ export default function WorkerPanel({ highlightTaskId }: Props) {
     { key: 'failed', label: '失败' },
   ]
 
+  const runQuickTest = async (kind: 'mqtt' | 'adapter') => {
+    if (onlineCount === 0) {
+      window.alert('没有在线 Worker')
+      return
+    }
+    setQuickBusy(true)
+    try {
+      if (kind === 'mqtt') {
+        const body = await fireMqttWorkerTrigger('fangyu/line1/event', { value: 42, unit: 'C' })
+        const task = body.task as { id?: string } | undefined
+        const taskId = task?.id ?? (body.task_id as string | undefined)
+        if (taskId) setSelectedId(String(taskId))
+      } else {
+        const workerId = selectedWorkerId && workers.some(w => w.id === selectedWorkerId && w.online)
+          ? selectedWorkerId
+          : workers.find(w => w.online)?.id
+        const result = await dispatchAdapterTest('mqtt_sim', workerId ?? undefined)
+        setSelectedId(result.task_id)
+      }
+      await refresh()
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : String(err))
+    } finally {
+      setQuickBusy(false)
+    }
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div style={{
@@ -124,6 +159,35 @@ export default function WorkerPanel({ highlightTaskId }: Props) {
         <div style={{ flex: 1 }} />
         <button className="notion-btn" style={{ fontSize: 12 }} onClick={() => void refresh()} disabled={loading}>
           {loading ? '刷新中…' : '刷新'}
+        </button>
+      </div>
+
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+        padding: '6px 14px', borderBottom: '1px solid var(--border-light)', fontSize: 11,
+      }}>
+        <span style={{ color: 'var(--text-muted)' }}>
+          MQTT {mqttStatus?.started ? '监听中' : '未启用'}
+          {mqttStatus?.triggers?.length ? ` · ${mqttStatus.triggers.length} 触发器` : ''}
+        </span>
+        <div style={{ flex: 1 }} />
+        <button
+          type="button"
+          className="notion-btn"
+          style={{ fontSize: 11, opacity: quickBusy ? 0.6 : 1 }}
+          disabled={quickBusy}
+          onClick={() => void runQuickTest('mqtt')}
+        >
+          测试 MQTT→行
+        </button>
+        <button
+          type="button"
+          className="notion-btn"
+          style={{ fontSize: 11, opacity: quickBusy ? 0.6 : 1 }}
+          disabled={quickBusy}
+          onClick={() => void runQuickTest('adapter')}
+        >
+          测试 Adapter
         </button>
       </div>
 
@@ -172,6 +236,11 @@ export default function WorkerPanel({ highlightTaskId }: Props) {
               <div style={{ color: 'var(--text-muted)', fontSize: 10, marginTop: 2 }}>
                 {(w.capabilities ?? []).join(', ')}
               </div>
+              {w.last_seen && (
+                <div style={{ color: 'var(--text-muted)', fontSize: 10, marginTop: 2 }}>
+                  心跳 {formatTs(w.last_seen)}
+                </div>
+              )}
             </button>
           ))}
         </div>

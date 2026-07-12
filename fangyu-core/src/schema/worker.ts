@@ -25,7 +25,7 @@ export interface WorkerTask {
   finished_at: number | null
 }
 
-export type WorkerTaskType = 'shell' | 'run_flow' | 'read_file' | 'write_file'
+export type WorkerTaskType = 'shell' | 'run_flow' | 'read_file' | 'write_file' | 'adapter_invoke'
 
 export interface DispatchTaskInput {
   type: WorkerTaskType

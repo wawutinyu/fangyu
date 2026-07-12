@@ -23,7 +23,8 @@ import { updateSkillFlow, loadAgents } from '../store/agentSlice'
 import { convertToExportFormat } from '../utils/flowHelper'
 import { demoFlows } from '../utils/demoFlows'
 import { snapshotFlowFromCanvas, getExportFormatFromCanvas } from '../utils/flowSnapshot'
-import { dispatchTask, fetchWorkers, pollTaskUntilDone } from '../utils/workerApi'
+import { fetchWorkers, pollTaskUntilDone } from '../utils/workerApi'
+import { publishAndDispatchFromCanvas } from '../utils/workerDispatch'
 import type { WorkerInfo } from '@fangyu/core/schema'
 
 
@@ -335,19 +336,11 @@ export default function App() {
         store.dispatch,
       )
 
-      const workerId = selectedWorkerId && online.some(w => w.id === selectedWorkerId)
-        ? selectedWorkerId
-        : online[0].id
-
-      const result = await dispatchTask({
-        type: 'run_flow',
-        worker_id: workerId,
-        payload: {
-          ...snapshot,
-          global_vars: { globalPrompts: state.flow.globalPrompts },
-          snapshot_id: saveEntry.id,
-          snapshot_name: snapshotName,
-        },
+      const result = await publishAndDispatchFromCanvas({
+        exportData,
+        snapshotName,
+        snapshotId: saveEntry.id,
+        workerId: selectedWorkerId,
       })
       setHighlightWorkerTaskId(result.task_id)
       setWorkersFocusSignal(s => s + 1)
@@ -501,7 +494,14 @@ export default function App() {
           />
         </div>
       </div>
-      <SaveHistory onRestore={handleRestore} />
+      <SaveHistory
+        onRestore={handleRestore}
+        selectedWorkerId={selectedWorkerId}
+        onDispatchTask={(taskId) => {
+          setHighlightWorkerTaskId(taskId)
+          setWorkersFocusSignal(s => s + 1)
+        }}
+      />
       <SettingsPanel />
       {compiling && createPortal(
         <div style={{

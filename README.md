@@ -12,7 +12,12 @@ AI 社会的基础设施 — 可视化编排 + DAG 执行引擎 + A2A 协议 + A
 | **方隅·行** | `fangyu-worker` | 执行、连接、交付 — 本机 Worker |
 
 > **序而后行**：在序里设计并发布，在行里本机 shell / 文件 / Adapter 真干活。  
-> `fangyu-desktop`（Electron）为**可选过渡壳**，默认不必安装。
+> `fangyu-desktop`（Electron）为**可选过渡壳**，计划由 `fangyu-worker` 原生安装包替代后退役。
+
+## MQTT → 行（可选）
+
+复制 `data/worker-mqtt-triggers.example.json` 为 `data/worker-mqtt-triggers.json` 并设 `"enabled": true`，  
+API 启动后会监听 `mqtt_sim` 主题并自动派发 Worker 任务。也可在 **方隅·行** 面板点「测试 MQTT→行」。
 
 ## 安装与启动
 

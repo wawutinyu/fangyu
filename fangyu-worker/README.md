@@ -36,6 +36,7 @@ node fangyu-worker/src/cli.mjs --api-base http://127.0.0.1:8000 --name my-pc
 | `run_flow` | 调用 `/api/v1/flow/run` 在本机跑 Flow |
 | `read_file` | 读取工作区文件（`FANGYU_WORKSPACE`，默认 cwd） |
 | `write_file` | 写入工作区文件 |
+| `adapter_invoke` | 经序 API 调用 Adapter（`ingest` / `emit`） |
 
 Shell 执行会回传审计事件到序：`shell_start` / `shell_done` / `shell_blocked` 等，可在 **方隅·行** 面板查看。
 
@@ -72,4 +73,4 @@ set FANGYU_SHELL_POLICY=allowlist
 ## 后续
 
 - Tauri 原生壳 + Windows 安装包（Rust 就绪后再做）
-- 文件/Adapter/Bundle daemon
+- Bundle 常驻 daemon（MQTT 触发 → 自动派发行）

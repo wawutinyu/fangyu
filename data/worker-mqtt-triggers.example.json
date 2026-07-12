@@ -1,0 +1,12 @@
+{
+  "enabled": false,
+  "triggers": [
+    {
+      "topic": "fangyu/line1/event",
+      "task_type": "adapter_invoke",
+      "action": "ingest",
+      "adapter": "mqtt_sim",
+      "worker_name": null
+    }
+  ]
+}

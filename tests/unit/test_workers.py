@@ -171,3 +171,12 @@ def test_enqueue_read_file_task(client):
     })
     assert created.status_code == 200
     assert created.json()["status"] == "pending"
+
+
+def test_enqueue_adapter_invoke_task(client):
+    created = client.post("/api/v1/workers/tasks", json={
+        "type": "adapter_invoke",
+        "payload": {"action": "ingest", "adapter": "mqtt_sim", "raw": {"topic": "t", "payload": {"v": 1}}},
+    })
+    assert created.status_code == 200
+    assert created.json()["status"] == "pending"

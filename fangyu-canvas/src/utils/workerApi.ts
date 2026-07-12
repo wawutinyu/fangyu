@@ -37,6 +37,44 @@ export async function fetchTaskEvents(taskId: string, limit = 100): Promise<Work
   return body.events ?? []
 }
 
+export async function fetchMqttTriggerStatus(): Promise<Record<string, unknown>> {
+  const res = await apiFetch('/api/v1/workers/triggers/mqtt/status')
+  if (!res.ok) return { started: false, triggers: [] }
+  return res.json()
+}
+
+export async function fireMqttWorkerTrigger(topic: string, payload?: Record<string, unknown>) {
+  const res = await apiFetch('/api/v1/workers/triggers/mqtt/fire', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ topic, payload }),
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(text || `mqtt fire failed (${res.status})`)
+  }
+  return res.json()
+}
+
+export async function dispatchAdapterTest(adapter = 'mqtt_sim', workerId?: string) {
+  return dispatchTask({
+    type: 'adapter_invoke',
+    worker_id: workerId,
+    payload: {
+      action: 'ingest',
+      adapter,
+      raw: { topic: 'fangyu/test', payload: { ping: true } },
+    },
+  })
+}
+
+export async function fetchAdapters(): Promise<Array<{ name: string; available?: boolean }>> {
+  const res = await apiFetch('/api/v1/adapters')
+  if (!res.ok) return []
+  const body = await res.json()
+  return body.adapters ?? []
+}
+
 export async function dispatchTask(input: DispatchTaskInput): Promise<DispatchTaskResult> {
   const res = await apiFetch('/api/v1/workers/tasks', {
     method: 'POST',
