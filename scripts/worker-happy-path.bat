@@ -1,16 +1,16 @@
 @echo off
 REM 方隅 序 + 行 + Happy Path 验证（需先 dev-clean 若端口占用）
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
 if not exist node_modules call npm install
 py -m pip install -e . -q
 
 echo [1/3] 启动 API...
-start "fangyu-api" cmd /c "cd /d %~dp0 && py -m fangyu --server"
+start "fangyu-api" cmd /c "cd /d %CD% && py -m fangyu --server"
 timeout /t 3 /nobreak >nul
 
 echo [2/3] 启动方隅·行 Worker...
-start "fangyu-worker" cmd /c "cd /d %~dp0 && npm run dev:worker"
+start "fangyu-worker" cmd /c "cd /d %CD% && npm run dev:worker"
 timeout /t 3 /nobreak >nul
 
 echo [3/3] 运行 Happy Path...

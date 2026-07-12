@@ -203,6 +203,12 @@ export default function SettingsPanel() {
 
           {activeTab === 'constitution' && (
             <div style={{ padding: '16px 20px 20px' }}>
+              <div style={{
+                fontSize: 11, color: 'var(--text-muted)', marginBottom: 12, padding: '8px 10px',
+                background: 'var(--bg-secondary)', borderRadius: 8, border: '1px solid var(--border-color)',
+              }}>
+                完整「方隅·律」门面（宪法 + 审计链）请用顶栏 <strong>方隅·律</strong>。此处为快捷编辑。
+              </div>
               {!constitution ? (
                 <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>加载中...</div>
               ) : (

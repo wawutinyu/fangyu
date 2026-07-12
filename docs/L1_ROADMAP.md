@@ -2,7 +2,9 @@
 
 > **后续开发北极星。** 画布不只造「聊天 Agent」，而是造**能干活、带身份、可加密通信、可独立导出、可授权接入**的行动体。
 
-关联文档：[愿景与产品方向](VISION_AND_PRODUCT.md)
+关联文档：[愿景与产品方向](VISION_AND_PRODUCT.md)（含 **四门两包** 交付模型）
+
+**产品交付（锁定）：** 叙事 **序 / 行 / 观 / 律** 四门；安装 **studio + worker** 两包。观、律先挂序包为一等入口，协议独立，达标再拆包。
 
 ---
 
@@ -343,20 +345,25 @@ Worker-only Agent：`user.enabled = false`，runtime 不启动 Chat UI。
 
 ---
 
-### Phase 6 — AI 助手层 + 场景模板（**后续，infra 闭环后**）
+### Phase 6 — AI 助手层 + 场景模板（**进行中**）
 
 > **受众：普通人 + 开发者。** 在 Phase 5 的 L0 之上叠 L2/L3，行业通过模板覆盖，不 fork 代码。
 
-| 任务 | 说明 |
-|------|------|
-| Intent → Flow | 自然语言描述目标 → 生成 action-first flow + 宪法扫描 |
-| Intent → Agent 网 | 描述协作关系 → 自动生成 Agent 画布 + 路由 |
-| Setup Copilot | 外部 Agent：粘贴 URL → 人话确认信任 → 一键授权 |
-| 违宪 / 失败可解释 | 协作失败、ATP 拒绝 → 白话 + 建议下一步 |
-| 场景模板库 | 产线巡检、文档助手等 — 一键实例化 Bundle + 策略包 |
-| 模板市场（可选） | 社区/官方模板分发 |
+| 任务 | 说明 | 状态 |
+|------|------|------|
+| Intent → Flow | 自然语言描述目标 → 生成 action-first flow + 宪法扫描 | ✅ MVP（模板路由 + 序工具栏「意图生成」） |
+| Intent → Agent 网 | 描述协作关系 → 自动生成 Agent 画布 + 路由 | ✅ MVP（`POST /api/v1/intent/to-agents` + 意图面板） |
+| **观 · Presence MVP** | Agent/Worker 在线忙闲 + 协作时间线（挂序内） | ✅ + 持久化 + 协作边图 |
+| **律 · 一等入口** | 宪法/审计从设置边角升格为序包主入口 | ✅ + 白话解释 |
+| **违宪 / 失败可解释** | 协作失败、ATP 拒绝 → 白话 + 建议下一步 | ✅ MVP（`lawExplain` · 律面板） |
+| Setup Copilot | 外部 Agent：粘贴 URL → 人话确认信任 → 一键授权 | ⬜ |
+| 场景模板库 | 产线巡检、文档助手等 — 一键实例化 Bundle + 策略包 | ⬜ 部分：Intent 已含文档/行动模板 |
+| 模板市场（可选） | 社区/官方模板分发 | ⬜ |
 
-**验收：** 非开发者用户仅通过对话 + 按钮，完成「创建一个 Worker 并导出运行」（无需理解 agent_id/公钥）。
+**API：** `POST /api/v1/intent/to-flow` · `POST /api/v1/intent/to-agents` · `GET /api/v1/presence`  
+**测试：** `test_intent_flow.py` · `test_intent_agents.py` · `test_collaboration.py` · `test_presence_integration.py`
+
+**验收（完整 Phase 6）：** 非开发者用户仅通过对话 + 按钮，完成「创建一个 Worker 并导出运行」（无需理解 agent_id/公钥）。
 
 **前置条件：** Phase 5 开发者 Happy Path 全绿；否则 AI 层只会生成不可靠的配置。
 
@@ -396,4 +403,4 @@ Worker-only Agent：`user.enabled = false`，runtime 不启动 Chat UI。
 
 ---
 
-*文档版本：L1 主线 v2 — Phase 1–4 已完成；Phase 5 开发者 infra 为当前阶段。*
+*文档版本：L1 主线 v2.1 — Phase 1–5.5 已完成；Phase 6 Intent→Flow MVP 已落地。*

@@ -1,8 +1,8 @@
 # Electron 过渡壳冒烟验证（可选）
 
 > **维护模式 / 计划退役**：`fangyu-desktop` 为过渡方案。  
-> **推荐日常**：`dev.bat`（方隅·序）+ `dev-worker-tray.bat`（方隅·行）。  
-> 当 Worker 具备稳定原生安装包且团队 4+ 周不依赖 Electron 后，将移除本包。
+> **推荐日常**：`dev.bat`（方隅·序）+ `install-worker.bat` / `dev-worker-tray.bat`（方隅·行）。  
+> 退役门槛与勾选表见 **[扔 Electron 检查清单](ELECTRON_RETIREMENT.md)**。
 
 ## 结构
 

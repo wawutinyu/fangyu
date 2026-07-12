@@ -132,6 +132,7 @@ class AgentBus:
     def send_message(self, target_agent: str, message: dict, task_id: str = "", **metadata) -> dict:
         tid = task_id or uuid.uuid4().hex[:12]
         now = time.time()
+        skill_id = (message.get("metadata") or {}).get("skill_id", "")
         task = {
             "id": tid,
             "status": {"state": "submitted", "message": "", "updatedAt": now},
@@ -140,6 +141,18 @@ class AgentBus:
         }
         with _task_lock:
             _tasks[tid] = task
+
+        try:
+            from fangyu.core.collaboration import emit_event
+            emit_event(
+                "a2a.send",
+                actor=str(metadata.get("from_agent") or metadata.get("source") or "user"),
+                target=target_agent,
+                message=f"→ {target_agent}" + (f" / {skill_id}" if skill_id else ""),
+                detail={"task_id": tid, "skill_id": skill_id, **{k: metadata[k] for k in metadata if k in ("pipeline_id", "step_index")}},
+            )
+        except Exception:
+            pass
 
         try:
             task["status"] = {"state": "working", "message": "", "updatedAt": time.time()}
@@ -152,6 +165,17 @@ class AgentBus:
                     task["artifact"] = result["artifact"]
                 elif result.get("output") is not None:
                     task["artifact"] = {"output": result["output"]}
+            try:
+                from fangyu.core.collaboration import emit_event
+                emit_event(
+                    "a2a.complete",
+                    actor=target_agent,
+                    target=target_agent,
+                    message=f"{target_agent} 完成" + (f" ({skill_id})" if skill_id else ""),
+                    detail={"task_id": tid, "skill_id": skill_id},
+                )
+            except Exception:
+                pass
         except Exception as e:
             from ..core.constitution import ConstitutionViolation, audit_event, violation_to_dict
             from .trust_runtime import TrustViolation
@@ -162,6 +186,18 @@ class AgentBus:
                     {"agent": target_agent, "error": str(e), **getattr(e, "context", {})},
                 )
             task["status"] = {"state": "failed", "message": str(e), "updatedAt": time.time()}
+            try:
+                from fangyu.core.collaboration import emit_event
+                emit_event(
+                    "a2a.failed",
+                    actor=target_agent,
+                    target=target_agent,
+                    message=str(e),
+                    detail={"task_id": tid, "skill_id": skill_id},
+                    severity="error",
+                )
+            except Exception:
+                pass
 
         with _task_lock:
             _tasks[tid] = task

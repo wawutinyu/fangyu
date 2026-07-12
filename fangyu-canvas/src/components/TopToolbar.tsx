@@ -63,6 +63,7 @@ interface Props {
   onOpenSettings: () => void
   onLoadDemo: (demoId: string) => void
   onOpenAssets: () => void
+  onOpenIntent?: () => void
   simulating?: boolean
   dispatching?: boolean
   workersOnline?: number
@@ -138,6 +139,15 @@ export default function TopToolbar(props: Props) {
           导出
         </Btn>
         <DemoMenu groups={GROUPED_DEMOS} count={DEMO_COUNT} onSelect={props.onLoadDemo} />
+        {props.onOpenIntent && (
+          <Btn onClick={props.onOpenIntent} title="自然语言 → 生成 Flow（Phase 6）">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 2a7 7 0 0 1 7 7c0 2.4-1.2 4.5-3 5.7V17H8v-2.3C6.2 13.5 5 11.4 5 9a7 7 0 0 1 7-7z"/>
+              <line x1="9" y1="21" x2="15" y2="21"/>
+            </svg>
+            意图生成
+          </Btn>
+        )}
         <Btn onClick={props.onOpenAssets} title="打开资产库（官方模板 + 我的流程）">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
           资产库

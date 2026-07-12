@@ -8,3 +8,12 @@ export type {
   DispatchTaskInput,
   DispatchTaskResult,
 } from './worker'
+export type {
+  PresenceKind,
+  PresenceStatus,
+  PresenceEntity,
+  CollaborationSeverity,
+  CollaborationEvent,
+  CollaborationEdge,
+  PresenceSnapshot,
+} from './presence'

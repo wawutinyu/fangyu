@@ -118,6 +118,11 @@ def audit_event(event_type: str, details: dict | None = None) -> None:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     except OSError:
         pass
+    try:
+        from .collaboration import fanout_audit
+        fanout_audit(event_type, details)
+    except Exception:
+        pass
 
 
 def verify_audit_chain(limit: int = 200) -> dict[str, Any]:

@@ -46,13 +46,25 @@ def register_worker(
     capabilities: list[str] | None = None,
     worker_id: str | None = None,
 ) -> dict[str, Any]:
-    return upsert_worker(
+    worker = upsert_worker(
         name=name,
         hostname=hostname,
         os_name=os_name,
         capabilities=capabilities or ["shell", "run_flow", "read_file", "write_file", "adapter_invoke"],
         worker_id=worker_id,
     )
+    try:
+        from .collaboration import emit_event
+        emit_event(
+            "worker.register",
+            actor=worker.get("name") or worker.get("id", ""),
+            target=worker.get("id"),
+            message=f"Worker 上线: {worker.get('name')}",
+            detail={"worker_id": worker.get("id"), "hostname": hostname, "os": os_name},
+        )
+    except Exception:
+        pass
+    return worker
 
 
 def heartbeat(worker_id: str) -> dict[str, Any] | None:
@@ -94,13 +106,37 @@ def enqueue_task(
         payload=payload,
         worker_id=worker_id,
     )
+    try:
+        from .collaboration import emit_event
+        emit_event(
+            "worker.task_enqueued",
+            actor=worker_name or worker_id or "dispatcher",
+            target=worker_id,
+            message=f"派发 {task_type}",
+            detail={"task_id": task_id, "type": task_type},
+        )
+    except Exception:
+        pass
     return task
 
 
 def poll_task(worker_id: str) -> dict[str, Any] | None:
     if not get_worker_db(worker_id):
         return None
-    return poll_task_db(worker_id)
+    task = poll_task_db(worker_id)
+    if task:
+        try:
+            from .collaboration import emit_event
+            emit_event(
+                "worker.task_started",
+                actor=worker_id,
+                target=task.get("id"),
+                message=f"开始 {task.get('type')}",
+                detail={"task_id": task.get("id"), "type": task.get("type")},
+            )
+        except Exception:
+            pass
+    return task
 
 
 def complete_task(
@@ -111,13 +147,27 @@ def complete_task(
     result: dict[str, Any] | None = None,
     error: str | None = None,
 ) -> dict[str, Any] | None:
-    return complete_task_db(
+    task = complete_task_db(
         task_id,
         worker_id=worker_id,
         status=status,
         result=result,
         error=error,
     )
+    if task:
+        try:
+            from .collaboration import emit_event
+            emit_event(
+                "worker.task_done" if status == "done" else "worker.task_failed",
+                actor=worker_id,
+                target=task_id,
+                message=error or f"{task.get('type')} → {status}",
+                detail={"task_id": task_id, "type": task.get("type"), "status": status},
+                severity="error" if status == "failed" else "info",
+            )
+        except Exception:
+            pass
+    return task
 
 
 def get_task(task_id: str) -> dict[str, Any] | None:
@@ -149,6 +199,19 @@ def append_task_event(
         return False
 
     log_event(task_id, event_type, message, detail)
+
+    try:
+        from .collaboration import emit_event
+        emit_event(
+            f"worker.{event_type}",
+            actor=worker_id,
+            target=task_id,
+            message=message or event_type,
+            detail={"task_id": task_id, "event_type": event_type, **(detail or {})},
+            severity="deny" if event_type in ("shell_blocked", "shell_denied") else "info",
+        )
+    except Exception:
+        pass
 
     if event_type in ("shell_blocked", "shell_denied"):
         try:

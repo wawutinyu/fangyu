@@ -2,8 +2,8 @@
 
 **序** — 编排、治理、发布。Web 管理与设计台，加载 [fangyu-canvas](../fangyu-canvas) 画布。
 
-> 执行与真干活在 **方隅·行**（`fangyu-worker`，原生 App，开发中）。  
-> 当前桌面过渡壳见 [fangyu-desktop](../fangyu-desktop)。
+> 真干活在 **方隅·行**（[`fangyu-worker`](../fangyu-worker)）：`install-worker.bat` / `dev-worker-tray.bat`。  
+> Electron 过渡壳 [`fangyu-desktop`](../fangyu-desktop) 计划退役 — [检查清单](../docs/ELECTRON_RETIREMENT.md)。
 
 ## 启动
 
@@ -29,7 +29,8 @@ npm run dev
 ## 工程结构
 
 ```
-fangyu-canvas/   ← 共享画布（序 为主）
+fangyu-canvas/   ← 共享画布
 fangyu-studio/   ← 本包：方隅·序
-fangyu-desktop/  ← 方隅·行 过渡（Electron）
+fangyu-worker/   ← 方隅·行（真执行）
+fangyu-desktop/  ← Electron 过渡（计划退役）
 ```

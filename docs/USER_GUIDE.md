@@ -2,7 +2,13 @@
 
 > 面向**零编程经验**用户。按顺序阅读即可完成：安装 → 画布编排 → 导出 Agent → 独立运行 → 接入外部 Agent → 产线 Demo。
 
-技术细节请参阅 [L1 路线图](L1_ROADMAP.md)、[Adapter 开发指南](ADAPTER_DEV_GUIDE.md)。
+**日常入口（推荐）：**
+- **方隅·序**（设计）：仓库根目录 `dev.bat` → http://localhost:5173  
+- **方隅·行**（本机执行）：`install-worker.bat`（首次）或 `dev-worker-tray.bat`  
+- **方隅·观**（协作现场）：序顶栏「方隅·观」— Presence + 时间线 + 协作边  
+- **方隅·律**（宪法审计）：序顶栏「方隅·律」— 规则、白话解释、审计链  
+
+技术细节请参阅 [L1 路线图](L1_ROADMAP.md)、[Adapter 开发指南](ADAPTER_DEV_GUIDE.md)、[愿景·四门两包](VISION_AND_PRODUCT.md)、[扔 Electron 检查清单](ELECTRON_RETIREMENT.md)。
 
 ---
 
@@ -386,11 +392,12 @@ curl -X POST http://127.0.0.1:9001/rpc -H "Content-Type: application/json" -d "{
 
 | 文档 | 适合谁 |
 |------|--------|
+| [VISION_AND_PRODUCT.md](VISION_AND_PRODUCT.md) | 愿景与四门两包（序/行/观/律） |
 | [L1_ROADMAP.md](L1_ROADMAP.md) | 了解产品方向与技术阶段 |
-| [VISION_AND_PRODUCT.md](VISION_AND_PRODUCT.md) | 愿景与四条产品主线 |
 | [A2A_REMOTE.md](A2A_REMOTE.md) | 跨机器 RPC 调用 |
 | [ADAPTER_DEV_GUIDE.md](ADAPTER_DEV_GUIDE.md) | 开发 MQTT/OPC-UA 等 Adapter 插件 |
-| [ELECTRON_SMOKE.md](ELECTRON_SMOKE.md) | 桌面版 Electron |
+| [ELECTRON_RETIREMENT.md](ELECTRON_RETIREMENT.md) | 何时可删掉 Electron 过渡壳 |
+| [ELECTRON_SMOKE.md](ELECTRON_SMOKE.md) | Electron 过渡壳冒烟（附录，可选） |
 
 ---
 

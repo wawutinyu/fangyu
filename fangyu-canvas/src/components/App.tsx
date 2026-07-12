@@ -13,6 +13,9 @@ import BottomPanel from './BottomPanel'
 import SaveHistory from './SaveHistory'
 import SettingsPanel from './SettingsPanel'
 import AssetLibrary from './AssetLibrary'
+import IntentPanel from './IntentPanel'
+import PresencePanel from './PresencePanel'
+import LawPanel from './LawPanel'
 import { AssetContext, type AgentBindTarget } from '../context/AssetContext'
 import { store } from '../store'
 import { useAppSelector } from '../store/hooks'
@@ -61,7 +64,7 @@ export default function App() {
   const [exportDialogVisible, setExportDialogVisible] = useState(false)
   const [exportNodes, setExportNodes] = useState<any[]>([])
   const [exportEdges, setExportEdges] = useState<any[]>([])
-  const [view, setView] = useState<'flow' | 'agent'>('flow')
+  const [view, setView] = useState<'flow' | 'agent' | 'presence' | 'law'>('flow')
   const [libraryCollapsed, setLibraryCollapsed] = useState(false)
   const [simulating, setSimulating] = useState(false)
   const [dispatching, setDispatching] = useState(false)
@@ -73,6 +76,7 @@ export default function App() {
   const [assetsFocusSignal, setAssetsFocusSignal] = useState(0)
   const [workersFocusSignal, setWorkersFocusSignal] = useState(0)
   const [highlightWorkerTaskId, setHighlightWorkerTaskId] = useState<string | null>(null)
+  const [intentPanelOpen, setIntentPanelOpen] = useState(false)
   const [agentBindTarget, setAgentBindTarget] = useState<AgentBindTarget | null>(null)
   const [agentAssetPickerOpen, setAgentAssetPickerOpen] = useState(false)
 
@@ -141,7 +145,7 @@ export default function App() {
     fetchAllProjects(store.dispatch)
     const onSwitchView = (e: Event) => {
       const view = (e as CustomEvent).detail?.view
-      if (view === 'flow' || view === 'agent') setView(view)
+      if (view === 'flow' || view === 'agent' || view === 'presence' || view === 'law') setView(view)
     }
     window.addEventListener('fangyu:switch-view', onSwitchView)
     // 首次加载时，如果画布为空则添加默认输入节点
@@ -433,8 +437,32 @@ export default function App() {
           padding: '3px 12px', border: 'none', borderRadius: '4px 4px 0 0',
           background: view === 'agent' ? 'var(--bg-primary)' : 'transparent',
           color: view === 'agent' ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: view === 'agent' ? 600 : 400,
-          cursor: 'pointer', fontSize: 12,
+          cursor: 'pointer', fontSize: 12, marginRight: 1,
         }}>Agent 编排</button>
+        <button
+          onClick={() => setView('presence')}
+          data-testid="nav-presence"
+          title="方隅·观 — 多 Agent 协作现场"
+          style={{
+            padding: '3px 12px', border: 'none', borderRadius: '4px 4px 0 0',
+            background: view === 'presence' ? 'var(--bg-primary)' : 'transparent',
+            color: view === 'presence' ? 'var(--text-primary)' : 'var(--text-muted)',
+            fontWeight: view === 'presence' ? 600 : 400,
+            cursor: 'pointer', fontSize: 12, marginRight: 1,
+          }}
+        >方隅·观</button>
+        <button
+          onClick={() => setView('law')}
+          data-testid="nav-law"
+          title="方隅·律 — 宪法与审计"
+          style={{
+            padding: '3px 12px', border: 'none', borderRadius: '4px 4px 0 0',
+            background: view === 'law' ? 'var(--bg-primary)' : 'transparent',
+            color: view === 'law' ? 'var(--text-primary)' : 'var(--text-muted)',
+            fontWeight: view === 'law' ? 600 : 400,
+            cursor: 'pointer', fontSize: 12,
+          }}
+        >方隅·律</button>
         <div style={{ flex: 1 }} />
         <button onClick={() => setDark(d => !d)} style={{
           padding: '3px 10px', border: 'none', borderRadius: 4, cursor: 'pointer',
@@ -459,6 +487,7 @@ export default function App() {
         onOpenSettings={handleOpenSettings}
         onOpenFlowConfig={() => store.dispatch(openFlowConfig())}
         onLoadDemo={handleLoadDemo}
+        onOpenIntent={() => setIntentPanelOpen(true)}
         onBatchTest={() => setBatchVisible(true)}
         onOpenAssets={() => setAssetsFocusSignal(s => s + 1)}
         simulating={simulating}
@@ -494,6 +523,16 @@ export default function App() {
           />
         </div>
       </div>
+      <IntentPanel
+        open={intentPanelOpen}
+        onClose={() => setIntentPanelOpen(false)}
+        onApply={(flow) => {
+          flowCanvasRef.current?.importFlow(flow)
+        }}
+        onApplyAgents={(graph) => {
+          loadAgentsToCanvas(graph)
+        }}
+      />
       <SaveHistory
         onRestore={handleRestore}
         selectedWorkerId={selectedWorkerId}
@@ -533,6 +572,12 @@ export default function App() {
       <div style={{ display: view === 'agent' ? 'flex' : 'none', flex: 1, overflow: 'hidden' }} data-testid="agent-canvas">
         <AgentCanvas />
         <AgentConfigPanel />
+      </div>
+      <div style={{ display: view === 'presence' ? 'flex' : 'none', flex: 1, overflow: 'hidden' }}>
+        <PresencePanel />
+      </div>
+      <div style={{ display: view === 'law' ? 'flex' : 'none', flex: 1, overflow: 'hidden' }}>
+        <LawPanel />
       </div>
       {exportDialogVisible && (
         <ExportDialog
