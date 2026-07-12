@@ -82,7 +82,7 @@ Flow/Agent 画布 → 导出 Bundle → run-bundle (daemon) → 本地/跨机 A2
 ```mermaid
 sequenceDiagram
     participant Dev as 开发者
-    participant UI as fangyu-flow
+    participant UI as fangyu-studio
     participant API as bundle/export
     participant B1 as Bundle A (caller)
     participant B2 as Bundle B (worker)
@@ -219,9 +219,9 @@ __main__.py            # 路由到 bundle_cli
 | `routers/a2a.py` | discover 增强 |
 | `scripts/happy_path_demo.py` | **新** — E2E 演示 |
 | `__main__.py` | bundle 子命令路由 |
-| `fangyu-flow/.../exportAgentBundle.ts` | Runbook 类型 |
-| `fangyu-flow/.../AgentCanvas.tsx` | 导出后指引面板 |
-| `fangyu-flow/.../AgentConfigPanel.tsx` | discover 自动填身份 |
+| `fangyu-canvas/.../exportAgentBundle.ts` | Runbook 类型 |
+| `fangyu-canvas/.../AgentCanvas.tsx` | 导出后指引面板 |
+| `fangyu-canvas/.../AgentConfigPanel.tsx` | discover 自动填身份 |
 | `tests/integration/test_happy_path.py` | **新** |
 | `tests/unit/test_bundle_cli.py` | **新** |
 

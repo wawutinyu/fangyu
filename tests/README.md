@@ -4,9 +4,8 @@
 tests/
 ├── unit/            # Python 单元测试（pytest，无需启动服务）
 ├── integration/     # Python 集成测试（需启动 API 服务）
-└── (fangyu-flow/)   # 前端测试
-    ├── src/**/__tests__/   # Vitest 单元测试
-    └── e2e/                # Playwright E2E
+├── fangyu-canvas/   # Vitest 单元测试
+└── fangyu-studio/   # Playwright E2E（方隅·序）
 ```
 
 ## 运行
@@ -26,7 +25,7 @@ py tests/integration/check_all_features_api.py
 # 全部 Python 测试
 py -m pytest tests/ -v
 
-# 前端
-cd fangyu-flow && npm test
-cd fangyu-flow && npm run test:e2e
+# 前端（项目根目录 npm install 一次）
+npm run test -w fangyu-canvas          # 或 npm run test:fast -w fangyu-canvas
+npm run test:e2e -w fangyu-studio
 ```

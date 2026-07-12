@@ -25,6 +25,8 @@ from .routers import trust as trust_router
 from .routers import constitution as constitution_router
 from .routers import bundle as bundle_router
 from .routers import adapters as adapters_router
+from .routers import assets as assets_router
+from .routers import workers as workers_router
 
 
 @asynccontextmanager
@@ -32,6 +34,12 @@ async def lifespan(app: FastAPI):
     await init_db()
     from .engine.mcp import _init_internal_tools
     await _init_internal_tools()
+    from .models.database import async_session
+    from .core.asset_seed import maintain_asset_library
+    from .core.worker_store import init_store
+    init_store()
+    async with async_session() as session:
+        await maintain_asset_library(session)
     yield
 
 
@@ -70,6 +78,8 @@ app.include_router(trust_router.router)
 app.include_router(constitution_router.router)
 app.include_router(bundle_router.router)
 app.include_router(adapters_router.router)
+app.include_router(assets_router.router)
+app.include_router(workers_router.router)
 
 
 @app.get("/api/health")

@@ -46,11 +46,18 @@ async def _inject_settings(global_vars: dict, db: AsyncSession) -> dict:
     return global_vars
 
 
+async def _prepare_global_vars(raw: dict, db: AsyncSession) -> dict:
+    from fangyu.engine.flow_prompts import inject_canvas_prompts
+
+    global_vars = await _inject_settings(dict(raw or {}), db)
+    return inject_canvas_prompts(global_vars)
+
+
 @router.post("/run")
 async def run_flow_endpoint(body: RunFlowBody, db: AsyncSession = Depends(get_session)):
     from ..models.execution_log import ExecutionLog
 
-    global_vars = await _inject_settings(body.global_vars, db)
+    global_vars = await _prepare_global_vars(body.global_vars, db)
     result = await run_flow(
         nodes=body.nodes,
         edges=body.edges,
@@ -100,7 +107,7 @@ async def run_flow_stream(body: RunFlowBody, db: AsyncSession = Depends(get_sess
         await event_queue.put({"type": evt_type, **data})
 
     async def event_generator():
-        global_vars = await _inject_settings(body.global_vars, db)
+        global_vars = await _prepare_global_vars(body.global_vars, db)
         task = asyncio.create_task(
             run_flow(
                 nodes=body.nodes,

@@ -366,7 +366,7 @@ Worker-only Agent：`user.enabled = false`，runtime 不启动 Chat UI。
 
 | 新能力 | 主要改动位置 |
 |--------|--------------|
-| Bundle 导出 | `fangyu-flow/src/utils/exportAgentBundle.ts`（新） |
+| Bundle 导出 | `fangyu-canvas/src/utils/exportAgentBundle.ts`（新） |
 | Bundle 运行 | `fangyu/__main__.py` 增 `run-bundle`；`engine/agent_runtime.py`（新） |
 | 身份签发 | `a2a/trust/identity.py`、`routers/trust.py` |
 | 加密通信 | `a2a/trust/envelope.py`（已有，扩到全链路） |

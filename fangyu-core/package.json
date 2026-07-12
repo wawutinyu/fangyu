@@ -1,0 +1,22 @@
+{
+  "name": "@fangyu/core",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "fangyu 共享内核 — 类型、Schema、API 客户端、平台能力契约（Web / 原生桌面共用）",
+  "exports": {
+    ".": "./src/index.ts",
+    "./platform": "./src/platform/index.ts",
+    "./schema": "./src/schema/index.ts",
+    "./api": "./src/api/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "vitest": "^4.1.9"
+  }
+}

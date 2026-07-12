@@ -1,0 +1,33 @@
+{
+  "name": "fangyu-studio",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "方隅·序 — 编排、治理、发布（Web 管理与设计台）",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:desktop": "cross-env ELECTRON=1 vite build",
+    "preview": "vite preview",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint src"
+  },
+  "dependencies": {
+    "fangyu-canvas": "file:../fangyu-canvas",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-redux": "^9.2.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "cross-env": "^7.0.3",
+    "oxlint": "^1.69.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.0"
+  }
+}

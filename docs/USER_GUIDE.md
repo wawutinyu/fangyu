@@ -56,7 +56,7 @@ cd C:\Users\你\Desktop\fangyu
 
 1. 安装 Python 依赖
 2. 启动后端 API（端口 **8000**）
-3. 启动前端画布（端口 **5173**）
+3. 启动 **方隅·序** `fangyu-studio`（端口 **5173**）
 
 ### 3.3 打开界面
 
@@ -64,10 +64,10 @@ cd C:\Users\你\Desktop\fangyu
 
 | 地址 | 用途 |
 |------|------|
-| http://localhost:5173 | 可视化画布（主要操作界面） |
+| http://localhost:5173 | 方隅·序 — 可视化设计台 |
 | http://localhost:8000/docs | API 文档（进阶用户） |
 
-> 若 5173 打不开，检查 `dev.bat` 弹出的两个命令行窗口是否报错；前端首次需 `npm install`，可手动执行：`cd fangyu-flow && npm install && npm run dev`。
+> 若 5173 打不开或界面是旧版「fangyu — AI Flow Canvas」，先运行 **`dev-clean.bat`** 再 **`dev.bat`**。
 
 ### 3.4 手动启动（可选）
 
@@ -77,8 +77,8 @@ cd fangyu
 py -m pip install -e .
 py -m fangyu --server
 
-# 终端 2 — 前端
-cd fangyu-flow
+# 终端 2 — 前端（项目根目录）
+cd fangyu
 npm install
 npm run dev
 ```

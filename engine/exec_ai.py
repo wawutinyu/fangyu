@@ -13,8 +13,23 @@ from .variable import variable_get as var_get, variable_set as var_set
 
 
 async def _exec_llm(ctx: NodeContext) -> dict[str, Any]:
-    prompt = _smart_template(ctx.config.get("prompt", ""), ctx.all_outputs, ctx.inputs, ctx.external_inputs, ctx.global_vars)
-    system_prompt = _smart_template(ctx.config.get("system_prompt", ""), ctx.all_outputs, ctx.inputs, ctx.external_inputs, ctx.global_vars)
+    cfg_prompt = ctx.config.get("prompt", "")
+    cfg_system = ctx.config.get("system_prompt", "")
+    global_system = str(ctx.global_vars.get("_global_system_prompt") or "")
+    global_user_tpl = str(ctx.global_vars.get("_global_user_template") or "")
+
+    if cfg_system and global_system:
+        raw_system = f"{global_system}\n\n{cfg_system}"
+    else:
+        raw_system = cfg_system or global_system
+
+    raw_prompt = cfg_prompt or global_user_tpl
+
+    prompt = _smart_template(raw_prompt, ctx.all_outputs, ctx.inputs, ctx.external_inputs, ctx.global_vars)
+    system_prompt = _smart_template(raw_system, ctx.all_outputs, ctx.inputs, ctx.external_inputs, ctx.global_vars)
+    global_context = str(ctx.global_vars.get("_global_context") or "")
+    if global_context and "{{" not in prompt:
+        prompt = f"{global_context}\n\n{prompt}" if prompt else global_context
     model = ctx.config.get("model", "gpt-4o")
     user_content = prompt or ctx.inputs.get("input") or ""
 

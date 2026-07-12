@@ -1,0 +1,1057 @@
+{
+  "assets": [
+    {
+      "id": "official_agent_openclaw",
+      "type": "agent_topology",
+      "name": "OpenClaw Gateway",
+      "description": "本地优先个人助手：持久记忆、A2A 网关、工具调用、技能学习与定时巡检（映射 OpenClaw 核心循环）",
+      "category": "种子 Agent",
+      "tags": [
+        "官方",
+        "openclaw",
+        "gateway",
+        "memory"
+      ],
+      "source_ref": "official:official_agent_openclaw",
+      "version": "1",
+      "payload": {
+        "nodes": [
+          {
+            "id": "seed_openclaw",
+            "label": "OpenClaw 网关",
+            "type": "a2a-agent",
+            "agentKind": "hybrid",
+            "position": {
+              "x": 120,
+              "y": 160
+            },
+            "agentCard": {
+              "name": "OpenClaw Gateway",
+              "description": "本地优先个人助手：持久记忆、A2A 网关、工具调用、技能学习与定时巡检（映射 OpenClaw 核心循环）",
+              "version": "1.0.0",
+              "capabilities": {
+                "streaming": true,
+                "pushNotifications": true
+              },
+              "skills": [
+                {
+                  "id": "assistant",
+                  "name": "日常助手",
+                  "description": "读取记忆 → 推理 → 调用工具 → 写回记忆",
+                  "tags": [
+                    "chat",
+                    "memory",
+                    "tools"
+                  ]
+                },
+                {
+                  "id": "heartbeat",
+                  "name": "主动巡检",
+                  "description": "定时触发状态摘要与待办提醒",
+                  "tags": [
+                    "cron",
+                    "proactive"
+                  ]
+                },
+                {
+                  "id": "skill_manage",
+                  "name": "技能管理",
+                  "description": "从对话中学习并注册可复用技能",
+                  "tags": [
+                    "skills"
+                  ]
+                }
+              ],
+              "defaultInterface": {
+                "type": "in-memory"
+              },
+              "metadata": {
+                "seed": "openclaw",
+                "reference": "https://openclaw.ai",
+                "channels": [
+                  "webchat",
+                  "a2a"
+                ],
+                "agentKind": "hybrid",
+                "workerOnly": false
+              },
+              "interfaces": {
+                "user": {
+                  "enabled": true
+                },
+                "a2a": {
+                  "enabled": true
+                }
+              }
+            },
+            "trust": {
+              "enabled": true,
+              "algorithm": "Ed25519",
+              "anchorSource": "auto",
+              "policies": [],
+              "revocationList": [],
+              "auditEnabled": true,
+              "auditPath": "./audit.log"
+            },
+            "skillFlows": {
+              "assistant": {
+                "nodes": [
+                  {
+                    "id": "s",
+                    "data": {
+                      "originType": "start",
+                      "label": "start",
+                      "config": {}
+                    }
+                  },
+                  {
+                    "id": "mem_r",
+                    "data": {
+                      "originType": "memory",
+                      "label": "读记忆",
+                      "config": {
+                        "operation": "search",
+                        "scope": "user",
+                        "limit": 8
+                      }
+                    }
+                  },
+                  {
+                    "id": "llm",
+                    "data": {
+                      "originType": "llm",
+                      "label": "推理",
+                      "config": {
+                        "model": "deepseek-v4-flash",
+                        "system_prompt": "你是 OpenClaw 风格本地助手。结合用户记忆与上下文作答；需要实时信息时说明将调用工具。",
+                        "temperature": 0.5,
+                        "max_tokens": 2048,
+                        "auto_inject_memory": true
+                      }
+                    }
+                  },
+                  {
+                    "id": "tool",
+                    "data": {
+                      "originType": "tool-call",
+                      "label": "工具",
+                      "config": {
+                        "tool_name": "web_search",
+                        "args": "{\"query\":\"{{input}}\"}"
+                      }
+                    }
+                  },
+                  {
+                    "id": "mem_w",
+                    "data": {
+                      "originType": "memory",
+                      "label": "写记忆",
+                      "config": {
+                        "operation": "extract",
+                        "scope": "user",
+                        "max_facts": 3
+                      }
+                    }
+                  },
+                  {
+                    "id": "o",
+                    "data": {
+                      "originType": "output",
+                      "label": "output",
+                      "config": {}
+                    }
+                  }
+                ],
+                "edges": [
+                  {
+                    "id": "e_s_mem_r",
+                    "source": "s",
+                    "target": "mem_r",
+                    "data": {}
+                  },
+                  {
+                    "id": "e_mem_r_llm",
+                    "source": "mem_r",
+                    "target": "llm",
+                    "data": {}
+                  },
+                  {
+                    "id": "e_llm_tool",
+                    "source": "llm",
+                    "target": "tool",
+                    "data": {}
+                  },
+                  {
+                    "id": "e_tool_mem_w",
+                    "source": "tool",
+                    "target": "mem_w",
+                    "data": {}
+                  },
+                  {
+                    "id": "e_mem_w_o",
+                    "source": "mem_w",
+                    "target": "o",
+                    "data": {}
+                  }
+                ]
+              },
+              "heartbeat": {
+                "nodes": [
+                  {
+                    "id": "s",
+                    "data": {
+                      "originType": "start",
+                      "label": "start",
+                      "config": {}
+                    }
+                  },
+                  {
+                    "id": "tr",
+                    "data": {
+                      "originType": "trigger",
+                      "label": "定时触发",
+                      "config": {}
+                    }
+                  },
+                  {
+                    "id": "llm",
+                    "data": {
+                      "originType": "llm",
+                      "label": "巡检摘要",
+                      "config": {
+                        "model": "deepseek-v4-flash",
+                        "system_prompt": "生成简短巡检摘要：系统状态、待办、需要用户确认的事项。3-5 条 bullet。",
+                        "temperature": 0.3,
+                        "max_tokens": 512
+                      }
+                    }
+                  },
+                  {
+                    "id": "o",
+                    "data": {
+                      "originType": "output",
+                      "label": "output",
+                      "config": {}
+                    }
+                  }
+                ],
+                "edges": [
+                  {
+                    "id": "e_s_tr",
+                    "source": "s",
+                    "target": "tr",
+                    "data": {}
+                  },
+                  {
+                    "id": "e_tr_llm",
+                    "source": "tr",
+                    "target": "llm",
+                    "data": {}
+                  },
+                  {
+                    "id": "e_llm_o",
+                    "source": "llm",
+                    "target": "o",
+                    "data": {}
+                  }
+                ]
+              },
+              "skill_manage": {
+                "nodes": [
+                  {
+                    "id": "s",
+                    "data": {
+                      "originType": "start",
+                      "label": "start",
+                      "config": {}
+                    }
+                  },
+                  {
+                    "id": "llm",
+                    "data": {
+                      "originType": "llm",
+                      "label": "提炼技能",
+                      "config": {
+                        "model": "deepseek-v4-flash",
+                        "system_prompt": "若对话包含可复用工作流，输出 skill 定义（name/description/steps）。否则回复 NO_SKILL。",
+                        "temperature": 0.2,
+                        "max_tokens": 1024
+                      }
+                    }
+                  },
+                  {
+                    "id": "learn",
+                    "data": {
+                      "originType": "learn-skill",
+                      "label": "学习技能",
+                      "config": {}
+                    }
+                  },
+                  {
+                    "id": "list",
+                    "data": {
+                      "originType": "tool-call",
+                      "label": "列出技能",
+                      "config": {
+                        "tool_name": "skill_list",
+                        "args": "{}"
+                      }
+                    }
+                  },
+                  {
+                    "id": "o",
+                    "data": {
+                      "originType": "output",
+                      "label": "output",
+                      "config": {}
+                    }
+                  }
+                ],
+                "edges": [
+                  {
+                    "id": "e_s_llm",
+                    "source": "s",
+                    "target": "llm",
+                    "data": {}
+                  },
+                  {
+                    "id": "e_llm_learn",
+                    "source": "llm",
+                    "target": "learn",
+                    "data": {}
+                  },
+                  {
+                    "id": "e_learn_list",
+                    "source": "learn",
+                    "target": "list",
+                    "data": {}
+                  },
+                  {
+                    "id": "e_list_o",
+                    "source": "list",
+                    "target": "o",
+                    "data": {}
+                  }
+                ]
+              }
+            },
+            "timeout": 120000,
+            "retryCount": 1,
+            "lifecycle": "sync",
+            "pushNotificationUrl": "",
+            "tenantId": "",
+            "extensions": {}
+          }
+        ],
+        "edges": []
+      }
+    },
+    {
+      "id": "official_agent_hermes",
+      "type": "agent_topology",
+      "name": "Hermes Developer",
+      "description": "软件工程 Agent：规划 → 终端/文件工具 → 代码执行 → 技能沉淀（映射 Hermes 核心开发循环）",
+      "category": "种子 Agent",
+      "tags": [
+        "官方",
+        "hermes",
+        "coding",
+        "terminal"
+      ],
+      "source_ref": "official:official_agent_hermes",
+      "version": "1",
+      "payload": {
+        "nodes": [
+          {
+            "id": "seed_hermes",
+            "label": "Hermes 开发",
+            "type": "a2a-agent",
+            "agentKind": "worker",
+            "position": {
+              "x": 120,
+              "y": 200
+            },
+            "agentCard": {
+              "name": "Hermes Developer",
+              "description": "软件工程 Agent：规划 → 终端/文件工具 → 代码执行 → 技能沉淀（映射 Hermes 核心开发循环）",
+              "version": "1.0.0",
+              "capabilities": {
+                "streaming": false,
+                "pushNotifications": false
+              },
+              "skills": [
+                {
+                  "id": "code_task",
+                  "name": "编码任务",
+                  "description": "LLM 规划 → shell/文件工具 → 验证",
+                  "tags": [
+                    "terminal",
+                    "files",
+                    "code"
+                  ]
+                },
+                {
+                  "id": "execute_code",
+                  "name": "代码编排",
+                  "description": "多步工具编排，减少上下文膨胀",
+                  "tags": [
+                    "rpc",
+                    "tools"
+                  ]
+                },
+                {
+                  "id": "delegate",
+                  "name": "子任务委派",
+                  "description": "拆分子任务并并行执行技能",
+                  "tags": [
+                    "subagent"
+                  ]
+                }
+              ],
+              "defaultInterface": {
+                "type": "in-memory"
+              },
+              "metadata": {
+                "seed": "hermes",
+                "reference": "https://hermes-agent.org",
+                "agentKind": "worker",
+                "workerOnly": true
+              },
+              "interfaces": {
+                "user": {
+                  "enabled": false
+                },
+                "a2a": {
+                  "enabled": true
+                }
+              }
+            },
+            "trust": {
+              "enabled": true,
+              "algorithm": "Ed25519",
+              "anchorSource": "auto",
+              "policies": [],
+              "revocationList": [],
+              "auditEnabled": true,
+              "auditPath": "./audit.log"
+            },
+            "skillFlows": {
+              "code_task": {
+                "nodes": [
+                  {
+                    "id": "s",
+                    "data": {
+                      "originType": "start",
+                      "label": "start",
+                      "config": {}
+                    }
+                  },
+                  {
+                    "id": "plan",
+                    "data": {
+                      "originType": "llm",
+                      "label": "规划",
+                      "config": {
+                        "model": "deepseek-v4-flash",
+                        "system_prompt": "你是 Hermes 风格开发 Agent。将任务拆为：读代码 → 改文件 → 跑命令 → 验证。输出 JSON：{\"steps\":[],\"shell\":\"\",\"files\":[]}",
+                        "temperature": 0.2,
+                        "max_tokens": 1024
+                      }
+                    }
+                  },
+                  {
+                    "id": "shell",
+                    "data": {
+                      "originType": "tool-call",
+                      "label": "终端",
+                      "config": {
+                        "tool_name": "shell_execution",
+                        "args": "{\"command\":\"echo plan received\"}"
+                      }
+                    }
+                  },
+                  {
+                    "id": "file",
+                    "data": {
+                      "originType": "tool-call",
+                      "label": "读文件",
+                      "config": {
+                        "tool_name": "file_operations",
+                        "args": "{\"action\":\"list\",\"path\":\".\"}"
+                      }
+                    }
+                  },
+                  {
+                    "id": "code",
+                    "data": {
+                      "originType": "code",
+                      "label": "整理结果",
+                      "config": {
+                        "code": "result = {'phase': 'act', 'status': 'ok', 'input': input}"
+                      }
+                    }
+                  },
+                  {
+                    "id": "verify",
+                    "data": {
+                      "originType": "execute-skill",
+                      "label": "验证",
+                      "config": {
+                        "skill_name": "greet"
+                      }
+                    }
+                  },
+                  {
+                    "id": "o",
+                    "data": {
+                      "originType": "output",
+                      "label": "output",
+                      "config": {}
+                    }
+                  }
+                ],
+                "edges": [
+                  {
+                    "id": "e_s_plan",
+                    "source": "s",
+                    "target": "plan",
+                    "data": {}
+                  },
+                  {
+                    "id": "e_plan_shell",
+                    "source": "plan",
+                    "target": "shell",
+                    "data": {}
+                  },
+                  {
+                    "id": "e_shell_file",
+                    "source": "shell",
+                    "target": "file",
+                    "data": {}
+                  },
+                  {
+                    "id": "e_file_code",
+                    "source": "file",
+                    "target": "code",
+                    "data": {}
+                  },
+                  {
+                    "id": "e_code_verify",
+                    "source": "code",
+                    "target": "verify",
+                    "data": {}
+                  },
+                  {
+                    "id": "e_verify_o",
+                    "source": "verify",
+                    "target": "o",
+                    "data": {}
+                  }
+                ]
+              },
+              "execute_code": {
+                "nodes": [
+                  {
+                    "id": "s",
+                    "data": {
+                      "originType": "start",
+                      "config": {},
+                      "label": "start"
+                    }
+                  },
+                  {
+                    "id": "observe",
+                    "data": {
+                      "originType": "code",
+                      "label": "observe",
+                      "config": {
+                        "code": "goal = _input.get('query') or _input.get('message') or _input.get('goal') or 'complete task'\ntry:\n    files = ws_list('.')\nexcept NameError:\n    files = []\ntry:\n    state = ws_state()\nexcept NameError:\n    state = {}\nresult = {'phase': 'observe', 'goal': goal, 'files': files, 'state': state}\ntry:\n    ws_save_state({'observe': result, **(state or {})})\nexcept NameError:\n    pass"
+                      }
+                    }
+                  },
+                  {
+                    "id": "plan_llm",
+                    "data": {
+                      "originType": "llm",
+                      "label": "plan",
+                      "config": {
+                        "model": "deepseek-v4-flash",
+                        "temperature": 0.2,
+                        "max_tokens": 256,
+                        "system_prompt": "You are an action planner for a worker agent with a workspace. Reply with ONLY valid JSON, no markdown.",
+                        "prompt": "Goal: {{query}}\nObserve context: {{input}}\n\nIf result.txt already exists in workspace, choose verify_only; otherwise write_result.\nJSON format: {\"action\":\"write_result|verify_only\",\"goal\":\"<goal>\",\"reason\":\"<short>\"}"
+                      }
+                    }
+                  },
+                  {
+                    "id": "plan",
+                    "data": {
+                      "originType": "code",
+                      "label": "plan_parse",
+                      "config": {
+                        "code": "src = _input if isinstance(_input, dict) else {}\ntry:\n    obs = (ws_state() or {}).get('observe') or {}\nexcept NameError:\n    obs = {}\ngoal = obs.get('goal') or src.get('goal') or 'task'\nfiles = obs.get('files') or []\naction = 'write_result'\nif 'result.txt' in files:\n    action = 'verify_only'\nraw = src.get('result') or src.get('input') or ''\ntext = raw if isinstance(raw, str) else str(raw)\nif '{' in text:\n    try:\n        chunk = text[text.index('{'): text.rindex('}') + 1]\n        j = json.loads(chunk)\n        action = j.get('action', action)\n        goal = j.get('goal', goal)\n    except Exception:\n        pass\nresult = {'phase': 'plan', 'goal': goal, 'action': action, 'files': files, 'mode': 'llm'}"
+                      }
+                    }
+                  },
+                  {
+                    "id": "act",
+                    "data": {
+                      "originType": "code",
+                      "label": "act",
+                      "config": {
+                        "code": "src = _input if isinstance(_input, dict) else {}\naction = src.get('action') or (src.get('result') or {}).get('action') or ''\ngoal = src.get('goal') or (src.get('result') or {}).get('goal') or ''\ntry:\n    if action == 'write_result':\n        ws_write('result.txt', f'done: {goal}')\n        result = {'phase': 'act', 'acted': True, 'file': 'result.txt'}\n    else:\n        result = {'phase': 'act', 'acted': False, 'action': action}\nexcept NameError:\n    result = {'phase': 'act', 'acted': False, 'error': 'no workspace'}"
+                      }
+                    }
+                  },
+                  {
+                    "id": "verify",
+                    "data": {
+                      "originType": "code",
+                      "label": "verify",
+                      "config": {
+                        "code": "try:\n    files = ws_list('.')\nexcept NameError:\n    files = []\nok = 'result.txt' in files\nstatus = 'completed' if ok else 'pending'\ntry:\n    ws_save_state({'last_status': status, 'verified': ok})\nexcept NameError:\n    pass\nresult = {'phase': 'verify', 'verified': ok, 'status': status, 'files': files}"
+                      }
+                    }
+                  },
+                  {
+                    "id": "o",
+                    "data": {
+                      "originType": "output",
+                      "config": {},
+                      "label": "output"
+                    }
+                  }
+                ],
+                "edges": [
+                  {
+                    "id": "e1",
+                    "source": "s",
+                    "target": "observe",
+                    "data": {}
+                  },
+                  {
+                    "id": "e2",
+                    "source": "observe",
+                    "target": "plan_llm",
+                    "data": {}
+                  },
+                  {
+                    "id": "e3",
+                    "source": "plan_llm",
+                    "target": "plan",
+                    "data": {}
+                  },
+                  {
+                    "id": "e4",
+                    "source": "plan",
+                    "target": "act",
+                    "data": {}
+                  },
+                  {
+                    "id": "e5",
+                    "source": "act",
+                    "target": "verify",
+                    "data": {}
+                  },
+                  {
+                    "id": "e6",
+                    "source": "verify",
+                    "target": "o",
+                    "data": {}
+                  }
+                ],
+                "meta": {
+                  "skill_id": "execute_code",
+                  "kind": "action-loop",
+                  "name": "execute_code",
+                  "plan_mode": "llm"
+                }
+              },
+              "delegate": {
+                "nodes": [
+                  {
+                    "id": "s",
+                    "data": {
+                      "originType": "start",
+                      "label": "start",
+                      "config": {}
+                    }
+                  },
+                  {
+                    "id": "llm",
+                    "data": {
+                      "originType": "llm",
+                      "label": "拆分任务",
+                      "config": {
+                        "model": "deepseek-v4-flash",
+                        "system_prompt": "将复杂任务拆成最多 3 个可并行子任务，JSON 数组输出。",
+                        "temperature": 0.3,
+                        "max_tokens": 768
+                      }
+                    }
+                  },
+                  {
+                    "id": "mcp",
+                    "data": {
+                      "originType": "mcp-call",
+                      "label": "MCP 调用",
+                      "config": {
+                        "tool_name": "hello",
+                        "server": "__internal__"
+                      }
+                    }
+                  },
+                  {
+                    "id": "o",
+                    "data": {
+                      "originType": "output",
+                      "label": "output",
+                      "config": {}
+                    }
+                  }
+                ],
+                "edges": [
+                  {
+                    "id": "e_s_llm",
+                    "source": "s",
+                    "target": "llm",
+                    "data": {}
+                  },
+                  {
+                    "id": "e_llm_mcp",
+                    "source": "llm",
+                    "target": "mcp",
+                    "data": {}
+                  },
+                  {
+                    "id": "e_mcp_o",
+                    "source": "mcp",
+                    "target": "o",
+                    "data": {}
+                  }
+                ]
+              }
+            },
+            "timeout": 120000,
+            "retryCount": 1,
+            "lifecycle": "sync",
+            "pushNotificationUrl": "",
+            "tenantId": "",
+            "extensions": {}
+          }
+        ],
+        "edges": []
+      }
+    },
+    {
+      "id": "official_agent_opencode",
+      "type": "agent_topology",
+      "name": "OpenCode Terminal",
+      "description": "终端优先编码 Agent：build 全权限开发 / plan 只读分析（映射 OpenCode build & plan 模式）",
+      "category": "种子 Agent",
+      "tags": [
+        "官方",
+        "opencode",
+        "terminal",
+        "build",
+        "plan"
+      ],
+      "source_ref": "official:official_agent_opencode",
+      "version": "1",
+      "payload": {
+        "nodes": [
+          {
+            "id": "seed_opencode",
+            "label": "OpenCode 终端",
+            "type": "a2a-agent",
+            "agentKind": "hybrid",
+            "position": {
+              "x": 120,
+              "y": 240
+            },
+            "agentCard": {
+              "name": "OpenCode Terminal",
+              "description": "终端优先编码 Agent：build 全权限开发 / plan 只读分析（映射 OpenCode build & plan 模式）",
+              "version": "1.0.0",
+              "capabilities": {
+                "streaming": true,
+                "pushNotifications": false
+              },
+              "skills": [
+                {
+                  "id": "build",
+                  "name": "Build 模式",
+                  "description": "读写文件 + shell + 代码转换，完整开发权限",
+                  "tags": [
+                    "build",
+                    "write"
+                  ]
+                },
+                {
+                  "id": "plan",
+                  "name": "Plan 模式",
+                  "description": "只读分析代码库，输出变更计划",
+                  "tags": [
+                    "plan",
+                    "readonly"
+                  ]
+                },
+                {
+                  "id": "general",
+                  "name": "General 子代理",
+                  "description": "复杂搜索与多步推理",
+                  "tags": [
+                    "subagent"
+                  ]
+                }
+              ],
+              "defaultInterface": {
+                "type": "in-memory"
+              },
+              "metadata": {
+                "seed": "opencode",
+                "reference": "https://opencode.ai",
+                "agentKind": "hybrid",
+                "workerOnly": false
+              },
+              "interfaces": {
+                "user": {
+                  "enabled": true
+                },
+                "a2a": {
+                  "enabled": true
+                }
+              }
+            },
+            "trust": {
+              "enabled": true,
+              "algorithm": "Ed25519",
+              "anchorSource": "auto",
+              "policies": [],
+              "revocationList": [],
+              "auditEnabled": true,
+              "auditPath": "./audit.log"
+            },
+            "skillFlows": {
+              "build": {
+                "nodes": [
+                  {
+                    "id": "s",
+                    "data": {
+                      "originType": "start",
+                      "label": "start",
+                      "config": {}
+                    }
+                  },
+                  {
+                    "id": "llm",
+                    "data": {
+                      "originType": "llm",
+                      "label": "Build",
+                      "config": {
+                        "model": "deepseek-v4-flash",
+                        "system_prompt": "OpenCode build 模式：可编辑文件、运行 shell。先理解任务再行动，输出具体步骤。",
+                        "temperature": 0.3,
+                        "max_tokens": 2048
+                      }
+                    }
+                  },
+                  {
+                    "id": "read",
+                    "data": {
+                      "originType": "tool-call",
+                      "label": "读文件",
+                      "config": {
+                        "tool_name": "file_operations",
+                        "args": "{\"action\":\"list\",\"path\":\".\"}"
+                      }
+                    }
+                  },
+                  {
+                    "id": "shell",
+                    "data": {
+                      "originType": "tool-call",
+                      "label": "Shell",
+                      "config": {
+                        "tool_name": "shell_execution",
+                        "args": "{\"command\":\"git status\"}"
+                      }
+                    }
+                  },
+                  {
+                    "id": "code",
+                    "data": {
+                      "originType": "code",
+                      "label": "补丁",
+                      "config": {
+                        "code": "result = {'mode': 'build', 'done': True}"
+                      }
+                    }
+                  },
+                  {
+                    "id": "o",
+                    "data": {
+                      "originType": "output",
+                      "label": "output",
+                      "config": {}
+                    }
+                  }
+                ],
+                "edges": [
+                  {
+                    "id": "e_s_llm",
+                    "source": "s",
+                    "target": "llm",
+                    "data": {}
+                  },
+                  {
+                    "id": "e_llm_read",
+                    "source": "llm",
+                    "target": "read",
+                    "data": {}
+                  },
+                  {
+                    "id": "e_read_shell",
+                    "source": "read",
+                    "target": "shell",
+                    "data": {}
+                  },
+                  {
+                    "id": "e_shell_code",
+                    "source": "shell",
+                    "target": "code",
+                    "data": {}
+                  },
+                  {
+                    "id": "e_code_o",
+                    "source": "code",
+                    "target": "o",
+                    "data": {}
+                  }
+                ]
+              },
+              "plan": {
+                "nodes": [
+                  {
+                    "id": "s",
+                    "data": {
+                      "originType": "start",
+                      "label": "start",
+                      "config": {}
+                    }
+                  },
+                  {
+                    "id": "llm",
+                    "data": {
+                      "originType": "llm",
+                      "label": "Plan",
+                      "config": {
+                        "model": "deepseek-v4-flash",
+                        "system_prompt": "OpenCode plan 模式：只读分析，禁止修改文件。输出变更计划、风险与测试建议。",
+                        "temperature": 0.2,
+                        "max_tokens": 2048
+                      }
+                    }
+                  },
+                  {
+                    "id": "search",
+                    "data": {
+                      "originType": "knowledge",
+                      "label": "代码检索",
+                      "config": {
+                        "top_k": 5
+                      }
+                    }
+                  },
+                  {
+                    "id": "o",
+                    "data": {
+                      "originType": "output",
+                      "label": "output",
+                      "config": {}
+                    }
+                  }
+                ],
+                "edges": [
+                  {
+                    "id": "e_s_llm",
+                    "source": "s",
+                    "target": "llm",
+                    "data": {}
+                  },
+                  {
+                    "id": "e_llm_search",
+                    "source": "llm",
+                    "target": "search",
+                    "data": {}
+                  },
+                  {
+                    "id": "e_search_o",
+                    "source": "search",
+                    "target": "o",
+                    "data": {}
+                  }
+                ]
+              },
+              "general": {
+                "nodes": [
+                  {
+                    "id": "s",
+                    "data": {
+                      "originType": "start",
+                      "label": "start",
+                      "config": {}
+                    }
+                  },
+                  {
+                    "id": "llm",
+                    "data": {
+                      "originType": "llm",
+                      "label": "LLM",
+                      "config": {
+                        "model": "deepseek-v4-flash",
+                        "system_prompt": "General 子代理：处理复杂搜索与多步推理，输出结构化结论与下一步建议。",
+                        "temperature": 0.4,
+                        "max_tokens": 2048,
+                        "auto_inject_memory": true
+                      }
+                    }
+                  },
+                  {
+                    "id": "o",
+                    "data": {
+                      "originType": "output",
+                      "label": "output",
+                      "config": {}
+                    }
+                  }
+                ],
+                "edges": [
+                  {
+                    "id": "e_s_llm",
+                    "source": "s",
+                    "target": "llm",
+                    "data": {}
+                  },
+                  {
+                    "id": "e_llm_o",
+                    "source": "llm",
+                    "target": "o",
+                    "data": {}
+                  }
+                ]
+              }
+            },
+            "timeout": 120000,
+            "retryCount": 1,
+            "lifecycle": "sync",
+            "pushNotificationUrl": "",
+            "tenantId": "",
+            "extensions": {}
+          }
+        ],
+        "edges": []
+      }
+    }
+  ]
+}

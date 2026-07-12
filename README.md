@@ -1,106 +1,83 @@
-# fangyu
+# 方隅（fangyu）
 
 AI 社会的基础设施 — 可视化编排 + DAG 执行引擎 + A2A 协议 + ATP 信任层。
 
 **fangyu/ 就是项目根目录。**
 
-## 项目目的
+## 产品双子
 
-用本平台构建一个完整的 **AI 社会**：
+| 产品 | 包名 | 定位 |
+|------|------|------|
+| **方隅·序** | `fangyu-studio` | 编排、治理、发布 — Web 管理与设计 |
+| **方隅·行** | `fangyu-worker` | 执行、连接、交付 — 本机 Worker |
 
-- 每个导出的智能体都是与人类交互的**独立节点**
-- 通过 **A2A 协议**相互协作
-- 受共同的**法律与道德规范**约束
-- 最终价值目标：**为人类服务**
-
-## 当前能力一览
-
-| 能力 | 状态 |
-|------|------|
-| Flow / Agent 双画布 | ✅ |
-| 28 种节点执行引擎 | ✅ |
-| 导出 Python 代码（export↔engine parity，10 fixture） | ✅ |
-| 安全表达式（AST 白名单，无 eval） | ✅ |
-| 宪法可组合策略 + warn/deny + 策略模板 | ✅ |
-| 画布违宪警告 UI | ✅ |
-| 审计链 hash 防篡改 | ✅ |
-| 多 Agent 链式协作 + 跨 RPC demo | ✅ |
-| Agent Bundle 导出 + 独立运行时 + 加密 A2A | ✅ |
-| 外部 Agent 联邦编排 | ✅ |
-| 多模态 Payload + 物理 Adapter 插件 | ✅ |
-| 真实 MQTT Adapter（`fangyu[mqtt]`） | ✅ |
-
-详见：
-
-- **[用户手册](docs/USER_GUIDE.md)** ← 零经验入门（安装 → 编排 → 导出 → 组网）
-- **[项目评估](docs/PROJECT_ASSESSMENT.md)** ← 阶段性看法与优先级建议
-- **[L1 开发主线与技术方案](docs/L1_ROADMAP.md)** ← 后续开发北极星
-- **[Phase 5 技术方案](docs/PHASE5_TECH_SPEC.md)** ← Happy Path / CLI / Daemon 设计
-- **[安全模型 v1](docs/SECURITY_MODEL.md)** ← 密钥、信封、授权拍板
-- **[集成 Cookbook](docs/INTEGRATION_COOKBOOK.md)** ← curl / CLI / Python 集成示例
-- [愿景与产品方向](docs/VISION_AND_PRODUCT.md)
-- [跨机器 A2A](docs/A2A_REMOTE.md)
-- [Adapter 开发指南](docs/ADAPTER_DEV_GUIDE.md)
+> **序而后行**：在序里设计并发布，在行里本机 shell / 文件 / Adapter 真干活。  
+> `fangyu-desktop`（Electron）为**可选过渡壳**，默认不必安装。
 
 ## 安装与启动
 
 ```bash
-# 一键启动（Windows）
-dev.bat
-
-# 或手动：
+# 根目录一次安装
+npm install
 py -m pip install -e .
-py -m fangyu --server          # → http://localhost:8000
 
-cd fangyu-flow && npm install && npm run dev   # → http://localhost:5173
-```
+# 端口被占用或界面是旧版时，先清理
+dev-clean.bat
 
-## 演示脚本
+# 方隅·序 + API（主入口）
+dev.bat
+# → http://localhost:5173  标题应显示「方隅·序」
 
-```bash
-# Phase 5 Happy Path（Bundle → daemon → 本地 RPC → 跨 Bundle 加密 RPC）
-py -3 scripts/happy_path_demo.py
+# 方隅·行 Worker（真执行）
+dev-worker.bat
 
-# Agent Bundle 本地演示
-py -3 scripts/bundle_demo.py
+# 方隅·行 — Windows 系统托盘（原生 Shell MVP，推荐）
+dev-worker-tray.bat
 
-# Bundle CLI
-py -3 -m fangyu bundle run ./my-agent.bundle --port 9001 --daemon
-py -3 -m fangyu bundle rpc ./my-agent.bundle --url http://127.0.0.1:9001/rpc -m "hello"
-py -3 -m fangyu bundle trust add ./worker.bundle --from ./caller.bundle
-
-# 跨机器单 Agent RPC
-py -3 scripts/a2a_remote_demo.py --base http://127.0.0.1:8000
-
-# 产线 PLC → Worker Agent demo
-py -3 scripts/plc_demo.py --base http://127.0.0.1:8000
-
-# MQTT → Worker（默认 sim；--real 需 broker + fangyu[mqtt]）
-py -3 scripts/mqtt_demo.py --base http://127.0.0.1:8000
-
-# Action Loop + workspace（单 Agent 行动闭环）
-py -3 scripts/action_loop_demo.py
-
-# Bundle MQTT 事件触发（mqtt_sim → 自动跑 skill）
-py -3 scripts/bundle_mqtt_demo.py
-```
-
-## 测试
-
-```bash
-py -3 -m pytest tests/unit/ -q
-cd fangyu-flow && npm run test:fast && npm run test:slow
+# Electron 过渡壳（可选）
+dev-desktop.bat
 ```
 
 ## 目录结构
 
 ```
 fangyu/
-├── engine/          # DAG 执行引擎
-├── core/            # 宪法 + 审计链
-├── a2a/             # A2A 协议 + ATP 信任
-├── adapters/        # 物理层 Adapter 插件 (MQTT/OPC-UA/PLC 模拟)
-├── fangyu-flow/     # React 画布
-├── scripts/         # A2A demo
-└── data/            # constitution.json, audit.log
+├── engine/            # DAG 执行引擎
+├── core/              # 宪法 + 审计 + Worker 注册表
+├── a2a/               # A2A 协议 + ATP 信任
+├── adapters/          # 物理层 Adapter 插件
+├── fangyu-core/       # 共享内核（@fangyu/core）
+├── fangyu-canvas/     # 共享画布 UI
+├── fangyu-studio/     # 方隅·序
+├── fangyu-worker/     # 方隅·行
+├── fangyu-desktop/    # Electron 过渡壳（可选，deprecated）
+├── scripts/           # Demo 脚本
+└── data/              # constitution.json, assets/
 ```
+
+## 测试
+
+```bash
+py -m pytest tests/unit/ -q
+npm run test
+npm run build:studio
+
+# 序 → 行 Happy Path（shell + run_flow，需 API + Worker）
+py scripts/worker_happy_path.py --spawn-worker
+```
+
+## 文档
+
+- **[用户手册](docs/USER_GUIDE.md)**
+- **[L1 开发主线](docs/L1_ROADMAP.md)**
+- **[Phase 5 技术方案](docs/PHASE5_TECH_SPEC.md)**
+- **[Electron 过渡壳冒烟](docs/ELECTRON_SMOKE.md)**（可选）
+
+## 已移除
+
+| 旧路径 | 说明 |
+|--------|------|
+| `fangyu-flow/` | 已并入 `fangyu-canvas` |
+| `fangyu-web/` | 已重命名为 `fangyu-studio`（方隅·序） |
+
+若本地仍存在上述文件夹，先 **`dev-clean.bat`**，再 **`scripts\remove-legacy.bat`**。

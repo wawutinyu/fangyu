@@ -7,18 +7,28 @@ venv/
 *.sqlite3
 data/*.db
 
-# Node / fangyu-flow
-fangyu-flow/node_modules/
-fangyu-flow/dist/
-fangyu-flow/dist-ssr/
-fangyu-flow/test-results/
-fangyu-flow/release/
+# Worker 持久化
+data/workers.db
+data/worker-local.json
+
+# Node workspaces
+node_modules/
+**/dist/
+**/dist-ssr/
+**/test-results/
+**/release/
 *.local
+
+# 已废弃目录（若本地残留，勿提交）
+fangyu-flow/
+fangyu-web/
+
+# 方隅·行 Worker 本地身份（开发用）
+data/worker-local.json
+worker-local.json
 
 # Environment
 .env
-
-# Editor / OS
 .vscode/*
 !.vscode/extensions.json
 .idea/
@@ -27,7 +37,6 @@ Thumbs.db
 *.log
 
 # Build
-dist/
 build/
 .eggs/
 *.egg

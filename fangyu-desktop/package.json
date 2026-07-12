@@ -1,0 +1,54 @@
+{
+  "name": "fangyu-desktop",
+  "private": true,
+  "version": "1.0.0",
+  "description": "【可选·过渡】Electron 壳 — 长期由 fangyu-worker 替代",
+  "deprecated": "请优先使用 fangyu-studio + fangyu-worker；本包仅保留打包参考",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "node electron/dev-runner.cjs",
+    "build:ui": "npm run build:desktop --prefix ../fangyu-studio",
+    "sync:ui": "node electron/sync-ui.cjs",
+    "build": "npm run build:ui && npm run sync:ui && electron-builder",
+    "start": "electron ."
+  },
+  "build": {
+    "appId": "ai.fangyu.desktop",
+    "productName": "方隅·行",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "dist/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "..",
+        "to": "fangyu",
+        "filter": [
+          "**/*",
+          "!fangyu-canvas/**",
+          "!fangyu-studio/**",
+          "!fangyu-desktop/**",
+          "!fangyu.egg-info/**",
+          "!data/**",
+          "!__pycache__/**",
+          "!*.pyc",
+          "!.env",
+          "!**/__pycache__/**"
+        ]
+      }
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    }
+  },
+  "devDependencies": {
+    "electron": "^42.6.1",
+    "electron-builder": "^26.15.3"
+  }
+}

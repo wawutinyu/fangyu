@@ -1,0 +1,15 @@
+{
+  "name": "fangyu-worker",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "方隅·行 — 本机 Worker 守护进程（shell / run_flow）",
+  "bin": {
+    "fangyu-worker": "./src/cli.mjs"
+  },
+  "scripts": {
+    "start": "node src/cli.mjs",
+    "dev": "node src/cli.mjs",
+    "tray": "powershell -ExecutionPolicy Bypass -File tray/worker-tray.ps1"
+  }
+}

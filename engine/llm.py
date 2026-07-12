@@ -123,7 +123,8 @@ async def _call_openai_compat(
             resp.raise_for_status()
             json = resp.json()
             choice = json['choices'][0]
-            content = choice['message'].get('content', '')
+            msg = choice.get('message') or {}
+            content = msg.get('content') or msg.get('reasoning_content') or ''
             return {'result': content, 'usage': json.get('usage', {})}
         except httpx.HTTPStatusError as e:
             return {'result': f'[API 错误 {e.response.status_code}: {e.response.text}]', 'usage': {}}

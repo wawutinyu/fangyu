@@ -50,7 +50,7 @@ Industrial body 推荐字段：
 ```
 
 Python 解析：`fangyu.a2a.payload.message_to_inputs(message)`  
-TypeScript：`fangyu-flow/src/utils/payload.ts` → `messageToInputs()`
+TypeScript：`fangyu-canvas/src/utils/payload.ts` → `messageToInputs()`
 
 ---
 

@@ -78,6 +78,7 @@ async def init_db():
     from .memory import MemoryFact  # noqa: F401
     from .execution_log import ExecutionLog  # noqa: F401
     from .conversation import ConversationLog  # noqa: F401
+    from .asset import Asset  # noqa: F401
 
     async with engine.begin() as conn:
         # run_sync：在异步连接中执行同步的 create_all

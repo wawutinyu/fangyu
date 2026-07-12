@@ -1,0 +1,22 @@
+{
+  "name": "fangyu",
+  "private": true,
+  "workspaces": [
+    "fangyu-core",
+    "fangyu-canvas",
+    "fangyu-studio",
+    "fangyu-worker",
+    "fangyu-desktop"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w fangyu-studio",
+    "dev:studio": "npm run dev -w fangyu-studio",
+    "dev:worker": "npm run start -w fangyu-worker",
+    "dev:tray": "npm run tray -w fangyu-worker",
+    "dev:desktop": "npm run dev -w fangyu-desktop",
+    "build:studio": "npm run build -w fangyu-studio",
+    "build:desktop": "npm run build -w fangyu-desktop",
+    "test": "npm run test:fast -w fangyu-canvas && npm run test -w fangyu-core",
+    "test:all": "npm run test -w fangyu-canvas"
+  }
+}

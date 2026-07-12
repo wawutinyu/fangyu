@@ -1,0 +1,16 @@
+{
+  "mode": "deny",
+  "deny_patterns": [
+    "\\brm\\s+-[a-z]*f",
+    "\\bdel\\s+/[sfq]",
+    "\\bformat\\s+[a-z]:",
+    "\\bshutdown\\b"
+  ],
+  "allowlist": [
+    "echo",
+    "dir",
+    "python",
+    "py",
+    "npm"
+  ]
+}

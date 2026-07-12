@@ -1,0 +1,45 @@
+{
+  "name": "fangyu-canvas",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "fangyu 画布核心 — 组件、状态、平台抽象（Web / 桌面共用）",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles/*": "./src/styles/*"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:fast": "cross-env FANGYU_LIVE= vitest run --exclude '**/exportEngineParity.test.ts' --exclude '**/demoFlows.live.test.ts'",
+    "test:live": "vitest run src/utils/__tests__/demoFlows.live.test.ts --testTimeout=120000",
+    "test:slow": "vitest run src/utils/__tests__/exportEngineParity.test.ts --testTimeout=120000",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint src",
+    "export:seed-agents": "npx tsx scripts/exportSeedAgents.ts"
+  },
+  "dependencies": {
+    "@fangyu/core": "file:../fangyu-core",
+    "@codemirror/lang-python": "^6.2.1",
+    "@codemirror/theme-one-dark": "^6.1.3",
+    "@reduxjs/toolkit": "^2.7.1",
+    "codemirror": "^6.0.2",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-redux": "^9.2.3",
+    "reactflow": "^11.11.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "cross-env": "^7.0.3",
+    "jsdom": "^29.1.1",
+    "oxlint": "^1.69.0",
+    "tsx": "^4.21.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.0",
+    "vitest": "^4.1.9"
+  }
+}

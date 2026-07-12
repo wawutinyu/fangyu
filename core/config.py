@@ -5,8 +5,9 @@ from dotenv import load_dotenv
 
 # fangyu/ 即项目根目录
 PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent
-DATA_DIR: Path = PROJECT_ROOT / "data"
-DATA_DIR.mkdir(exist_ok=True)
+_data_dir_override = os.getenv("FANGYU_DATA_DIR")
+DATA_DIR: Path = Path(_data_dir_override) if _data_dir_override else PROJECT_ROOT / "data"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 load_dotenv(PROJECT_ROOT / ".env")
 
