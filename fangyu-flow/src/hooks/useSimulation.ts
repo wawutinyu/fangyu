@@ -76,8 +76,12 @@ export function useSimulation(
       error: result.error,
     })
     if (result.success) {
+      const mockedLlm = result.results.some(r => r.output?._mocked === true)
       const warnNote = pendingWarnings ? `（${pendingWarnings.violations?.length || 0} 条宪法警告）` : ''
       showToast(`运行完成，${result.results.length} 个节点已执行${warnNote}`, pendingWarnings ? 'warn' : 'success')
+      if (mockedLlm) {
+        showToast('LLM 节点使用了 mock 响应，请确认后端已启动且已配置 API Key', 'warn')
+      }
     } else {
       showToast(result.error || '运行中止', 'warn')
     }

@@ -47,6 +47,13 @@ def _init_registry():
         "memory-write": ("记忆写入", "记忆存储", [{"name": "key", "type": "string"}, {"name": "value", "type": "any", "required": True}], [{"name": "success", "type": "boolean"}]),
         "extract-memory": ("事实提取", "记忆存储", [{"name": "text", "type": "string", "required": True}], [{"name": "facts", "type": "array"}, {"name": "count", "type": "number"}]),
         "search-sessions": ("会话搜索", "记忆存储", [{"name": "query", "type": "string", "required": True}, {"name": "session_id", "type": "string"}], [{"name": "results", "type": "array"}, {"name": "count", "type": "number"}]),
+        "branch": ("条件/多路分支", "流程控制", [{"name": "input", "type": "any", "required": True}], [{"name": "true", "type": "any"}, {"name": "false", "type": "any"}]),
+        "memory": ("记忆操作", "记忆存储", [{"name": "input", "type": "any"}], [{"name": "result", "type": "any"}]),
+        "execute": ("执行", "工具集成", [{"name": "input", "type": "any"}], [{"name": "result", "type": "any"}]),
+        "register": ("注册", "工具集成", [{"name": "llm_output", "type": "string"}], [{"name": "result", "type": "any"}]),
+        "mcp-tools": ("MCP 工具列表", "工具集成", [], [{"name": "tools", "type": "array"}]),
+        "mcp-call": ("MCP 工具调用", "工具集成", [{"name": "tool_name", "type": "string"}, {"name": "args", "type": "object"}], [{"name": "result", "type": "any"}]),
+        "mcp": ("MCP 操作", "工具集成", [{"name": "input", "type": "any"}], [{"name": "result", "type": "any"}]),
         "approval": ("审批", "流程控制", [{"name": "input", "type": "string", "required": True}], [{"name": "approval_id", "type": "string"}, {"name": "status", "type": "string"}, {"name": "message", "type": "string"}]),
         "input": ("输入", "流程控制", [], [{"name": "input", "type": "any"}]),
         "output": ("输出", "流程控制", [{"name": "input", "type": "any", "required": True}], []),
@@ -70,4 +77,5 @@ def register_executors():
     from .exec_data import register as r3
     from .exec_memory import register as r4
     from .exec_tools import register as r5
-    r1(); r2(); r3(); r4(); r5()
+    from .exec_unified import register as r6
+    r1(); r2(); r3(); r4(); r5(); r6()

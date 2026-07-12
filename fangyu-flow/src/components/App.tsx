@@ -19,7 +19,6 @@ import { openFlowConfig } from '../store/flowSlice'
 import { toggleHistory, saveFlowApi, fetchAllProjects, createProjectApi } from '../store/saveSlice'
 import { convertToExportFormat } from '../utils/flowHelper'
 import { demoFlows } from '../utils/demoFlows'
-import { normalizeFlowResult, warningsToViolationPayload } from '../utils/constitutionWarnings'
 
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -75,42 +74,14 @@ export default function App() {
 
   const handleLoadDemo = useCallback(async (demoId: string) => {
     const demo = demoFlows[demoId]
-    if (!demo) return
+    if (!demo) {
+      alert(`用例「${demoId}」不存在，请检查 demoFlows 配置`)
+      return
+    }
     flowCanvasRef.current?.importFlow(demo.data)
     setTimeout(async () => {
-      const handle = flowCanvasRef.current
-      if (!handle) return
-      const { nodes: flowNodes, edges: flowEdges } = handle.getNodesAndEdges()
-      if (flowNodes.length === 0) return
-      try {
-        const resp = await fetch('/api/v1/flow/run', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nodes: flowNodes, edges: flowEdges, external_inputs: {}, global_vars: { flow_id: demoId } }),
-        })
-        const result = await resp.json()
-        const normalized = normalizeFlowResult(result)
-        if (result.success) {
-          const warnPayload = normalized.constitution_warnings?.length
-            ? warningsToViolationPayload(normalized.constitution_warnings)
-            : null
-          handle.showResults(
-            result.results.map((r: { nodeId: string; nodeName: string; outputs?: Record<string, unknown> }) => ({
-              nodeId: r.nodeId,
-              nodeName: r.nodeName,
-              output: r.outputs || {},
-            })),
-            { constitutionWarnings: warnPayload },
-          )
-        } else if (normalized.violation) {
-          handle.showResults([], { constitutionWarnings: normalized.violation })
-        } else {
-          alert(`运行失败：${result.error || '请先配置 API Key'}`)
-        }
-      } catch {
-        alert('运行失败：后端服务不可用')
-      }
-    }, 500)
+      await flowCanvasRef.current?.runSimulation(true)
+    }, 300)
   }, [])
 
   useEffect(() => {

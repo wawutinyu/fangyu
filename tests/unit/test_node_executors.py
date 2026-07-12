@@ -25,6 +25,7 @@ def test_all_core_executors_registered():
         "json-parse", "variable-set", "variable-get", "transform", "text-process",
         "memory-read", "memory-write", "extract-memory", "search-sessions",
         "http", "tool-call", "register-tool", "execute-skill", "learn-skill",
+        "branch", "memory", "execute", "register", "mcp-tools", "mcp-call", "mcp",
     }
     missing = expected - set(_EXECUTORS.keys())
     assert not missing, f"缺少 executor: {missing}"
@@ -298,3 +299,89 @@ def test_composite_node_inner_output():
     assert result["success"] is True
     comp = next(r for r in result["results"] if r["type"] == "composite")
     assert comp["outputs"]["outputs"]["i1"]["result"] == "inner-val"
+
+
+def test_branch_bool_mode():
+    nodes = [
+        node("s", "start"),
+        node("b", "branch", config={"mode": "bool", "expression": "input >= 5"}),
+        node("o", "output"),
+    ]
+    result = run_flow_sync(nodes, [edge("s", "b"), edge("b", "o")], external_inputs={"input": 8})
+    assert_flow_ok(result, "branch", lambda o: o.get("branch") == "true")
+
+
+def test_branch_multi_mode():
+    nodes = [
+        node("s", "start"),
+        node("b", "branch", config={"mode": "multi", "expression": "input", "branch_count": 3}),
+        node("o", "output"),
+    ]
+    result = run_flow_sync(nodes, [edge("s", "b"), edge("b", "o")], external_inputs={"input": 2})
+    assert_flow_ok(result, "branch", lambda o: o.get("branch") == "branch_2")
+
+
+def test_memory_unified_write_read():
+    nodes = [
+        node("s", "start"),
+        node("w", "memory", config={"operation": "write", "memory_key": "ui_pref", "scope": "user"}),
+        node("r", "memory", config={"operation": "read", "memory_key": "ui_pref", "scope": "user"}),
+        node("o", "output"),
+    ]
+    result = run_flow_sync(
+        nodes,
+        [edge("s", "w"), edge("w", "r"), edge("r", "o")],
+        external_inputs={"input": "深色主题"},
+    )
+    assert result["success"] is True
+    mem_rows = [r for r in result["results"] if r["type"] == "memory"]
+    assert mem_rows[-1]["outputs"].get("value") == "深色主题"
+
+
+def test_execute_unified_tool_mode():
+    assert_flow_ok(
+        chain_flow({"originType": "execute", "config": {"mode": "tool", "tool_name": "skill_list", "args": {}}}),
+        "execute",
+        lambda o: o.get("success") is True,
+    )
+
+
+def test_register_unified_tool_mode():
+    llm_out = '{"tool": "demo_tool", "description": "d", "parameters": {}}'
+    assert_flow_ok(
+        chain_flow({"originType": "register", "config": {"mode": "tool", "llm_output": llm_out}}),
+        "register",
+        lambda o: o.get("count", 0) >= 0,
+    )
+
+
+def test_mcp_tools_node():
+    assert_flow_ok(
+        chain_flow({"originType": "mcp-tools", "config": {"server": "__internal__"}}),
+        "mcp-tools",
+        lambda o: isinstance(o.get("tools"), list) and len(o["tools"]) > 0,
+    )
+
+
+def test_mcp_call_node():
+    assert_flow_ok(
+        chain_flow({"originType": "mcp-call", "config": {"server": "__internal__", "tool_name": "current_time", "args": "{}"}}),
+        "mcp-call",
+        lambda o: o.get("success") is True and o.get("result"),
+    )
+
+
+def test_mcp_unified_list():
+    assert_flow_ok(
+        chain_flow({"originType": "mcp", "config": {"operation": "list", "server": "__internal__"}}),
+        "mcp",
+        lambda o: isinstance(o.get("tools"), list) and len(o["tools"]) > 0,
+    )
+
+
+def test_mcp_unified_call():
+    assert_flow_ok(
+        chain_flow({"originType": "mcp", "config": {"operation": "call", "server": "__internal__", "tool_name": "current_time", "args": "{}"}}),
+        "mcp",
+        lambda o: o.get("success") is True and o.get("result"),
+    )

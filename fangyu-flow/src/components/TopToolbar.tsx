@@ -1,4 +1,48 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { demoFlows } from '../utils/demoFlows'
+
+const CATEGORY_ORDER = ['流程控制', 'AI 能力', '数据操作', '记忆存储', '工具集成', '其他']
+
+const DEMO_CATEGORY_BY_ID: Record<string, string> = {
+  core: 'AI 能力',
+  condition: '流程控制',
+  switch: '流程控制',
+  loop: '流程控制',
+  approval: '流程控制',
+  knowledge: 'AI 能力',
+  search_web: '工具集成',
+  memory: '记忆存储',
+  ext: '工具集成',
+  text_processing: '数据操作',
+  variable: '数据操作',
+  mcp: '工具集成',
+  tool_call: '工具集成',
+  tool_skill: '工具集成',
+  trigger: '流程控制',
+  code_exec: 'AI 能力',
+  var_text: '数据操作',
+  memory_extract: '记忆存储',
+  prompt: 'AI 能力',
+  role: 'AI 能力',
+  actionWorker: 'AI 能力',
+}
+
+function inferCategory(id: string): string {
+  return demoFlows[id].category || DEMO_CATEGORY_BY_ID[id] || '其他'
+}
+
+const GROUPED_DEMOS = CATEGORY_ORDER.map(cat => ({
+  category: cat,
+  items: Object.keys(demoFlows)
+    .filter(id => inferCategory(id) === cat)
+    .map(id => ({
+      id,
+      label: demoFlows[id].label,
+      desc: demoFlows[id].desc || '',
+    })),
+})).filter(g => g.items.length > 0)
+
+const DEMO_COUNT = Object.keys(demoFlows).length
 
 interface Props {
   onNewFlow: () => void
@@ -17,25 +61,6 @@ interface Props {
   onLoadDemo: (demoId: string) => void
   simulating?: boolean
 }
-
-const DEMOS = [
-  { id: 'core', label: '核心链路', desc: 'input → llm → json-parse → transform → output' },
-  { id: 'condition', label: '条件分支', desc: 'input → llm → condition → 两路 output' },
-  { id: 'switch', label: '多路分支', desc: 'input → llm → switch → output' },
-  { id: 'loop', label: '循环', desc: 'loop → llm → output' },
-  { id: 'trigger', label: '触发器', desc: 'trigger → llm → output' },
-  { id: 'code_exec', label: '代码执行', desc: 'llm → code → output' },
-  { id: 'var_text', label: '变量与文本', desc: 'variable-set → variable-get → text-process → output' },
-  { id: 'memory', label: '记忆系统', desc: 'llm → memory-write → memory-read → output' },
-  { id: 'memory_extract', label: '记忆提取', desc: 'memory-write → extract-memory → search-sessions → output' },
-  { id: 'knowledge', label: '知识库', desc: 'input → knowledge → llm → output' },
-  { id: 'prompt', label: '提示词组装', desc: 'input → prompt-assembly → llm → output' },
-  { id: 'ext', label: '外部服务', desc: 'input → search → http → llm → output' },
-  { id: 'approval', label: '审批', desc: 'input → llm → approval → output' },
-  { id: 'tool_call', label: '工具调用', desc: 'llm → tool-call → output' },
-  { id: 'tool_skill', label: '工具与技能', desc: 'register-tool → learn-skill → execute-skill → output' },
-  { id: 'role', label: '角色扮演', desc: 'input → llm(角色) → output' },
-]
 
 export default function TopToolbar(props: Props) {
   const Btn = ({ title, onClick, primary, children }: { title?: string; onClick: () => void; primary?: boolean; children: React.ReactNode }) => (
@@ -75,7 +100,7 @@ export default function TopToolbar(props: Props) {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           导出
         </Btn>
-        <DemoMenu demos={DEMOS} onSelect={props.onLoadDemo} />
+        <DemoMenu groups={GROUPED_DEMOS} count={DEMO_COUNT} onSelect={props.onLoadDemo} />
         <div style={{ width: 1, height: 20, background: 'var(--border-color)', margin: '0 4px' }} />
         <Btn onClick={props.onGroupSelected} title="封装为组合原子">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
@@ -120,11 +145,14 @@ export default function TopToolbar(props: Props) {
   )
 }
 
-function DemoMenu({ demos, onSelect }: { demos: { id: string; label: string; desc: string }[]; onSelect: (id: string) => void }) {
+function DemoMenu({ groups, count, onSelect }: {
+  groups: { category: string; items: { id: string; label: string; desc: string }[] }[]
+  count: number
+  onSelect: (id: string) => void
+}) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState({ top: 0, left: 0 })
   const ref = useRef<HTMLDivElement>(null)
-  const btnRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -137,35 +165,42 @@ function DemoMenu({ demos, onSelect }: { demos: { id: string; label: string; des
 
   return (
     <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
-      <button ref={btnRef} className="notion-btn" onClick={(e) => {
+      <button className="notion-btn" onClick={(e) => {
         const r = e.currentTarget.getBoundingClientRect()
         setPos({ top: r.bottom + 4, left: r.left })
         setOpen(o => !o)
-      }} title="加载示例流程">
+      }} title={`加载示例流程 (${count} 个)`}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
         </svg>
-        用例
+        用例 ({count})
       </button>
       {open && (
         <div style={{
           position: 'fixed', top: pos.top, left: pos.left, zIndex: 10000, background: '#fff', borderRadius: 8,
           boxShadow: '0 4px 20px rgba(0,0,0,0.15)', border: '1px solid #eee',
-          minWidth: 220, maxHeight: '70vh', overflowY: 'auto',
+          minWidth: 260, maxHeight: '75vh', overflowY: 'auto',
         }}>
-          {demos.map(d => (
-            <button key={d.id} style={{
-              display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px',
-              border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12,
-              borderBottom: '1px solid #f5f5f3',
-            }}
-              onClick={() => { onSelect(d.id); setOpen(false) }}
-              onMouseEnter={e => e.currentTarget.style.background = '#f5f5f3'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-            >
-              <div style={{ fontWeight: 600, color: '#37352f', marginBottom: 2 }}>{d.label}</div>
-              <div style={{ fontSize: 11, color: '#9b9a97' }}>{d.desc}</div>
-            </button>
+          {groups.map(g => (
+            <div key={g.category}>
+              <div style={{ padding: '8px 12px 4px', fontSize: 10, fontWeight: 700, color: '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                {g.category} ({g.items.length})
+              </div>
+              {g.items.map(d => (
+                <button key={d.id} style={{
+                  display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px 8px 16px',
+                  border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12,
+                  borderBottom: '1px solid #f5f5f3',
+                }}
+                  onClick={() => { onSelect(d.id); setOpen(false) }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#f5f5f3'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <div style={{ fontWeight: 600, color: '#37352f', marginBottom: 2 }}>{d.label}</div>
+                  <div style={{ fontSize: 11, color: '#9b9a97' }}>{d.desc}</div>
+                </button>
+              ))}
+            </div>
           ))}
         </div>
       )}

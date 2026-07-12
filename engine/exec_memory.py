@@ -16,14 +16,14 @@ async def _exec_memory_read(ctx: NodeContext) -> dict[str, Any]:
 async def _exec_memory_write(ctx: NodeContext) -> dict[str, Any]:
     scope = ctx.config.get("scope", "user")
     key = ctx.inputs.get("key") or ctx.config.get("memory_key", "")
-    val = ctx.inputs.get("value") or ctx.config.get("memory_value", "")
+    val = ctx.inputs.get("value") or ctx.inputs.get("input") or ctx.config.get("memory_value", "")
     if key and val is not None:
         memory_write(scope, key, str(val))
     return {"success": bool(key)}
 
 
 async def _exec_extract_memory(ctx: NodeContext) -> dict[str, Any]:
-    text = ctx.inputs.get("text", ctx.config.get("text", ""))
+    text = ctx.inputs.get("text") or ctx.inputs.get("input") or ctx.config.get("text", "")
     max_facts = ctx.config.get("max_facts", 3)
     scope = ctx.config.get("scope", "user")
     facts = memory_extract_facts(str(text), max_facts)

@@ -85,8 +85,8 @@ export function convertFromExportFormat(exportData: ExportFormat): { nodes: Node
       category: n.category,
       label: n.name || '',
       config: n.config || {},
-      ...(n.is_group ? {
-        is_group: true,
+      ...((n.is_group || n.type === 'loop' || n.type === 'composite-node') && (n.inner_nodes?.length || n.inner_links?.length) ? {
+        is_group: n.is_group ?? n.type === 'composite-node',
         inner_nodes: (n.inner_nodes || []).map(inode => {
           if (inode && typeof inode === 'object' && 'data' in inode && (inode as Record<string, unknown>).data && typeof (inode as Record<string, unknown>).data === 'object') {
             const d = (inode as Record<string, unknown>).data as Record<string, unknown>
