@@ -357,11 +357,11 @@ Worker-only Agent：`user.enabled = false`，runtime 不启动 Chat UI。
 | **律 · 一等入口** | 宪法/审计从设置边角升格为序包主入口 | ✅ + 白话解释 |
 | **违宪 / 失败可解释** | 协作失败、ATP 拒绝 → 白话 + 建议下一步 | ✅ MVP（`lawExplain` · 律面板） |
 | Setup Copilot | 外部 Agent：粘贴 URL → 人话确认信任 → 一键授权 | ✅ MVP（`POST /api/v1/setup/copilot/preview` + 序内面板） |
-| 场景模板库 | 产线巡检、文档助手等 — 一键实例化 Bundle + 策略包 | ⬜ 部分：Intent 已含文档/行动模板 |
+| 场景模板库 | 产线巡检、文档助手等 — 一键实例化 Bundle + 策略包 | ✅ MVP（`POST /api/v1/scenario/instantiate` + 序「场景模板」） |
 | 模板市场（可选） | 社区/官方模板分发 | ⬜ |
 
-**API：** `POST /api/v1/intent/to-flow` · `POST /api/v1/intent/to-agents` · `GET /api/v1/presence` · `GET /api/v1/presence/stream`（SSE） · `POST /api/v1/setup/copilot/preview`  
-**测试：** `test_intent_flow.py` · `test_intent_agents.py` · `test_collaboration.py` · `test_presence_integration.py` · `test_setup_and_sse.py`
+**API：** `POST /api/v1/intent/to-flow` · `POST /api/v1/intent/to-agents` · `GET /api/v1/presence` · `GET /api/v1/presence/stream`（SSE） · `POST /api/v1/setup/copilot/preview` · `GET /api/v1/scenario/templates` · `POST /api/v1/scenario/instantiate`  
+**测试：** `test_intent_flow.py` · `test_intent_agents.py` · `test_collaboration.py` · `test_presence_integration.py` · `test_setup_and_sse.py` · `test_scenario_templates.py`
 
 **行壳（开发）：** `dev-worker-tray.bat`（过渡）· `dev-worker-tauri.bat`（Tauri MVP，需 Rust）— 见 `fangyu-worker-tauri/README.md`
 

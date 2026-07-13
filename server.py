@@ -30,6 +30,7 @@ from .routers import workers as workers_router
 from .routers import intent as intent_router
 from .routers import presence as presence_router
 from .routers import setup as setup_router
+from .routers import scenario as scenario_router
 
 
 @asynccontextmanager
@@ -88,6 +89,7 @@ app.include_router(workers_router.router)
 app.include_router(intent_router.router)
 app.include_router(presence_router.router)
 app.include_router(setup_router.router)
+app.include_router(scenario_router.router)
 
 
 @app.get("/api/health")

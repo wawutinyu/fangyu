@@ -64,6 +64,7 @@ interface Props {
   onLoadDemo: (demoId: string) => void
   onOpenAssets: () => void
   onOpenIntent?: () => void
+  onOpenScenario?: () => void
   simulating?: boolean
   dispatching?: boolean
   workersOnline?: number
@@ -146,6 +147,17 @@ export default function TopToolbar(props: Props) {
               <line x1="9" y1="21" x2="15" y2="21"/>
             </svg>
             意图生成
+          </Btn>
+        )}
+        {props.onOpenScenario && (
+          <Btn onClick={props.onOpenScenario} title="场景模板一键实例化（Flow + Agent + Bundle + 策略）">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="7" height="7"/>
+              <rect x="14" y="3" width="7" height="7"/>
+              <rect x="14" y="14" width="7" height="7"/>
+              <rect x="3" y="14" width="7" height="7"/>
+            </svg>
+            场景模板
           </Btn>
         )}
         <Btn onClick={props.onOpenAssets} title="打开资产库（官方模板 + 我的流程）">

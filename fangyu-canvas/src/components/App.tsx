@@ -14,6 +14,7 @@ import SaveHistory from './SaveHistory'
 import SettingsPanel from './SettingsPanel'
 import AssetLibrary from './AssetLibrary'
 import IntentPanel from './IntentPanel'
+import ScenarioPanel from './ScenarioPanel'
 import PresencePanel from './PresencePanel'
 import LawPanel from './LawPanel'
 import SetupCopilotPanel from './SetupCopilotPanel'
@@ -78,6 +79,7 @@ export default function App() {
   const [workersFocusSignal, setWorkersFocusSignal] = useState(0)
   const [highlightWorkerTaskId, setHighlightWorkerTaskId] = useState<string | null>(null)
   const [intentPanelOpen, setIntentPanelOpen] = useState(false)
+  const [scenarioPanelOpen, setScenarioPanelOpen] = useState(false)
   const [setupCopilotOpen, setSetupCopilotOpen] = useState(false)
   const [agentBindTarget, setAgentBindTarget] = useState<AgentBindTarget | null>(null)
   const [agentAssetPickerOpen, setAgentAssetPickerOpen] = useState(false)
@@ -490,6 +492,7 @@ export default function App() {
         onOpenFlowConfig={() => store.dispatch(openFlowConfig())}
         onLoadDemo={handleLoadDemo}
         onOpenIntent={() => setIntentPanelOpen(true)}
+        onOpenScenario={() => setScenarioPanelOpen(true)}
         onBatchTest={() => setBatchVisible(true)}
         onOpenAssets={() => setAssetsFocusSignal(s => s + 1)}
         simulating={simulating}
@@ -533,6 +536,22 @@ export default function App() {
         }}
         onApplyAgents={(graph) => {
           loadAgentsToCanvas(graph)
+        }}
+      />
+      <ScenarioPanel
+        open={scenarioPanelOpen}
+        onClose={() => setScenarioPanelOpen(false)}
+        onApply={(result) => {
+          if (result.flow?.flow) {
+            flowCanvasRef.current?.importFlow(result.flow.flow)
+          }
+          if (result.agents?.graph) {
+            loadAgentsToCanvas({
+              nodes: result.agents.graph.nodes,
+              edges: result.agents.graph.edges,
+            })
+          }
+          setView('agent')
         }}
       />
       <SetupCopilotPanel
