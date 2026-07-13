@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:desktop": "cross-env ELECTRON=1 vite build",
+    "build:tauri": "cross-env TAURI=1 vite build",
     "preview": "vite preview",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",

@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useAppSelector, useAppDispatch } from '../store/hooks'
-import { updateAgentCard, updateAgentNode, updateAgentEdge, updateRoutingRules, updateSkillFlow, clearSkillFlow } from '../store/agentSlice'
+import { updateAgentCard, updateAgentNode, updateAgentEdge, updateRoutingRules, updateSkillFlow, clearSkillFlow, selectAgentNode, selectAgentEdge } from '../store/agentSlice'
 import type { AgentSkill, RoutingRule, AgentKind } from '../utils/a2aProtocol'
 import { snapshotFlowFromCanvas } from '../utils/agentDeploy'
 import { discoverExternalAgent, authorizeExternalAgent } from '../utils/externalAgent'
@@ -38,13 +38,31 @@ export default function AgentConfigPanel() {
   const [newRuleCondition, setNewRuleCondition] = useState('')
   const [newRulePriority, setNewRulePriority] = useState(0)
 
+  // 未选中时不占位，画布全宽；选中节点/连线后再弹出配置栏
+  if (!edge && !node) return null
+
   // 如果选中了连线，显示连线配置
   if (edge) {
     const srcNode = nodes.find(n => n.id === edge.source)
     const tgtNode = nodes.find(n => n.id === edge.target)
     return (
-      <div style={{ width: 260, borderLeft: '1px solid var(--border-color)', padding: 12, fontSize: 13, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ fontWeight: 600, fontSize: 14 }}>连线配置</div>
+      <div style={{
+        width: 'var(--panel-width)', flexShrink: 0,
+        borderLeft: '1px solid var(--border-color)', padding: 12, fontSize: 13,
+        display: 'flex', flexDirection: 'column', gap: 10, background: 'var(--bg-primary)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ fontWeight: 600, fontSize: 13 }}>连线配置</div>
+          <button
+            type="button"
+            className="notion-btn"
+            style={{ marginLeft: 'auto', fontSize: 11, padding: '2px 8px' }}
+            onClick={() => dispatch(selectAgentEdge(null))}
+            title="关闭"
+          >
+            关闭
+          </button>
+        </div>
         <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
           {srcNode?.label || edge.source} → {tgtNode?.label || edge.target}
         </div>
@@ -56,13 +74,7 @@ export default function AgentConfigPanel() {
     )
   }
 
-  if (!node) {
-    return (
-      <div style={{ width: 260, borderLeft: '1px solid var(--border-color)', padding: 12, fontSize: 13, color: 'var(--text-muted)' }}>
-        选中一个节点或连线以查看配置
-      </div>
-    )
-  }
+  if (!node) return null
 
   const card = node.agentCard || { name: node.label, version: '1.0.0', capabilities: { streaming: false, pushNotifications: false }, skills: [], defaultInterface: { type: 'a2a' } }
   const trust = node.trust || { enabled: false, algorithm: 'Ed25519' as const, anchorSource: 'auto' as const, policies: [], revocationList: [], auditEnabled: false, auditPath: '' }
@@ -198,15 +210,37 @@ export default function AgentConfigPanel() {
       ]
 
   return (
-    <div style={{ width: 300, borderLeft: '1px solid #eee', display: 'flex', flexDirection: 'column', height: '100%', fontSize: 13 }}>
-      <div style={{ display: 'flex', borderBottom: '1px solid #eee' }}>
-        {tabs.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)} style={{
-            flex: 1, padding: '8px 0', border: 'none', background: tab === t.key ? '#fff7e6' : 'transparent',
-            color: tab === t.key ? '#fa8c16' : '#888', fontWeight: tab === t.key ? 600 : 400,
-            cursor: 'pointer', fontSize: 11, borderBottom: tab === t.key ? '2px solid #fa8c16' : '2px solid transparent',
-          }}>{t.label}</button>
-        ))}
+    <div style={{
+      width: 'var(--panel-width)', flexShrink: 0,
+      borderLeft: '1px solid var(--border-color)',
+      display: 'flex', flexDirection: 'column', height: '100%', fontSize: 13,
+      background: 'var(--bg-primary)',
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: '6px 8px 0', borderBottom: '1px solid var(--border-color)',
+      }}>
+        <div style={{ display: 'flex', flex: 1, minWidth: 0, overflowX: 'auto' }}>
+          {tabs.map(t => (
+            <button key={t.key} type="button" onClick={() => setTab(t.key)} style={{
+              flex: '0 0 auto', padding: '8px 10px', border: 'none',
+              background: 'transparent',
+              color: tab === t.key ? 'var(--text-primary)' : 'var(--text-muted)',
+              fontWeight: tab === t.key ? 600 : 400,
+              cursor: 'pointer', fontSize: 11,
+              borderBottom: tab === t.key ? '2px solid var(--text-primary)' : '2px solid transparent',
+            }}>{t.label}</button>
+          ))}
+        </div>
+        <button
+          type="button"
+          className="notion-btn"
+          style={{ fontSize: 11, padding: '2px 8px', flexShrink: 0 }}
+          onClick={() => dispatch(selectAgentNode(null))}
+          title="关闭配置"
+        >
+          关闭
+        </button>
       </div>
 
       <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>

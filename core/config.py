@@ -22,7 +22,8 @@ class Settings:
     )
     CORS_ORIGINS: list[str] = os.getenv(
         "CORS_ORIGINS",
-        "http://localhost:5173,http://localhost:5174,http://localhost:5175,file://",
+        "http://localhost:5173,http://localhost:5174,http://localhost:5175,"
+        "http://tauri.localhost,https://tauri.localhost,tauri://localhost,file://",
     ).split(",")
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     DEEPSEEK_API_KEY: str = os.getenv("DEEPSEEK_API_KEY", "")

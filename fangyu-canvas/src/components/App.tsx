@@ -17,6 +17,7 @@ import IntentPanel from './IntentPanel'
 import ScenarioPanel from './ScenarioPanel'
 import PresencePanel from './PresencePanel'
 import LawPanel from './LawPanel'
+import HangBoard from './HangBoard'
 import SetupCopilotPanel from './SetupCopilotPanel'
 import { AssetContext, type AgentBindTarget } from '../context/AssetContext'
 import { store } from '../store'
@@ -66,7 +67,8 @@ export default function App() {
   const [exportDialogVisible, setExportDialogVisible] = useState(false)
   const [exportNodes, setExportNodes] = useState<any[]>([])
   const [exportEdges, setExportEdges] = useState<any[]>([])
-  const [view, setView] = useState<'flow' | 'agent' | 'presence' | 'law'>('flow')
+  const [view, setView] = useState<'flow' | 'law' | 'worker' | 'presence'>('flow')
+  const [xuMode, setXuMode] = useState<'flow' | 'agent'>('flow')
   const [libraryCollapsed, setLibraryCollapsed] = useState(false)
   const [simulating, setSimulating] = useState(false)
   const [dispatching, setDispatching] = useState(false)
@@ -88,14 +90,19 @@ export default function App() {
     flowCanvasRef.current?.importFlow(data)
   }, [])
 
+  const goXuAgent = useCallback(() => {
+    setView('flow')
+    setXuMode('agent')
+    window.dispatchEvent(new CustomEvent('fangyu:switch-chat-mode', { detail: { mode: 'agent' } }))
+  }, [])
+
   const loadAgentsToCanvas = useCallback((data: { nodes: unknown[]; edges: unknown[] }) => {
     store.dispatch(loadAgents({
       nodes: data.nodes as import('../store/agentSlice').AgentCanvasNode[],
       edges: data.edges as import('../store/agentSlice').AgentCanvasEdge[],
     }))
-    setView('agent')
-    window.dispatchEvent(new CustomEvent('fangyu:switch-chat-mode', { detail: { mode: 'agent' } }))
-  }, [])
+    goXuAgent()
+  }, [goXuAgent])
 
   const bindAgentSkillFlow = useCallback((flow: { nodes: unknown[]; edges: unknown[] }) => {
     if (!agentBindTarget) return
@@ -148,8 +155,23 @@ export default function App() {
     fetchSettings(store.dispatch)
     fetchAllProjects(store.dispatch)
     const onSwitchView = (e: Event) => {
-      const view = (e as CustomEvent).detail?.view
-      if (view === 'flow' || view === 'agent' || view === 'presence' || view === 'law') setView(view)
+      const detail = (e as CustomEvent).detail || {}
+      const next = detail.view
+      if (next === 'agent') {
+        setView('flow')
+        setXuMode('agent')
+        return
+      }
+      if (next === 'worker' || next === 'hang' || next === '行') {
+        setView('worker')
+        return
+      }
+      if (next === 'flow' || next === 'presence' || next === 'law') {
+        setView(next)
+        if (next === 'flow' && (detail.xuMode === 'agent' || detail.xuMode === 'flow')) {
+          setXuMode(detail.xuMode)
+        }
+      }
     }
     window.addEventListener('fangyu:switch-view', onSwitchView)
     // 首次加载时，如果画布为空则添加默认输入节点
@@ -351,12 +373,14 @@ export default function App() {
         workerId: selectedWorkerId,
       })
       setHighlightWorkerTaskId(result.task_id)
+      setView('worker')
       setWorkersFocusSignal(s => s + 1)
 
       void pollTaskUntilDone(result.task_id, {
         onUpdate: (task) => setHighlightWorkerTaskId(task.id),
       }).then((task) => {
         setHighlightWorkerTaskId(task.id)
+        setView('worker')
         setWorkersFocusSignal(s => s + 1)
         if (task.status === 'failed') {
           window.alert(`任务失败：${task.error ?? '未知错误'}`)
@@ -424,59 +448,27 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler)
   }, [handleSaveFlow])
 
+  const flowDirty = useAppSelector(s => s.flow.dirty)
+
   return (
     <ErrorBoundary>
     <AssetContext.Provider value={assetContextValue}>
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)' }}>
-      {/* 导航栏 */}
-      <div style={{ display: 'flex', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)', padding: '0 16px', alignItems: 'center', height: 32 }}>
-        <span style={{ fontSize: 12, color: 'var(--text-muted)', marginRight: 16 }}>AI Flow Canvas</span>
-        <button onClick={() => setView('flow')} style={{
-          padding: '3px 12px', border: 'none', borderRadius: '4px 4px 0 0',
-          background: view === 'flow' ? 'var(--bg-primary)' : 'transparent',
-          color: view === 'flow' ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: view === 'flow' ? 600 : 400,
-          cursor: 'pointer', fontSize: 12, marginRight: 1,
-        }}>Flow 画布{useAppSelector(s => s.flow.dirty) ? ' ●' : ''}</button>
-        <button onClick={() => setView('agent')} style={{
-          padding: '3px 12px', border: 'none', borderRadius: '4px 4px 0 0',
-          background: view === 'agent' ? 'var(--bg-primary)' : 'transparent',
-          color: view === 'agent' ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: view === 'agent' ? 600 : 400,
-          cursor: 'pointer', fontSize: 12, marginRight: 1,
-        }}>Agent 编排</button>
-        <button
-          onClick={() => setView('presence')}
-          data-testid="nav-presence"
-          title="方隅·观 — 多 Agent 协作现场"
-          style={{
-            padding: '3px 12px', border: 'none', borderRadius: '4px 4px 0 0',
-            background: view === 'presence' ? 'var(--bg-primary)' : 'transparent',
-            color: view === 'presence' ? 'var(--text-primary)' : 'var(--text-muted)',
-            fontWeight: view === 'presence' ? 600 : 400,
-            cursor: 'pointer', fontSize: 12, marginRight: 1,
-          }}
-        >方隅·观</button>
-        <button
-          onClick={() => setView('law')}
-          data-testid="nav-law"
-          title="方隅·律 — 宪法与审计"
-          style={{
-            padding: '3px 12px', border: 'none', borderRadius: '4px 4px 0 0',
-            background: view === 'law' ? 'var(--bg-primary)' : 'transparent',
-            color: view === 'law' ? 'var(--text-primary)' : 'var(--text-muted)',
-            fontWeight: view === 'law' ? 600 : 400,
-            cursor: 'pointer', fontSize: 12,
-          }}
-        >方隅·律</button>
-        <div style={{ flex: 1 }} />
-        <button onClick={() => setDark(d => !d)} style={{
-          padding: '3px 10px', border: 'none', borderRadius: 4, cursor: 'pointer',
-          background: 'transparent', color: '#888', fontSize: 14,
-        }} title={dark ? '切换浅色模式' : '切换深色模式'}>{dark ? '☀' : '☾'}</button>
-        <span style={{ fontSize: 11, color: '#aaa', marginLeft: 8 }}>v2.0</span>
-      </div>
-      {/* 两个画布始终挂载，通过 display 切换 */}
-      <div style={{ display: view === 'flow' ? 'flex' : 'none', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
       <TopToolbar
+        view={view}
+        onViewChange={setView}
+        xuMode={xuMode}
+        onXuModeChange={(mode) => {
+          setXuMode(mode)
+          if (mode === 'agent') {
+            window.dispatchEvent(new CustomEvent('fangyu:switch-chat-mode', { detail: { mode: 'agent' } }))
+          } else {
+            window.dispatchEvent(new CustomEvent('fangyu:switch-chat-mode', { detail: { mode: 'flow' } }))
+          }
+        }}
+        flowDirty={flowDirty}
+        dark={dark}
+        onToggleDark={() => setDark(d => !d)}
         onNewFlow={handleNewFlow}
         onSaveFlow={handleSaveFlow}
         onShowHistory={handleShowHistory}
@@ -493,6 +485,7 @@ export default function App() {
         onLoadDemo={handleLoadDemo}
         onOpenIntent={() => setIntentPanelOpen(true)}
         onOpenScenario={() => setScenarioPanelOpen(true)}
+        onOpenSetupCopilot={() => setSetupCopilotOpen(true)}
         onBatchTest={() => setBatchVisible(true)}
         onOpenAssets={() => setAssetsFocusSignal(s => s + 1)}
         simulating={simulating}
@@ -503,6 +496,8 @@ export default function App() {
         onSelectWorker={setSelectedWorkerId}
       />
       <input ref={fileInputRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleFileSelected} />
+      {/* 画布始终挂载，通过 display 切换 */}
+      <div style={{ display: view === 'flow' && xuMode === 'flow' ? 'flex' : 'none', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {libraryCollapsed ? (
           <button onClick={() => setLibraryCollapsed(false)} style={{ width: 20, border: 'none', borderRight: '1px solid var(--border-color)', background: 'var(--bg-secondary)', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 10, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="展开组件">
@@ -550,8 +545,10 @@ export default function App() {
               nodes: result.agents.graph.nodes,
               edges: result.agents.graph.edges,
             })
+          } else if (result.flow?.flow) {
+            setView('flow')
+            setXuMode('flow')
           }
-          setView('agent')
         }}
       />
       <SetupCopilotPanel
@@ -559,7 +556,7 @@ export default function App() {
         onClose={() => setSetupCopilotOpen(false)}
         onRegistered={(node) => {
           store.dispatch(addAgentNode(node))
-          setView('agent')
+          goXuAgent()
         }}
       />
       <SaveHistory
@@ -567,6 +564,7 @@ export default function App() {
         selectedWorkerId={selectedWorkerId}
         onDispatchTask={(taskId) => {
           setHighlightWorkerTaskId(taskId)
+          setView('worker')
           setWorkersFocusSignal(s => s + 1)
         }}
       />
@@ -598,33 +596,20 @@ export default function App() {
         document.body
       )}
         </div>
-      <div style={{ display: view === 'agent' ? 'flex' : 'none', flex: 1, overflow: 'hidden', flexDirection: 'column' }} data-testid="agent-canvas">
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px',
-          borderBottom: '1px solid var(--border-color)', background: 'var(--bg-secondary)',
-        }}>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Agent 编排</span>
-          <div style={{ flex: 1 }} />
-          <button
-            type="button"
-            className="notion-btn"
-            style={{ fontSize: 11 }}
-            onClick={() => setSetupCopilotOpen(true)}
-            title="粘贴外部 Agent URL → 人话确认 → 授权"
-          >
-            Setup Copilot
-          </button>
-        </div>
+      <div style={{ display: view === 'flow' && xuMode === 'agent' ? 'flex' : 'none', flex: 1, overflow: 'hidden', flexDirection: 'column' }} data-testid="agent-canvas">
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
           <AgentCanvas />
           <AgentConfigPanel />
         </div>
       </div>
-      <div style={{ display: view === 'presence' ? 'flex' : 'none', flex: 1, overflow: 'hidden' }}>
-        <PresencePanel />
+      <div style={{ display: view === 'worker' ? 'flex' : 'none', flex: 1, overflow: 'hidden', flexDirection: 'column', minWidth: 0 }} data-testid="hang-board">
+        <HangBoard highlightTaskId={highlightWorkerTaskId} />
       </div>
-      <div style={{ display: view === 'law' ? 'flex' : 'none', flex: 1, overflow: 'hidden' }}>
+      <div style={{ display: view === 'law' ? 'flex' : 'none', flex: 1, overflow: 'hidden', flexDirection: 'column', minWidth: 0 }}>
         <LawPanel />
+      </div>
+      <div style={{ display: view === 'presence' ? 'flex' : 'none', flex: 1, overflow: 'hidden', flexDirection: 'column', minWidth: 0 }}>
+        <PresencePanel />
       </div>
       {exportDialogVisible && (
         <ExportDialog

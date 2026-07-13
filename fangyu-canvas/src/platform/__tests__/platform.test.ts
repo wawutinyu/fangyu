@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { initPlatform, getPlatform, isDesktop, resolveApiUrl } from '../index'
+import { initPlatform, getPlatform, isDesktop, isNative, resolveApiUrl } from '../index'
 
 describe('platform', () => {
   beforeEach(() => {
@@ -32,6 +32,19 @@ describe('platform', () => {
     expect(platform.kind).toBe('desktop')
     expect(isDesktop()).toBe(true)
     expect(resolveApiUrl('/api/v1/health')).toBe('http://127.0.0.1:8000/api/v1/health')
+  })
+
+  it('detects native kind bridge', () => {
+    window.__FANGYU_PLATFORM__ = {
+      kind: 'native',
+      apiBase: 'http://127.0.0.1:8000',
+      platform: 'win32',
+    }
+    const platform = initPlatform()
+    expect(platform.kind).toBe('native')
+    expect(isDesktop()).toBe(true)
+    expect(isNative()).toBe(true)
+    expect(getPlatform().label).toBe('Windows 原生')
   })
 
   it('desktop fetch shim rewrites /api requests', async () => {

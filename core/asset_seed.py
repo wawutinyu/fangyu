@@ -63,81 +63,48 @@ async def purge_demo_flow_assets(session: AsyncSession) -> int:
 
 
 async def seed_official_agent_topologies(session: AsyncSession) -> int:
-
-    """从 official_agents.json 导入种子 Agent（OpenClaw / Hermes / OpenCode）。返回新增数量。"""
-
+    """从 official_agents.json 导入种子 Agent。已存在的 id 跳过，缺失的补种。"""
     if not OFFICIAL_AGENTS_FILE.exists():
-
         return 0
-
-
-
-    result = await session.execute(
-
-        select(Asset.id).where(Asset.scope == "official", Asset.type == "agent_topology").limit(1)
-
-    )
-
-    if result.scalar_one_or_none():
-
-        return 0
-
-
 
     raw = json.loads(OFFICIAL_AGENTS_FILE.read_text(encoding="utf-8"))
-
     items = raw if isinstance(raw, list) else raw.get("assets", [])
+    if not items:
+        return 0
+
+    existing = await session.execute(
+        select(Asset.id).where(Asset.scope == "official", Asset.type == "agent_topology")
+    )
+    existing_ids = set(existing.scalars().all())
 
     count = 0
-
     for item in items:
-
         asset_id = item.get("id") or _gen_id("ast")
+        if asset_id in existing_ids:
+            continue
 
         payload = item.get("payload") or {}
-
         tags = item.get("tags") or []
-
         if isinstance(tags, str):
-
             tags = json.loads(tags) if tags.startswith("[") else [tags]
 
-
-
         session.add(Asset(
-
             id=asset_id,
-
             type="agent_topology",
-
             scope="official",
-
             name=item.get("name") or asset_id,
-
             description=item.get("description") or "",
-
             category=item.get("category") or "种子 Agent",
-
             tags=json.dumps(tags, ensure_ascii=False),
-
             source_ref=item.get("source_ref") or f"official:{asset_id}",
-
             payload=json.dumps(payload, ensure_ascii=False),
-
             version=item.get("version") or "1",
-
         ))
-
         count += 1
 
-
-
     if count:
-
         await session.commit()
-
     return count
-
 
 
 

@@ -1,5 +1,6 @@
-# 方隅·行 — Windows 系统托盘启动器（无需 Electron / 无需 Rust）
-# 用法: powershell -ExecutionPolicy Bypass -File tray/worker-tray.ps1
+﻿# Fangyu Worker — Windows tray (no Electron / Rust)
+# Usage: powershell -ExecutionPolicy Bypass -File tray/worker-tray.ps1
+# Saved as UTF-8 with BOM for Windows PowerShell 5.x
 
 $ErrorActionPreference = 'Stop'
 $WorkerRoot = Split-Path $PSScriptRoot -Parent
@@ -42,25 +43,39 @@ function Stop-WorkerProcess {
 $icon = [System.Drawing.SystemIcons]::Application
 $tray = New-Object System.Windows.Forms.NotifyIcon
 $tray.Icon = $icon
-$tray.Text = '方隅·行 Worker'
+$tray.Text = 'Fangyu Worker'
 $tray.Visible = $true
 
 $menu = New-Object System.Windows.Forms.ContextMenuStrip
-$miStatus = $menu.Items.Add('状态: 启动中…')
+$miStatus = New-Object System.Windows.Forms.ToolStripMenuItem
+$miStatus.Text = 'Status: starting...'
 $miStatus.Enabled = $false
-$menu.Items.Add('─') | Out-Null
-$menu.Items.Add('打开方隅·序 (浏览器)', $null, { Start-Process $StudioUrl }) | Out-Null
-$menu.Items.Add('重启 Worker', $null, {
+[void]$menu.Items.Add($miStatus)
+[void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
+
+$miOpen = New-Object System.Windows.Forms.ToolStripMenuItem
+$miOpen.Text = 'Open Studio (browser)'
+$miOpen.Add_Click({ Start-Process $StudioUrl })
+[void]$menu.Items.Add($miOpen)
+
+$miRestart = New-Object System.Windows.Forms.ToolStripMenuItem
+$miRestart.Text = 'Restart Worker'
+$miRestart.Add_Click({
     Stop-WorkerProcess
     Start-WorkerProcess
-}) | Out-Null
-$menu.Items.Add('退出', $null, {
+})
+[void]$menu.Items.Add($miRestart)
+
+$miExit = New-Object System.Windows.Forms.ToolStripMenuItem
+$miExit.Text = 'Exit'
+$miExit.Add_Click({
     Stop-WorkerProcess
     $tray.Visible = $false
     [System.Windows.Forms.Application]::Exit()
-}) | Out-Null
-$tray.ContextMenuStrip = $menu
+})
+[void]$menu.Items.Add($miExit)
 
+$tray.ContextMenuStrip = $menu
 $tray.Add_DoubleClick({ Start-Process $StudioUrl })
 
 Start-WorkerProcess
@@ -71,14 +86,14 @@ $timer.Add_Tick({
     $apiOk = Test-Api
     $workerOk = $script:WorkerProc -and -not $script:WorkerProc.HasExited
     if ($apiOk -and $workerOk) {
-        $miStatus.Text = '状态: 运行中 (API + Worker)'
-        $tray.Text = '方隅·行 — 运行中'
+        $miStatus.Text = 'Status: running (API + Worker)'
+        $tray.Text = 'Fangyu Worker - running'
     } elseif ($workerOk) {
-        $miStatus.Text = '状态: Worker 运行，API 未就绪'
-        $tray.Text = '方隅·行 — 等待 API'
+        $miStatus.Text = 'Status: Worker up, API down'
+        $tray.Text = 'Fangyu Worker - waiting API'
     } else {
-        $miStatus.Text = '状态: Worker 已停止'
-        $tray.Text = '方隅·行 — 已停止'
+        $miStatus.Text = 'Status: Worker stopped'
+        $tray.Text = 'Fangyu Worker - stopped'
     }
 })
 $timer.Start()

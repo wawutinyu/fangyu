@@ -12,8 +12,8 @@ for %%P in (5173 5180 8000) do (
 
 echo.
 echo [fangyu] 端口已清理。请重新启动：
+echo   install-native.bat / dev-native.bat  — Windows 原生（推荐）
 echo   dev.bat          — 方隅·序 + API
 echo   dev-worker.bat   — 方隅·行 Worker
-echo   dev-desktop.bat  — Electron 过渡壳（可选）
 echo.
 pause

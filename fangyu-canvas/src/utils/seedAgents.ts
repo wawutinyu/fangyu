@@ -314,8 +314,169 @@ function buildOpenCodeAgent(): SeedAgentAsset {
   }
 }
 
+/**
+ * 验 · Tester — 专门测方隅自己是否还能用。
+ * 日常入口：冒烟 → 单测 → 序→行；输出给人看的通过/失败摘要。
+ */
+function buildYanTesterAgent(): SeedAgentAsset {
+  const card: AgentCard = {
+    name: '验 · Tester',
+    description: '方隅专用测试智能体：一键冒烟、跑单测、验序→行链路，输出可读报告。自己做产品时先问它「还能不能用」。',
+    version: '1.0.0',
+    capabilities: { streaming: false, pushNotifications: false },
+    skills: [
+      {
+        id: 'smoke',
+        name: '冒烟验收',
+        description: '跑 happy_path_acceptance_check：观/律/场景/Worker 路由是否还在',
+        tags: ['smoke', 'api', 'acceptance'],
+      },
+      {
+        id: 'unit',
+        name: '单元测试',
+        description: 'pytest tests/unit — 快速确认核心逻辑没炸',
+        tags: ['pytest', 'unit'],
+      },
+      {
+        id: 'worker_loop',
+        name: '序→行链路',
+        description: '临时拉起 Worker，验证 shell + run_flow 派发闭环',
+        tags: ['worker', 'happy-path'],
+      },
+      {
+        id: 'report',
+        name: '读报告',
+        description: '把测试原始输出整理成通过/失败清单与建议',
+        tags: ['report', 'chat'],
+      },
+    ],
+    defaultInterface: { type: 'in-memory' },
+    metadata: { seed: 'yan', role: 'tester', dogfood: true },
+  }
+
+  const smokeFlow = chainFlow([
+    { id: 's', type: 'start', label: 'start' },
+    {
+      id: 'shell',
+      type: 'tool-call',
+      label: '冒烟脚本',
+      config: {
+        tool_name: 'shell_execution',
+        args: '{"command":"py scripts/happy_path_acceptance_check.py"}',
+      },
+    },
+    {
+      id: 'code',
+      type: 'code',
+      label: '判结果',
+      config: {
+        code: `raw = _input if isinstance(_input, dict) else {}
+out = raw.get('stdout') or raw.get('result') or raw.get('output') or raw
+text = out if isinstance(out, str) else str(out)
+ok = '[OK]' in text and 'FAIL' not in text.split('[OK]')[0]
+result = {'skill': 'smoke', 'passed': ok, 'summary': text[-2000:]}`,
+      },
+    },
+    { id: 'o', type: 'output', label: 'output' },
+  ])
+
+  const unitFlow = chainFlow([
+    { id: 's', type: 'start', label: 'start' },
+    {
+      id: 'shell',
+      type: 'tool-call',
+      label: 'pytest',
+      config: {
+        tool_name: 'shell_execution',
+        args: '{"command":"py -m pytest tests/unit/ -q --tb=line"}',
+      },
+    },
+    {
+      id: 'code',
+      type: 'code',
+      label: '判结果',
+      config: {
+        code: `raw = _input if isinstance(_input, dict) else {}
+out = raw.get('stdout') or raw.get('result') or raw.get('output') or raw
+text = out if isinstance(out, str) else str(out)
+ok = 'failed' not in text.lower() and 'error' not in text.lower().split('passed')[0]
+if 'passed' in text.lower():
+    ok = 'failed' not in text.lower()
+result = {'skill': 'unit', 'passed': ok, 'summary': text[-2000:]}`,
+      },
+    },
+    { id: 'o', type: 'output', label: 'output' },
+  ])
+
+  const workerLoopFlow = chainFlow([
+    { id: 's', type: 'start', label: 'start' },
+    {
+      id: 'shell',
+      type: 'tool-call',
+      label: 'Worker Happy Path',
+      config: {
+        tool_name: 'shell_execution',
+        args: '{"command":"py scripts/worker_happy_path.py --spawn-worker"}',
+      },
+    },
+    {
+      id: 'code',
+      type: 'code',
+      label: '判结果',
+      config: {
+        code: `raw = _input if isinstance(_input, dict) else {}
+out = raw.get('stdout') or raw.get('result') or raw.get('output') or raw
+text = out if isinstance(out, str) else str(out)
+ok = 'OK: Studio -> Worker' in text or '[happy-path] OK' in text
+result = {'skill': 'worker_loop', 'passed': ok, 'summary': text[-2000:]}`,
+      },
+    },
+    { id: 'o', type: 'output', label: 'output' },
+  ])
+
+  const reportFlow = chainFlow([
+    { id: 's', type: 'start', label: 'start' },
+    {
+      id: 'llm',
+      type: 'llm',
+      label: '整理报告',
+      config: {
+        model: 'deepseek-v4-flash',
+        system_prompt:
+          '你是方隅「验」测试智能体。把用户粘贴的测试输出整理成中文报告：1) 结论（通过/失败）2) 失败项与原文摘录 3) 建议下一步（最多 3 条）。不要编造未出现的结果。',
+        temperature: 0.2,
+        max_tokens: 1024,
+        auto_inject_memory: false,
+      },
+    },
+    { id: 'o', type: 'output', label: 'output' },
+  ])
+
+  const node = agentNode(
+    'seed_yan',
+    '验 · Tester',
+    card,
+    {
+      smoke: smokeFlow,
+      unit: unitFlow,
+      worker_loop: workerLoopFlow,
+      report: reportFlow,
+    },
+    { agentKind: 'hybrid', x: 120, y: 280 },
+  )
+
+  return {
+    id: 'official_agent_yan',
+    name: '验 · Tester',
+    description: card.description!,
+    category: '种子 Agent',
+    tags: ['官方', 'tester', 'smoke', 'dogfood', '验'],
+    payload: { nodes: [node], edges: [] },
+  }
+}
+
 export function buildSeedAgentAssets(): SeedAgentAsset[] {
-  return [buildOpenClawAgent(), buildHermesAgent(), buildOpenCodeAgent()]
+  return [buildOpenClawAgent(), buildHermesAgent(), buildOpenCodeAgent(), buildYanTesterAgent()]
 }
 
 export function getSeedAgentById(id: string): SeedAgentAsset | undefined {

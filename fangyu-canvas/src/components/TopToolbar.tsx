@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import type { WorkerInfo } from '@fangyu/core/schema'
 import { demoFlows } from '../utils/demoFlows'
-import { isDesktop } from '../platform'
+import { isDesktop, isNative, queryNativeHealth } from '../platform'
 
 const CATEGORY_ORDER = ['流程控制', 'AI 能力', '数据操作', '记忆存储', '工具集成', '其他']
 
@@ -46,7 +46,17 @@ const GROUPED_DEMOS = CATEGORY_ORDER.map(cat => ({
 
 const DEMO_COUNT = Object.keys(demoFlows).length
 
+export type AppView = 'flow' | 'law' | 'worker' | 'presence'
+export type XuMode = 'flow' | 'agent'
+
 interface Props {
+  view: AppView
+  onViewChange: (view: AppView) => void
+  xuMode: XuMode
+  onXuModeChange: (mode: XuMode) => void
+  flowDirty?: boolean
+  dark?: boolean
+  onToggleDark?: () => void
   onNewFlow: () => void
   onSaveFlow: () => void
   onShowHistory: () => void
@@ -65,6 +75,7 @@ interface Props {
   onOpenAssets: () => void
   onOpenIntent?: () => void
   onOpenScenario?: () => void
+  onOpenSetupCopilot?: () => void
   simulating?: boolean
   dispatching?: boolean
   workersOnline?: number
@@ -73,186 +84,255 @@ interface Props {
   onSelectWorker?: (workerId: string) => void
 }
 
+/** 四门排布：序 · 律 · 行 · 观（Agent 归入序） */
+const VIEWS: { id: AppView; label: string; title: string; testId?: string }[] = [
+  { id: 'flow', label: '序', title: '方隅·序 — 流程 / Agent 编排', testId: 'nav-xu' },
+  { id: 'law', label: '律', title: '方隅·律 — 宪法与审计', testId: 'nav-law' },
+  { id: 'worker', label: '行', title: '方隅·行 — Worker 看板', testId: 'nav-hang' },
+  { id: 'presence', label: '观', title: '方隅·观 — 协作现场', testId: 'nav-presence' },
+]
+
+const XU_MODES: { id: XuMode; label: string; title: string }[] = [
+  { id: 'flow', label: '流程', title: 'Flow 画布' },
+  { id: 'agent', label: 'Agent', title: 'Agent 编排' },
+]
+
 export default function TopToolbar(props: Props) {
-  const Btn = ({ title, onClick, primary, style, children }: { title?: string; onClick: () => void; primary?: boolean; style?: React.CSSProperties; children: React.ReactNode }) => (
+  const Btn = ({
+    title, onClick, primary, style, children,
+  }: {
+    title?: string
+    onClick: () => void
+    primary?: boolean
+    style?: React.CSSProperties
+    children: React.ReactNode
+  }) => (
     <button className={`notion-btn${primary ? ' primary' : ''}`} onClick={onClick} title={title} style={style}>
       {children}
     </button>
   )
 
+  const isXu = props.view === 'flow'
+  const isFlow = isXu && props.xuMode === 'flow'
+  const isAgent = isXu && props.xuMode === 'agent'
+
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      height: 'var(--header-height)', padding: '0 12px',
+      height: 48, padding: '0 12px', gap: 12,
       borderBottom: '1px solid var(--border-color)', background: 'var(--bg-primary)',
       userSelect: 'none', flexShrink: 0,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 100 }}>
-        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>
-          方隅<span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>·序</span>
+      {/* 品牌 + 三门（Agent 归入序） */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+        <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.3px', whiteSpace: 'nowrap' }}>
+          方隅
         </span>
-        {isDesktop() ? (
-          <span style={{
-            fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
-            background: 'var(--bg-secondary)', color: 'var(--text-muted)',
-            border: '1px solid var(--border-color)',
-          }} title="Electron 过渡壳">
-            行·过渡
-          </span>
-        ) : (
-          <span style={{
-            fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
-            background: 'var(--bg-secondary)', color: 'var(--text-muted)',
-            border: '1px solid var(--border-color)',
-          }} title="管理与设计台">
-            Studio
-          </span>
-        )}
-        {(props.workersOnline ?? 0) > 0 && (
-          <span style={{
-            fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
-            background: 'rgba(34, 197, 94, 0.12)', color: '#16a34a',
-            border: '1px solid rgba(34, 197, 94, 0.35)',
-          }} title="在线 Worker 数量">
-            行 {props.workersOnline}
-          </span>
-        )}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <Btn onClick={props.onNewFlow} title="新建画布">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          新建
-        </Btn>
-        <Btn onClick={props.onSaveFlow} primary title="保存 Ctrl+S">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-          保存
-        </Btn>
-        <Btn onClick={props.onShowHistory} title="保存历史">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          历史
-        </Btn>
-        <Btn onClick={props.onImportFlow} title="导入流程JSON">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          导入
-        </Btn>
-        <Btn onClick={props.onExportFlow} title="导出（源码 + 配置 + 可执行文件）">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          导出
-        </Btn>
-        <DemoMenu groups={GROUPED_DEMOS} count={DEMO_COUNT} onSelect={props.onLoadDemo} />
-        {props.onOpenIntent && (
-          <Btn onClick={props.onOpenIntent} title="自然语言 → 生成 Flow（Phase 6）">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2a7 7 0 0 1 7 7c0 2.4-1.2 4.5-3 5.7V17H8v-2.3C6.2 13.5 5 11.4 5 9a7 7 0 0 1 7-7z"/>
-              <line x1="9" y1="21" x2="15" y2="21"/>
-            </svg>
-            意图生成
-          </Btn>
-        )}
-        {props.onOpenScenario && (
-          <Btn onClick={props.onOpenScenario} title="场景模板一键实例化（Flow + Agent + Bundle + 策略）">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="3" width="7" height="7"/>
-              <rect x="14" y="3" width="7" height="7"/>
-              <rect x="14" y="14" width="7" height="7"/>
-              <rect x="3" y="14" width="7" height="7"/>
-            </svg>
-            场景模板
-          </Btn>
-        )}
-        <Btn onClick={props.onOpenAssets} title="打开资产库（官方模板 + 我的流程）">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-          资产库
-        </Btn>
-        <div style={{ width: 1, height: 20, background: 'var(--border-color)', margin: '0 4px' }} />
-        <Btn onClick={props.onGroupSelected} title="封装为组合原子">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-          组合
-        </Btn>
-        <Btn onClick={props.onUngroupSelected} title="展开组合原子">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="12" y1="9" x2="12" y2="15"/></svg>
-          展开
-        </Btn>
-        <div style={{ width: 1, height: 20, background: 'var(--border-color)', margin: '0 4px' }} />
-        <Btn onClick={props.onDeleteSelected} title="删除选中 Delete">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-          删除
-        </Btn>
-        <Btn onClick={props.onOpenFlowConfig} title="画布配置">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
-          提示词
-        </Btn>
-        <Btn onClick={props.onSimulate} primary title="序内预览 — 设计验证，非生产执行" style={props.simulating ? { opacity: 0.6, pointerEvents: 'none' } : undefined}>
-          {props.simulating ? (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 0.8s linear infinite' }}>
-              <circle cx="12" cy="12" r="10" strokeDasharray="30 70"/>
-            </svg>
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          )}
-          {props.simulating ? '预览中…' : '序内预览'}
-        </Btn>
-        {props.onDispatchToWorker && (
-          <>
-            {(props.onlineWorkers?.length ?? 0) > 0 && (
-              <select
-                value={props.selectedWorkerId ?? props.onlineWorkers![0].id}
-                onChange={e => props.onSelectWorker?.(e.target.value)}
-                title="选择目标 Worker"
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 2,
+          padding: 2, borderRadius: 8,
+          background: 'var(--bg-secondary)',
+          border: '1px solid var(--border-color)',
+        }}>
+          {VIEWS.map(v => {
+            const active = props.view === v.id
+            const label = v.id === 'flow' && props.flowDirty ? `${v.label} ●` : v.label
+            const hangBadge = v.id === 'worker' && (props.workersOnline ?? 0) > 0
+              ? ` ${props.workersOnline}`
+              : ''
+            return (
+              <button
+                key={v.id}
+                type="button"
+                data-testid={v.testId}
+                title={v.title}
+                onClick={() => props.onViewChange(v.id)}
                 style={{
-                  fontSize: 11,
-                  padding: '4px 6px',
-                  borderRadius: 4,
-                  border: '1px solid var(--border-color)',
-                  background: 'var(--bg-secondary)',
-                  color: 'var(--text-primary)',
-                  maxWidth: 160,
+                  padding: '4px 10px',
+                  border: 'none',
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: active ? 600 : 450,
+                  cursor: 'pointer',
+                  background: active ? 'var(--bg-primary)' : 'transparent',
+                  color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  boxShadow: active ? 'var(--shadow-sm)' : 'none',
                 }}
               >
-                {props.onlineWorkers!.map(w => (
-                  <option key={w.id} value={w.id}>{w.name}</option>
-                ))}
-              </select>
-            )}
+                {label}{hangBadge}
+              </button>
+            )
+          })}
+        </div>
+        {isXu && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 2,
+            padding: 2, borderRadius: 8,
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border-light)',
+          }}>
+            {XU_MODES.map(m => {
+              const active = props.xuMode === m.id
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  data-testid={m.id === 'agent' ? 'nav-xu-agent' : 'nav-xu-flow'}
+                  title={m.title}
+                  onClick={() => props.onXuModeChange(m.id)}
+                  style={{
+                    padding: '3px 9px',
+                    border: 'none',
+                    borderRadius: 6,
+                    fontSize: 11,
+                    fontWeight: active ? 600 : 450,
+                    cursor: 'pointer',
+                    background: active ? 'var(--bg-primary)' : 'transparent',
+                    color: active ? 'var(--text-primary)' : 'var(--text-muted)',
+                    boxShadow: active ? 'var(--shadow-sm)' : 'none',
+                  }}
+                >
+                  {m.label}
+                </button>
+              )
+            })}
+          </div>
+        )}
+        {isNative() ? (
+          <NativeShellBadge />
+        ) : isDesktop() ? (
+          <span style={{ fontSize: 10, color: 'var(--text-muted)' }} title="Electron 过渡壳">过渡</span>
+        ) : null}
+      </div>
+
+      {/* 情境操作：只保留主路径 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'center', minWidth: 0 }}>
+        {isFlow && (
+          <>
+            <Btn onClick={props.onNewFlow} title="新建画布">新建</Btn>
+            <Btn onClick={props.onSaveFlow} primary title="保存 Ctrl+S">保存</Btn>
+            <ToolbarMenu
+              label="创建"
+              title="意图 / 场景 / 用例 / 资产"
+              items={[
+                ...(props.onOpenIntent ? [{ label: '意图生成', hint: '自然语言 → Flow', onClick: props.onOpenIntent }] : []),
+                ...(props.onOpenScenario ? [{ label: '场景模板', hint: '一键实例化', onClick: props.onOpenScenario }] : []),
+                { label: `示例用例 (${DEMO_COUNT})`, hint: '加载演示流程', submenu: true },
+                { label: '资产库', hint: '官方模板 + 我的流程', onClick: props.onOpenAssets },
+              ]}
+              demoGroups={GROUPED_DEMOS}
+              onLoadDemo={props.onLoadDemo}
+            />
+            <ToolbarMenu
+              label="更多"
+              title="文件与编辑"
+              items={[
+                { label: '历史版本', onClick: props.onShowHistory },
+                { label: '导入 JSON', onClick: props.onImportFlow },
+                { label: '导出 Bundle', onClick: props.onExportFlow },
+                { label: '组合选中', onClick: props.onGroupSelected },
+                { label: '展开组合', onClick: props.onUngroupSelected },
+                { label: '删除选中', onClick: props.onDeleteSelected },
+                { label: '画布提示词', onClick: props.onOpenFlowConfig },
+                { label: '批量测试', onClick: props.onBatchTest },
+              ]}
+            />
+            <div style={{ width: 1, height: 18, background: 'var(--border-color)', margin: '0 6px' }} />
             <Btn
-              onClick={props.onDispatchToWorker}
-              title="发布快照并派发至行 — 由本机 Worker 真执行"
-              style={props.dispatching ? { opacity: 0.6, pointerEvents: 'none' } : undefined}
+              onClick={props.onSimulate}
+              primary
+              title="序内预览 — 设计验证"
+              style={props.simulating ? { opacity: 0.6, pointerEvents: 'none' } : undefined}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
-              {props.dispatching ? '派发中…' : '派发至行'}
+              {props.simulating ? '预览中…' : '预览'}
             </Btn>
+            {props.onDispatchToWorker && (
+              <>
+                {(props.onlineWorkers?.length ?? 0) > 1 && (
+                  <select
+                    value={props.selectedWorkerId ?? props.onlineWorkers![0].id}
+                    onChange={e => props.onSelectWorker?.(e.target.value)}
+                    title="选择目标 Worker"
+                    style={{
+                      fontSize: 11, padding: '4px 6px', borderRadius: 4,
+                      border: '1px solid var(--border-color)',
+                      background: 'var(--bg-secondary)', color: 'var(--text-primary)',
+                      maxWidth: 120,
+                    }}
+                  >
+                    {props.onlineWorkers!.map(w => (
+                      <option key={w.id} value={w.id}>{w.name}</option>
+                    ))}
+                  </select>
+                )}
+                <Btn
+                  onClick={props.onDispatchToWorker}
+                  title="派发至行 — 本机 Worker 真执行"
+                  style={props.dispatching ? { opacity: 0.6, pointerEvents: 'none' } : undefined}
+                >
+                  {props.dispatching ? '派发中…' : '派发至行'}
+                </Btn>
+              </>
+            )}
           </>
         )}
-        <Btn onClick={props.onBatchTest} title="批量测试">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-          批量测试
-        </Btn>
+        {isAgent && props.onOpenSetupCopilot && (
+          <Btn onClick={props.onOpenSetupCopilot} title="粘贴外部 Agent URL → 确认信任">
+            Setup Copilot
+          </Btn>
+        )}
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 100, justifyContent: 'flex-end' }}>
-        <Btn onClick={props.onOpenSettings} title="设置">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        </Btn>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>v1.0</span>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        {props.onToggleDark && (
+          <button
+            type="button"
+            className="notion-btn"
+            onClick={props.onToggleDark}
+            title={props.dark ? '浅色' : '深色'}
+            style={{ padding: '4px 8px', minWidth: 32 }}
+          >
+            {props.dark ? '浅' : '深'}
+          </button>
+        )}
+        <Btn onClick={props.onOpenSettings} title="设置">设置</Btn>
       </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }
 
-function DemoMenu({ groups, count, onSelect }: {
-  groups: { category: string; items: { id: string; label: string; desc: string }[] }[]
-  count: number
-  onSelect: (id: string) => void
+type MenuItem = {
+  label: string
+  hint?: string
+  onClick?: () => void
+  submenu?: boolean
+}
+
+function ToolbarMenu({
+  label,
+  title,
+  items,
+  demoGroups,
+  onLoadDemo,
+}: {
+  label: string
+  title?: string
+  items: MenuItem[]
+  demoGroups?: { category: string; items: { id: string; label: string; desc: string }[] }[]
+  onLoadDemo?: (id: string) => void
 }) {
   const [open, setOpen] = useState(false)
+  const [demoOpen, setDemoOpen] = useState(false)
   const [pos, setPos] = useState({ top: 0, left: 0 })
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+        setDemoOpen(false)
+      }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -260,45 +340,142 @@ function DemoMenu({ groups, count, onSelect }: {
 
   return (
     <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
-      <button className="notion-btn" onClick={(e) => {
-        const r = e.currentTarget.getBoundingClientRect()
-        setPos({ top: r.bottom + 4, left: r.left })
-        setOpen(o => !o)
-      }} title={`加载示例流程 (${count} 个)`}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
-        </svg>
-        用例 ({count})
+      <button
+        type="button"
+        className="notion-btn"
+        title={title}
+        onClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect()
+          setPos({ top: r.bottom + 4, left: r.left })
+          setOpen(o => !o)
+          setDemoOpen(false)
+        }}
+      >
+        {label}
+        <span style={{ fontSize: 9, opacity: 0.55, marginLeft: 2 }}>▾</span>
       </button>
       {open && (
         <div style={{
-          position: 'fixed', top: pos.top, left: pos.left, zIndex: 10000, background: '#fff', borderRadius: 8,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.15)', border: '1px solid #eee',
-          minWidth: 260, maxHeight: '75vh', overflowY: 'auto',
+          position: 'fixed', top: pos.top, left: pos.left, zIndex: 10000,
+          background: 'var(--bg-primary)', borderRadius: 8,
+          boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border-color)',
+          minWidth: 200, padding: 4,
         }}>
-          {groups.map(g => (
-            <div key={g.category}>
-              <div style={{ padding: '8px 12px 4px', fontSize: 10, fontWeight: 700, color: '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                {g.category} ({g.items.length})
-              </div>
-              {g.items.map(d => (
-                <button key={d.id} style={{
-                  display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px 8px 16px',
-                  border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12,
-                  borderBottom: '1px solid #f5f5f3',
+          {items.map(item => {
+            if (item.submenu && demoGroups && onLoadDemo) {
+              return (
+                <div key={item.label}>
+                  <button
+                    type="button"
+                    onClick={() => setDemoOpen(d => !d)}
+                    style={menuBtnStyle}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                  >
+                    <div style={{ fontWeight: 600 }}>{item.label}</div>
+                    {item.hint && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{item.hint}</div>}
+                  </button>
+                  {demoOpen && (
+                    <div style={{
+                      maxHeight: '50vh', overflowY: 'auto',
+                      borderTop: '1px solid var(--border-light)',
+                      marginTop: 2, paddingTop: 2,
+                    }}>
+                      {demoGroups.map(g => (
+                        <div key={g.category}>
+                          <div style={{
+                            padding: '6px 10px 2px', fontSize: 10, fontWeight: 700,
+                            color: 'var(--text-muted)', letterSpacing: '0.4px',
+                          }}>
+                            {g.category}
+                          </div>
+                          {g.items.map(d => (
+                            <button
+                              key={d.id}
+                              type="button"
+                              style={{ ...menuBtnStyle, paddingLeft: 14 }}
+                              onClick={() => {
+                                onLoadDemo(d.id)
+                                setOpen(false)
+                                setDemoOpen(false)
+                              }}
+                              onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)' }}
+                              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                            >
+                              <div style={{ fontWeight: 600 }}>{d.label}</div>
+                              {d.desc && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{d.desc}</div>}
+                            </button>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            }
+            return (
+              <button
+                key={item.label}
+                type="button"
+                style={menuBtnStyle}
+                onClick={() => {
+                  item.onClick?.()
+                  setOpen(false)
                 }}
-                  onClick={() => { onSelect(d.id); setOpen(false) }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#f5f5f3'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                >
-                  <div style={{ fontWeight: 600, color: '#37352f', marginBottom: 2 }}>{d.label}</div>
-                  <div style={{ fontSize: 11, color: '#9b9a97' }}>{d.desc}</div>
-                </button>
-              ))}
-            </div>
-          ))}
+                onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+              >
+                <div style={{ fontWeight: 600 }}>{item.label}</div>
+                {item.hint && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{item.hint}</div>}
+              </button>
+            )
+          })}
         </div>
       )}
     </div>
+  )
+}
+
+const menuBtnStyle: React.CSSProperties = {
+  display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px',
+  border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12,
+  color: 'var(--text-primary)', borderRadius: 6,
+}
+
+function NativeShellBadge() {
+  const [tip, setTip] = useState('Windows 原生 · 探测中…')
+  const [ok, setOk] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const tick = async () => {
+      const h = await queryNativeHealth()
+      if (cancelled) return
+      if (!h) {
+        setOk(null)
+        setTip('Windows 原生（IPC 不可用）')
+        return
+      }
+      const apiOk = h.api === 'running'
+      const workerOk = h.worker === 'running'
+      setOk(apiOk && workerOk)
+      setTip(`原生 · API ${h.api} · Worker ${h.worker}`)
+    }
+    tick()
+    const id = window.setInterval(tick, 8000)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [])
+
+  const color = ok === true
+    ? 'var(--success, #2a9d6e)'
+    : ok === false
+      ? 'var(--danger, #c44)'
+      : 'var(--text-muted)'
+
+  return (
+    <span style={{ fontSize: 10, color }} title={tip}>原生</span>
   )
 }

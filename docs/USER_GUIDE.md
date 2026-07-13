@@ -3,10 +3,10 @@
 > 面向**零编程经验**用户。按顺序阅读即可完成：安装 → 画布编排 → 导出 Agent → 独立运行 → 接入外部 Agent → 产线 Demo。
 
 **日常入口（推荐）：**
-- **方隅·序**（设计）：仓库根目录 `dev.bat` → http://localhost:5173  
-- **方隅·行**（本机执行）：`install-worker.bat`（首次）→ `dev-worker-tray.bat`（PowerShell 托盘）或 `dev-worker-tauri.bat`（Tauri 原生壳，需 Rust）  
-- **方隅·观**（协作现场）：序顶栏「方隅·观」— Presence + 时间线 + 协作边  
-- **方隅·律**（宪法审计）：序顶栏「方隅·律」— 规则、白话解释、审计链  
+- **Windows 原生**：`install-native.bat`（一次）→ 桌面「Fangyu」；或直接 `dev-native.bat`  
+- **仅网页序**：`dev.bat` → http://localhost:5173  
+- **仅行托盘**：`install-worker.bat`（首次）→ `dev-worker-tray.bat`  
+- **方隅·观 / 律**：原生或网页顶栏「观」「律」
 
 技术细节请参阅 [L1 路线图](L1_ROADMAP.md)、[Adapter 开发指南](ADAPTER_DEV_GUIDE.md)、[愿景·四门两包](VISION_AND_PRODUCT.md)、[扔 Electron 检查清单](ELECTRON_RETIREMENT.md)。
 
@@ -93,12 +93,15 @@ npm run dev
 
 ## 4. 界面导览
 
-顶部有两个主 Tab：
+顶部主入口按 **序 · 律 · 行 · 观** 排布；Agent 编排在 **序** 的二级切换里：
 
-| Tab | 作用 |
-|-----|------|
-| **Flow 画布** | 设计单个 Agent 的「技能流程」（节点 + 连线） |
-| **Agent 编排** | 设计多个 Agent 如何协作（Agent 节点 + 路由器） |
+| 入口 | 作用 |
+|------|------|
+| **序 · 流程** | 设计单条工作流（节点 DAG） |
+| **序 · Agent** | 设计多个 Agent 如何协作 |
+| **律** | 宪法与审计 |
+| **行** | Worker 看板：谁在线、在干什么 |
+| **观** | 多 Agent / Worker 协作现场 |
 
 底部或侧边通常有：
 
@@ -146,7 +149,7 @@ npm run dev
 
 ## 6. Agent 编排：多 Agent 协作
 
-切换到顶部 **Agent 编排** Tab。
+在顶部进入 **序**，再切换到 **Agent**（二级）。
 
 ### 6.1 添加 Agent
 
@@ -396,8 +399,7 @@ curl -X POST http://127.0.0.1:9001/rpc -H "Content-Type: application/json" -d "{
 | [L1_ROADMAP.md](L1_ROADMAP.md) | 了解产品方向与技术阶段 |
 | [A2A_REMOTE.md](A2A_REMOTE.md) | 跨机器 RPC 调用 |
 | [ADAPTER_DEV_GUIDE.md](ADAPTER_DEV_GUIDE.md) | 开发 MQTT/OPC-UA 等 Adapter 插件 |
-| [ELECTRON_RETIREMENT.md](ELECTRON_RETIREMENT.md) | 何时可删掉 Electron 过渡壳 |
-| [ELECTRON_SMOKE.md](ELECTRON_SMOKE.md) | Electron 过渡壳冒烟（附录，可选） |
+| [ELECTRON_RETIREMENT.md](ELECTRON_RETIREMENT.md) | Electron 过渡壳退役存档（已删包） |
 
 ---
 

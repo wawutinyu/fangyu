@@ -224,7 +224,7 @@ export default function AgentCanvas() {
   }, [selectedNodeId, storeNodes])
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ flex: 1, width: '100%', height: '100%', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
       {runbook && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000,
@@ -259,40 +259,28 @@ export default function AgentCanvas() {
           </div>
         </div>
       )}
-      <div style={{ padding: '8px 16px', borderBottom: '1px solid #eee', display: 'flex', gap: 8, alignItems: 'center' }}>
-        <span style={{ fontSize: 14, fontWeight: 600 }}>Agent 编排画布</span>
-        <button onClick={addNewAgent} style={{
-          padding: '4px 14px', background: '#722ed1', color: '#fff',
-          border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12,
-        }}>+ 智能体</button>
-        <button onClick={addNewExternal} style={{
-          padding: '4px 14px', background: '#fa8c16', color: '#fff',
-          border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12,
-        }}>+ 外部 Agent</button>
-        <button onClick={addNewRouter} style={{
-          padding: '4px 14px', background: '#fa8c16', color: '#fff',
-          border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12,
-        }}>+ 路由器</button>
-        <button onClick={addNewGroup} style={{
-          padding: '4px 14px', background: '#d3adf7', color: '#722ed1',
-          border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12,
-        }}>+ 编组</button>
-        <button onClick={loadDemo} style={{
-          padding: '4px 14px', background: '#13c2c2', color: '#fff',
-          border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12,
-        }}>加载 AI 社会 Demo</button>
+      <div style={{
+        height: 44, padding: '0 12px', borderBottom: '1px solid var(--border-color)',
+        display: 'flex', gap: 6, alignItems: 'center', background: 'var(--bg-primary)', flexShrink: 0,
+      }}>
+        <span style={{ fontSize: 13, fontWeight: 600, marginRight: 4 }}>序 · Agent</span>
+        <button type="button" className="notion-btn primary" onClick={addNewAgent}>+ 智能体</button>
+        <button type="button" className="notion-btn" onClick={addNewExternal}>+ 外部</button>
+        <button type="button" className="notion-btn" onClick={addNewRouter}>+ 路由</button>
+        <button type="button" className="notion-btn" onClick={addNewGroup}>+ 编组</button>
+        <div style={{ width: 1, height: 16, background: 'var(--border-color)', margin: '0 4px' }} />
+        <button type="button" className="notion-btn" onClick={loadDemo} title="加载 AI 社会 Demo">Demo</button>
         {selectedNodeId && storeNodes.find(n => n.id === selectedNodeId)?.type === 'a2a-agent' && (
-          <button onClick={exportSelectedBundle} style={{
-            padding: '4px 14px', background: '#531dab', color: '#fff',
-            border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12,
-          }}>导出 exe</button>
+          <button type="button" className="notion-btn" onClick={exportSelectedBundle}>导出</button>
         )}
-        {selectedNodeId && <span style={{ fontSize: 12, color: '#888' }}>已选: {selectedNodeId}</span>}
+        <div style={{ flex: 1 }} />
+        {selectedNodeId && (
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            已选 {selectedNodeId}
+          </span>
+        )}
         {(selectedNodeId || selectedEdgeId) && (
-          <button onClick={deleteSelected} style={{
-            padding: '4px 14px', background: '#e53e3e', color: '#fff',
-            border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12,
-          }}>删除</button>
+          <button type="button" className="notion-btn" onClick={deleteSelected} style={{ color: '#b42318' }}>删除</button>
         )}
       </div>
       <div style={{ flex: 1 }}>

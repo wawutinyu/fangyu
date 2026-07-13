@@ -126,33 +126,69 @@ def audit_event(event_type: str, details: dict | None = None) -> None:
 
 
 def verify_audit_chain(limit: int = 200) -> dict[str, Any]:
-    """验证审计链完整性，返回 {valid, checked, broken_at}。"""
+    """验证审计链完整性，返回 {valid, checked, broken_at}。
+
+    ``limit>0`` 时只检查最近 N 条。若日志比窗口更长，窗口不从创世哈希起步，
+    会以窗口内首条带 hash 记录的 ``prev_hash`` 为锚点，只验证窗口内连续性
+    （避免律面板 ``?limit=200`` 对长日志误报 ``prev_hash_mismatch``）。
+    """
     if not AUDIT_FILE.exists():
-        return {"valid": True, "checked": 0, "broken_at": None}
-    lines = [ln for ln in AUDIT_FILE.read_text(encoding="utf-8").splitlines() if ln.strip()]
-    if limit > 0:
-        lines = lines[-limit:]
+        return {"valid": True, "checked": 0, "broken_at": None, "legacy_skipped": 0, "window_truncated": False}
+    all_lines = [ln for ln in AUDIT_FILE.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    truncated = bool(limit > 0 and len(all_lines) > limit)
+    lines = all_lines[-limit:] if limit > 0 else all_lines
     prev = "0" * 64
     checked = 0
     legacy_skipped = 0
+    anchored = not truncated
     for i, line in enumerate(lines):
         try:
             entry = json.loads(line)
         except json.JSONDecodeError:
-            return {"valid": False, "checked": i, "broken_at": i, "reason": "invalid_json"}
+            return {
+                "valid": False,
+                "checked": i,
+                "broken_at": i,
+                "reason": "invalid_json",
+                "legacy_skipped": legacy_skipped,
+                "window_truncated": truncated,
+            }
         if "hash" not in entry:
             legacy_skipped += 1
             continue
+        if not anchored:
+            prev = str(entry.get("prev_hash") or ("0" * 64))
+            anchored = True
         if entry.get("prev_hash") != prev:
-            return {"valid": False, "checked": checked, "broken_at": i, "reason": "prev_hash_mismatch", "legacy_skipped": legacy_skipped}
+            return {
+                "valid": False,
+                "checked": checked,
+                "broken_at": i,
+                "reason": "prev_hash_mismatch",
+                "legacy_skipped": legacy_skipped,
+                "window_truncated": truncated,
+            }
         payload = {k: entry[k] for k in ("ts", "event", "details", "prev_hash") if k in entry}
         canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True)
         expected = hashlib.sha256(f"{prev}:{canonical}".encode()).hexdigest()
         if entry.get("hash") != expected:
-            return {"valid": False, "checked": checked, "broken_at": i, "reason": "hash_mismatch", "legacy_skipped": legacy_skipped}
+            return {
+                "valid": False,
+                "checked": checked,
+                "broken_at": i,
+                "reason": "hash_mismatch",
+                "legacy_skipped": legacy_skipped,
+                "window_truncated": truncated,
+            }
         prev = entry.get("hash", prev)
         checked += 1
-    return {"valid": True, "checked": checked, "broken_at": None, "legacy_skipped": legacy_skipped}
+    return {
+        "valid": True,
+        "checked": checked,
+        "broken_at": None,
+        "legacy_skipped": legacy_skipped,
+        "window_truncated": truncated,
+    }
 
 
 def read_audit_log(limit: int = 50) -> list[dict]:

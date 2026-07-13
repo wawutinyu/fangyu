@@ -1,65 +1,73 @@
-# 方隅·行 · Tauri 壳（MVP）
+# 方隅 · Windows 原生（Tauri）
 
-Windows 原生托盘壳，产品名 **方隅·行**。负责：
+第一阶段目标：**网页「序」有的功能，原生窗口里一比一都有**（同一套 `fangyu-studio` / `fangyu-canvas`，不重写 UI）。
 
-- 系统托盘菜单：打开方隅·序 / 重启 Worker / 状态窗口 / 退出
-- 拉起本机 `node fangyu-worker/src/cli.mjs`
-- 关闭窗口时隐藏到托盘（不杀进程）
-
-PowerShell 托盘（`dev-worker-tray.bat`）仍是过渡方案；本目录是 P1 原生壳方向。
-
-## 前置
-
-| 依赖 | 说明 |
+| 能力 | 说明 |
 |------|------|
-| Node.js 18+ | 前端 + Worker |
-| Rust (rustup) | `rustc` / `cargo` |
-| MSVC Build Tools | Windows 链接器（`tauri build`） |
+| 主窗口 | 嵌入完整序 UI：Flow / Agent / 律 / 行看板 / 观 |
+| API | 启动时拉起 `py -m fangyu --server`（已占用则复用） |
+| Worker（行） | 托盘守护 `fangyu-worker`，真 shell / run_flow |
+| 托盘 | 打开主窗口 / 重启 Worker / 退出 |
+| 安装 | `install-native.bat` → 桌面「Fangyu」+ `%LOCALAPPDATA%\Fangyu\native.json` |
+| 单实例 | 二次启动聚焦已有窗口 |
+| 开机自启 | 托盘「开机自启（切换）」 |
+| 安装包 | `build-native.bat` → NSIS |
 
-## 开发
+Web 与原生的长期分工**以后再定**；现阶段原生 = 全功能壳。
+
+> 运行时仍依赖本机仓库 + Python + Node（安装包不内嵌解释器）。配置：
+> - `%LOCALAPPDATA%\Fangyu\native.json` — `repo_root` / `data_dir`
+> - 或环境变量 `FANGYU_REPO_ROOT` / `FANGYU_DATA_DIR`
+
+## 安装（推荐）
 
 仓库根目录：
 
 ```bat
-dev-worker-tauri.bat
+install-native.bat
+```
+
+检查 Node / Python / Rust，装依赖，并创建桌面与开始菜单快捷方式 **Fangyu.lnk** → `dev-native.bat`。
+
+## 开发启动
+
+```bat
+dev-native.bat
+```
+
+或手动：
+
+1. `py -m fangyu --server`
+2. `npm run dev`（序 Vite :5173）
+3. `cd fangyu-worker-tauri && npx tauri dev`
+
+## 打包
+
+```bat
+build-native.bat
 ```
 
 或：
 
-```bash
-cd fangyu-worker-tauri
-npm install
-npx tauri dev
-```
-
-环境变量（可选）：
-
-| 变量 | 默认 |
-|------|------|
-| `FANGYU_API_BASE` | `http://127.0.0.1:8000` |
-| `FANGYU_STUDIO_URL` | `http://127.0.0.1:5173` |
-
-请先启动序 API（`dev.bat` 或 `py -m fangyu --server`），再开本壳。
-
-## 打包
-
-```bash
+```bat
 cd fangyu-worker-tauri
 npx tauri build
 ```
 
-产物：
+产物：`src-tauri/target/release/bundle/nsis/*.exe`
 
-| 文件 | 说明 |
+安装 NSIS 后仍需本机 clone（`install-native.bat` 写入 `native.json`），否则找不到 Worker/API。
+
+## 前置
+
+- Node 18+
+- Python 3.10+（`pip install -e .`）
+- Rust + MSVC（`rustup`）
+
+## 与 Electron / 旧托盘壳
+
+| 入口 | 角色 |
 |------|------|
-| `src-tauri/target/release/fangyu-worker-tauri.exe` | 可直接跑的托盘壳 |
-| `src-tauri/target/release/bundle/nsis/方隅·行_0.1.0_x64-setup.exe` | NSIS 安装包 |
-
-网络不稳时包内 `.cargo/config.toml` 使用 rsproxy 拉 crates。安装包默认只打 NSIS（不打 MSI，避免 WiX 下载卡住）。
-## 与 Worker 包关系
-
-| 包 | 角色 |
-|----|------|
-| `fangyu-worker/` | 真执行守护进程（Node） |
-| `fangyu-worker-tauri/` | 原生壳 + 托盘 UX |
-| `fangyu-desktop/` | Electron 过渡壳（计划退役） |
+| **`install-native.bat` / `dev-native.bat`** | **推荐**：Windows 原生全功能 |
+| `dev.bat` | 仅网页序 + API |
+| `install-worker.bat` | 仅行托盘 |

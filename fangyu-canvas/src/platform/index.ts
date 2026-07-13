@@ -4,6 +4,7 @@ import type { PlatformInfo } from './types'
 import { webPlatform } from './web'
 
 export type { PlatformInfo, PlatformKind, DesktopPreloadBridge } from './types'
+export { isTauriRuntime, queryNativeHealth } from './native'
 
 let currentPlatform: PlatformInfo = webPlatform
 
@@ -25,6 +26,10 @@ export function getPlatform(): PlatformInfo {
 
 export function isDesktop(): boolean {
   return currentPlatform.kind === 'desktop' || currentPlatform.kind === 'native'
+}
+
+export function isNative(): boolean {
+  return currentPlatform.kind === 'native'
 }
 
 export function resolveApiUrl(path: string): string {

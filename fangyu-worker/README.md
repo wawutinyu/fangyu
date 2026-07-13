@@ -82,6 +82,6 @@ set FANGYU_SHELL_POLICY=allowlist
 
 ## 后续
 
-- 外人安装验收（检查清单 A5）+ 团队 4 周不用 Electron（B5）→ 删 `fangyu-desktop`
+- 日常入口：Windows 原生 `install-native.bat`（Electron `fangyu-desktop` 已退役）
 - Tauri 原生壳 + Windows 安装包（Rust 就绪后再做，体验升级）
 - Bundle 常驻 daemon（MQTT 触发 → 自动派发行）

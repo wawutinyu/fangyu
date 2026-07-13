@@ -17,13 +17,15 @@ AI 社会的基础设施 — 可视化编排 + DAG 执行引擎 + A2A 协议 + A
 | **方隅·行** | 本机真执行 | `fangyu-worker`（行包） |
 
 ```
-四门:  序 ── 观 ── 律 ── 行
+四门:  序 ── 律 ── 行 ── 观
+（序内：流程 / Agent）
 两包:  └─ studio ─┘      worker
 ```
 
 > **序而后行**：在序里设计并发布，在行里本机 shell / 文件 / Adapter 真干活。  
 > **观 / 律** 叙事与序、行并列，工程上先挂在序包，不急着第三安装包。  
-> `fangyu-desktop`（Electron）为**可选过渡壳**；退役门槛见 **[扔 Electron 检查清单](docs/ELECTRON_RETIREMENT.md)**。
+> **Windows 原生（推荐体验）：** `install-native.bat` / `dev-native.bat` — Tauri 窗口内嵌完整序 UI（与网页 1:1）+ API + Worker。详见 [`fangyu-worker-tauri/README.md`](fangyu-worker-tauri/README.md)。  
+> Electron 过渡壳 `fangyu-desktop` **已退役**（见 [扔 Electron 检查清单](docs/ELECTRON_RETIREMENT.md)）。
 
 ## MQTT → 行（可选）
 
@@ -47,25 +49,26 @@ py -m pip install -e .
 # 端口被占用或界面是旧版时，先清理
 dev-clean.bat
 
-# 方隅·序 + API（主入口）
+# 方隅 Windows 原生（推荐）— 序 UI 1:1 + API + Worker 托盘
+install-native.bat
+# → 桌面「Fangyu」快捷方式 → 之后双击即可
+dev-native.bat
+build-native.bat
+# → NSIS 安装包
+
+# 仅网页序 + API
 dev.bat
-# → http://localhost:5173  标题应显示「方隅·序」
+# → http://localhost:5173
 
-# 方隅·行 — 首次安装（检查 Node + 桌面快捷方式）
+# 方隅·行 — 仅 Worker 托盘（不含序窗口）
 install-worker.bat
-
-# 方隅·行 Worker（真执行）
 dev-worker.bat
 
-# 方隅·行 — Windows 系统托盘（过渡：PowerShell）
+# 方隅·行 — PowerShell 托盘（过渡）
 dev-worker-tray.bat
-
-# 方隅·行 — Tauri 原生托盘壳（P1，需 Rust + MSVC）
-dev-worker-tauri.bat
-
-# Electron 过渡壳（可选，计划退役）
-dev-desktop.bat
 ```
+
+> 旧入口 `dev-worker-tauri.bat` 仍可用；完整体验请用 **`install-native.bat` / `dev-native.bat`**。
 
 ## 目录结构
 
@@ -79,8 +82,7 @@ fangyu/
 ├── fangyu-canvas/     # 共享画布 UI
 ├── fangyu-studio/     # 方隅·序
 ├── fangyu-worker/     # 方隅·行（Node 守护进程）
-├── fangyu-worker-tauri/ # 方隅·行 Tauri 托盘壳（P1）
-├── fangyu-desktop/    # Electron 过渡壳（可选，deprecated）
+├── fangyu-worker-tauri/ # Windows 原生壳（Tauri：序 UI + Worker）
 ├── scripts/           # Demo 脚本
 └── data/              # constitution.json, assets/
 ```
@@ -103,8 +105,7 @@ py scripts/worker_happy_path.py --spawn-worker
 - **[L1 开发主线](docs/L1_ROADMAP.md)**
 - **[Happy Path 验收清单](docs/HAPPY_PATH_ACCEPTANCE.md)**
 - **[Phase 5 技术方案](docs/PHASE5_TECH_SPEC.md)**
-- **[扔 Electron 检查清单](docs/ELECTRON_RETIREMENT.md)**
-- **[Electron 过渡壳冒烟](docs/ELECTRON_SMOKE.md)**（可选）
+- **[扔 Electron 检查清单](docs/ELECTRON_RETIREMENT.md)**（已退役存档）
 
 ## 已移除
 
@@ -112,5 +113,6 @@ py scripts/worker_happy_path.py --spawn-worker
 |--------|------|
 | `fangyu-flow/` | 已并入 `fangyu-canvas` |
 | `fangyu-web/` | 已重命名为 `fangyu-studio`（方隅·序） |
+| `fangyu-desktop/` | Electron 过渡壳，已由 Tauri 原生替代 |
 
 若本地仍存在上述文件夹，先 **`dev-clean.bat`**，再 **`scripts\remove-legacy.bat`**。

@@ -1,7 +1,7 @@
 [package]
 name = "fangyu-worker-tauri"
 version = "0.1.0"
-description = "A Tauri App"
+description = "方隅 — Windows 原生（序 UI 1:1 + Worker）"
 authors = ["you"]
 edition = "2021"
 
@@ -22,4 +22,8 @@ tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-autostart = "2"
+tauri-plugin-single-instance = "2"
 

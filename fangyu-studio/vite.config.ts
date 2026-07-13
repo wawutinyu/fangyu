@@ -8,7 +8,7 @@ const CANVAS_SRC = path.resolve(__dirname, '../fangyu-canvas/src')
 const CORE_SRC = path.resolve(__dirname, '../fangyu-core/src')
 
 export default defineConfig({
-  base: process.env.ELECTRON === '1' ? './' : '/',
+  base: process.env.TAURI === '1' ? './' : '/',
   plugins: [react()],
   resolve: {
     alias: {

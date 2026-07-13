@@ -1,0 +1,14 @@
+[[permission]]
+identifier = "allow-worker-status"
+description = "Allow frontend to query Worker process status"
+commands.allow = ["worker_status"]
+
+[[permission]]
+identifier = "allow-api-status"
+description = "Allow frontend to query API health"
+commands.allow = ["api_status"]
+
+[[permission]]
+identifier = "allow-restart-worker-cmd"
+description = "Allow frontend to restart Worker"
+commands.allow = ["restart_worker_cmd"]

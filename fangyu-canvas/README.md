@@ -9,7 +9,7 @@ fangyu **共享画布** — Flow / Agent 组件、Redux、工具函数、`platfo
 | **fangyu-canvas**（本包） | — | 全部 UI 与业务逻辑 |
 | **fangyu-studio** | 方隅·序 | Web 管理与设计 |
 | **fangyu-worker** | 方隅·行 | 本机 Worker（托盘 / Node 守护进程） |
-| **fangyu-desktop** | — | Electron 过渡壳（计划退役） |
+| **fangyu-worker-tauri** | Windows 原生 | 序 UI 1:1 + API + Worker |
 
 ## 开发
 
@@ -17,12 +17,10 @@ fangyu **共享画布** — Flow / Agent 组件、Redux、工具函数、`platfo
 
 ```bash
 # 仓库根目录
-dev.bat                 # 方隅·序
-dev-worker-tray.bat     # 方隅·行（推荐）
-# install-worker.bat    # 首次：快捷方式
+install-native.bat      # 推荐：Windows 原生
+dev.bat                 # 仅网页序
+dev-worker-tray.bat     # 仅行托盘
 ```
-
-过渡壳（可选）：`dev-desktop.bat` — 见 [扔 Electron 检查清单](../docs/ELECTRON_RETIREMENT.md)。
 
 ## 脚本
 
