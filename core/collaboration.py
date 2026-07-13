@@ -8,12 +8,14 @@ import threading
 import time
 import uuid
 from collections import deque
+from queue import Empty, Full, Queue
 from typing import Any
 
 _MAX_EVENTS = 800
 _lock = threading.RLock()
 _events: deque[dict[str, Any]] = deque(maxlen=_MAX_EVENTS)
 _persist_ready = False
+_subscribers: list = []
 
 
 def _ensure_persist() -> None:
@@ -33,6 +35,7 @@ def reset_collaboration() -> None:
     global _persist_ready
     with _lock:
         _events.clear()
+        _subscribers.clear()
     try:
         from .collaboration_store import clear_events, close_connection
         clear_events()
@@ -40,6 +43,37 @@ def reset_collaboration() -> None:
     except Exception:
         pass
     _persist_ready = False
+
+
+def subscribe_events(maxsize: int = 200) -> Queue:
+    """订阅实时事件（SSE / 推送用）。"""
+    q: Queue = Queue(maxsize=maxsize)
+    with _lock:
+        _subscribers.append(q)
+    return q
+
+
+def unsubscribe_events(q: Queue) -> None:
+    with _lock:
+        if q in _subscribers:
+            _subscribers.remove(q)
+
+
+def _broadcast(entry: dict[str, Any]) -> None:
+    with _lock:
+        subs = list(_subscribers)
+    for q in subs:
+        try:
+            q.put_nowait(entry)
+        except Full:
+            try:
+                q.get_nowait()
+            except Empty:
+                pass
+            try:
+                q.put_nowait(entry)
+            except Full:
+                pass
 
 
 def emit_event(
@@ -64,6 +98,7 @@ def emit_event(
     }
     with _lock:
         _events.append(entry)
+    _broadcast(entry)
     try:
         _ensure_persist()
         from .collaboration_store import insert_event

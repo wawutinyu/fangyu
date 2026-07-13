@@ -2,9 +2,11 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import {
   fetchPresenceSnapshot,
   fetchPresenceEvents,
+  mergePresenceEvent,
   statusColor,
   statusLabel,
   formatEventTime,
+  subscribePresenceStream,
 } from '../presenceApi'
 
 beforeEach(() => {
@@ -48,5 +50,44 @@ describe('presenceApi', () => {
   it('surfaces HTTP errors', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }))
     await expect(fetchPresenceSnapshot()).rejects.toThrow('503')
+  })
+
+  it('mergePresenceEvent prepends and caps', () => {
+    const base = {
+      presence: [],
+      events: [{ id: 'old', ts: 1, kind: 'x', actor: 'a', message: '', severity: 'info' as const }],
+      edges: [],
+      summary: { agents: 0, agents_busy: 0, workers: 0, workers_online: 0, events: 1 },
+      ts: 1,
+    }
+    const next = mergePresenceEvent(base, {
+      id: 'new', ts: 2, kind: 'y', actor: 'b', message: 'hi', severity: 'info',
+    })
+    expect(next.events[0].id).toBe('new')
+    expect(next.summary.events).toBe(2)
+  })
+
+  it('subscribePresenceStream wires EventSource listeners', () => {
+    const listeners: Record<string, (e: MessageEvent<string>) => void> = {}
+    const close = vi.fn()
+    class FakeES {
+      onerror: ((e: Event) => void) | null = null
+      constructor(public url: string) {}
+      addEventListener(type: string, cb: (e: MessageEvent<string>) => void) {
+        listeners[type] = cb
+      }
+      close = close
+    }
+    vi.stubGlobal('EventSource', FakeES as unknown as typeof EventSource)
+    const onSnapshot = vi.fn()
+    const onEvent = vi.fn()
+    const es = subscribePresenceStream({ onSnapshot, onEvent })
+    expect(es.url).toBe('/api/v1/presence/stream')
+    listeners.snapshot?.({ data: JSON.stringify({ presence: [], events: [], summary: {}, ts: 1 }) } as MessageEvent<string>)
+    listeners.collab?.({ data: JSON.stringify({ id: 'e', ts: 1, kind: 'k', actor: 'a', message: '', severity: 'info' }) } as MessageEvent<string>)
+    expect(onSnapshot).toHaveBeenCalled()
+    expect(onEvent).toHaveBeenCalled()
+    es.close()
+    expect(close).toHaveBeenCalled()
   })
 })

@@ -1,0 +1,9 @@
+# 国内/不稳定网络下加速 crates.io（仅本包）
+[source.crates-io]
+replace-with = "rsproxy-sparse"
+
+[source.rsproxy-sparse]
+registry = "sparse+https://rsproxy.cn/index/"
+
+[net]
+git-fetch-with-cli = true

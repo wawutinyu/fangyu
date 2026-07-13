@@ -4,7 +4,7 @@
 
 **日常入口（推荐）：**
 - **方隅·序**（设计）：仓库根目录 `dev.bat` → http://localhost:5173  
-- **方隅·行**（本机执行）：`install-worker.bat`（首次）或 `dev-worker-tray.bat`  
+- **方隅·行**（本机执行）：`install-worker.bat`（首次）→ `dev-worker-tray.bat`（PowerShell 托盘）或 `dev-worker-tauri.bat`（Tauri 原生壳，需 Rust）  
 - **方隅·观**（协作现场）：序顶栏「方隅·观」— Presence + 时间线 + 协作边  
 - **方隅·律**（宪法审计）：序顶栏「方隅·律」— 规则、白话解释、审计链  
 

@@ -1,10 +1,12 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from 'react'
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CollaborationEvent, PresenceEntity, PresenceSnapshot } from '@fangyu/core/schema'
 import {
   fetchPresenceSnapshot,
   formatEventTime,
+  mergePresenceEvent,
   statusColor,
   statusLabel,
+  subscribePresenceStream,
 } from '../utils/presenceApi'
 import { layoutCollaborationGraph } from '../utils/collaborationGraph'
 
@@ -12,7 +14,9 @@ import { layoutCollaborationGraph } from '../utils/collaborationGraph'
 export default function PresencePanel() {
   const [snap, setSnap] = useState<PresenceSnapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [live, setLive] = useState(false)
   const [filter, setFilter] = useState<'all' | 'agent' | 'worker'>('all')
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const reload = useCallback(async () => {
     try {
@@ -24,11 +28,52 @@ export default function PresencePanel() {
     }
   }, [])
 
-  useEffect(() => {
-    reload()
-    const t = setInterval(reload, 3000)
-    return () => clearInterval(t)
+  const stopPoll = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current)
+      pollRef.current = null
+    }
+  }, [])
+
+  const startPoll = useCallback(() => {
+    if (pollRef.current) return
+    void reload()
+    pollRef.current = setInterval(() => { void reload() }, 3000)
   }, [reload])
+
+  useEffect(() => {
+    let es: EventSource | null = null
+    let closed = false
+    try {
+      es = subscribePresenceStream({
+        onSnapshot: (s) => {
+          if (closed) return
+          setSnap(s)
+          setError(null)
+          setLive(true)
+          stopPoll()
+        },
+        onEvent: (ev) => {
+          if (closed) return
+          setSnap(prev => (prev ? mergePresenceEvent(prev, ev) : prev))
+          setLive(true)
+        },
+        onError: () => {
+          if (closed) return
+          setLive(false)
+          startPoll()
+        },
+      })
+    } catch {
+      setLive(false)
+      startPoll()
+    }
+    return () => {
+      closed = true
+      es?.close()
+      stopPoll()
+    }
+  }, [startPoll, stopPoll])
 
   const entities = (snap?.presence || []).filter(p =>
     filter === 'all' ? true : p.kind === filter,
@@ -52,7 +97,21 @@ export default function PresencePanel() {
         display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
       }}>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 700 }}>方隅·观</div>
+          <div style={{ fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+            方隅·观
+            <span
+              data-testid="presence-live"
+              title={live ? 'SSE 实时' : '轮询回退'}
+              style={{
+                fontSize: 10, fontWeight: 600, padding: '1px 6px',
+                borderRadius: 4,
+                color: live ? '#166534' : '#6b7280',
+                background: live ? '#dcfce7' : 'var(--bg-secondary, #f3f4f6)',
+              }}
+            >
+              {live ? 'LIVE' : 'POLL'}
+            </span>
+          </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
             协作现场 — 谁在线、在干嘛、谁在调谁
           </div>

@@ -57,8 +57,11 @@ install-worker.bat
 # 方隅·行 Worker（真执行）
 dev-worker.bat
 
-# 方隅·行 — Windows 系统托盘（推荐）
+# 方隅·行 — Windows 系统托盘（过渡：PowerShell）
 dev-worker-tray.bat
+
+# 方隅·行 — Tauri 原生托盘壳（P1，需 Rust + MSVC）
+dev-worker-tauri.bat
 
 # Electron 过渡壳（可选，计划退役）
 dev-desktop.bat
@@ -75,7 +78,8 @@ fangyu/
 ├── fangyu-core/       # 共享内核（@fangyu/core）
 ├── fangyu-canvas/     # 共享画布 UI
 ├── fangyu-studio/     # 方隅·序
-├── fangyu-worker/     # 方隅·行
+├── fangyu-worker/     # 方隅·行（Node 守护进程）
+├── fangyu-worker-tauri/ # 方隅·行 Tauri 托盘壳（P1）
 ├── fangyu-desktop/    # Electron 过渡壳（可选，deprecated）
 ├── scripts/           # Demo 脚本
 └── data/              # constitution.json, assets/

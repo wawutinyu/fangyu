@@ -16,13 +16,14 @@ import AssetLibrary from './AssetLibrary'
 import IntentPanel from './IntentPanel'
 import PresencePanel from './PresencePanel'
 import LawPanel from './LawPanel'
+import SetupCopilotPanel from './SetupCopilotPanel'
 import { AssetContext, type AgentBindTarget } from '../context/AssetContext'
 import { store } from '../store'
 import { useAppSelector } from '../store/hooks'
 import { toggleSettings, fetchSettings } from '../store/settingsSlice'
 import { openFlowConfig } from '../store/flowSlice'
 import { toggleHistory, saveFlowApi, fetchAllProjects, createProjectApi } from '../store/saveSlice'
-import { updateSkillFlow, loadAgents } from '../store/agentSlice'
+import { updateSkillFlow, loadAgents, addAgentNode } from '../store/agentSlice'
 import { convertToExportFormat } from '../utils/flowHelper'
 import { demoFlows } from '../utils/demoFlows'
 import { snapshotFlowFromCanvas, getExportFormatFromCanvas } from '../utils/flowSnapshot'
@@ -77,6 +78,7 @@ export default function App() {
   const [workersFocusSignal, setWorkersFocusSignal] = useState(0)
   const [highlightWorkerTaskId, setHighlightWorkerTaskId] = useState<string | null>(null)
   const [intentPanelOpen, setIntentPanelOpen] = useState(false)
+  const [setupCopilotOpen, setSetupCopilotOpen] = useState(false)
   const [agentBindTarget, setAgentBindTarget] = useState<AgentBindTarget | null>(null)
   const [agentAssetPickerOpen, setAgentAssetPickerOpen] = useState(false)
 
@@ -533,6 +535,14 @@ export default function App() {
           loadAgentsToCanvas(graph)
         }}
       />
+      <SetupCopilotPanel
+        open={setupCopilotOpen}
+        onClose={() => setSetupCopilotOpen(false)}
+        onRegistered={(node) => {
+          store.dispatch(addAgentNode(node))
+          setView('agent')
+        }}
+      />
       <SaveHistory
         onRestore={handleRestore}
         selectedWorkerId={selectedWorkerId}
@@ -569,9 +579,27 @@ export default function App() {
         document.body
       )}
         </div>
-      <div style={{ display: view === 'agent' ? 'flex' : 'none', flex: 1, overflow: 'hidden' }} data-testid="agent-canvas">
-        <AgentCanvas />
-        <AgentConfigPanel />
+      <div style={{ display: view === 'agent' ? 'flex' : 'none', flex: 1, overflow: 'hidden', flexDirection: 'column' }} data-testid="agent-canvas">
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px',
+          borderBottom: '1px solid var(--border-color)', background: 'var(--bg-secondary)',
+        }}>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Agent 编排</span>
+          <div style={{ flex: 1 }} />
+          <button
+            type="button"
+            className="notion-btn"
+            style={{ fontSize: 11 }}
+            onClick={() => setSetupCopilotOpen(true)}
+            title="粘贴外部 Agent URL → 人话确认 → 授权"
+          >
+            Setup Copilot
+          </button>
+        </div>
+        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+          <AgentCanvas />
+          <AgentConfigPanel />
+        </div>
       </div>
       <div style={{ display: view === 'presence' ? 'flex' : 'none', flex: 1, overflow: 'hidden' }}>
         <PresencePanel />
