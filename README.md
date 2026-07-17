@@ -105,6 +105,7 @@ py scripts/worker_happy_path.py --spawn-worker
 - **[L1 开发主线](docs/L1_ROADMAP.md)**
 - **[Happy Path 验收清单](docs/HAPPY_PATH_ACCEPTANCE.md)**
 - **[Phase 5 技术方案](docs/PHASE5_TECH_SPEC.md)**
+- **[方隅·知向量层](docs/VECTORSTORE.md)**
 - **[扔 Electron 检查清单](docs/ELECTRON_RETIREMENT.md)**（已退役存档）
 
 ## 已移除

@@ -264,13 +264,33 @@ class AgentBus:
             ext_inputs.setdefault("message", text)
             ext_inputs.setdefault("query", text)
             ext_inputs.setdefault("input", text)
+        agent_scope = f"agent:{agent_name}"
         result = asyncio.run(run_flow(
             nodes=flow.get("nodes", []),
             edges=flow.get("edges", []),
             external_inputs=ext_inputs,
+            global_vars={
+                "_agent_name": agent_name,
+                "_agent_scope": agent_scope,
+                "_skill_id": skill_id or "",
+            },
         ))
         last = (result.get("results") or [])[-1] if result.get("results") else {}
         summary = last.get("outputs", {}).get("result") or last.get("outputs", {})
+        # episodic 写入方隅·知（scope=agent:{name}）
+        try:
+            import hashlib
+            from .memory import memory_write
+            tid = str(task.get("id") or "").strip()
+            if not tid:
+                tid = hashlib.md5(f"{agent_name}:{text}".encode()).hexdigest()[:12]
+            memory_write(
+                agent_scope,
+                f"turn_{tid[:16]}",
+                f"Q: {text}\nA: {summary}",
+            )
+        except Exception:
+            pass
         task.setdefault("history", []).append({
             "role": "agent",
             "parts": [{"type": "text", "text": str(summary)}],

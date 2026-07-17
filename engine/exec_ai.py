@@ -6,10 +6,17 @@ from typing import Any
 from .executor import register_executor, _smart_template, _resolve_path, NodeContext
 from .llm import chat_completion, PROVIDER_MAP, PROVIDER_BASE_URL
 from .sandbox import run_code
-from .knowledge import search_chunks
-from .memory import memory_read, memory_write, memory_extract_facts, memory_list
+from .knowledge import search_chunks, search_knowledge_store
+from .memory import memory_write, memory_extract_facts, memory_list, memory_search
 from .skill import list_skills as get_skills
 from .variable import variable_get as var_get, variable_set as var_set
+
+
+def _resolve_mem_scope(ctx: NodeContext) -> str:
+    cfg = ctx.config.get("scope")
+    if cfg:
+        return str(cfg)
+    return str(ctx.global_vars.get("_agent_scope") or "user")
 
 
 async def _exec_llm(ctx: NodeContext) -> dict[str, Any]:
@@ -32,15 +39,20 @@ async def _exec_llm(ctx: NodeContext) -> dict[str, Any]:
         prompt = f"{global_context}\n\n{prompt}" if prompt else global_context
     model = ctx.config.get("model", "gpt-4o")
     user_content = prompt or ctx.inputs.get("input") or ""
+    mem_scope = _resolve_mem_scope(ctx)
 
     auto_inject = ctx.config.get("auto_inject_memory", False)
     if auto_inject:
         inject_parts = []
         if not system_prompt:
-            facts = memory_list("user")
+            # 优先语义检索相关记忆，否则列出全部
+            q = str(user_content)[:200]
+            related = memory_search(mem_scope, q, limit=8) if q else []
+            facts = related if related else memory_list(mem_scope)
             if facts:
-                lines = [f"- {f['key']}: {f['value']}" for f in facts]
-                inject_parts.append("## 用户记忆\n" + "\n".join(lines))
+                lines = [f"- {f.get('key')}: {f.get('value')}" for f in facts]
+                label = "Agent 记忆" if mem_scope.startswith("agent:") else "用户记忆"
+                inject_parts.append(f"## {label}\n" + "\n".join(lines))
         skills = get_skills()
         if skills:
             skill_lines = [f"- {s['name']}: {s.get('description', '')}" for s in skills[:20]]
@@ -86,7 +98,7 @@ async def _exec_llm(ctx: NodeContext) -> dict[str, Any]:
             facts = memory_extract_facts(content, max_facts=3)
             for fact in facts:
                 k = f"fact_{hashlib.md5(fact.encode()).hexdigest()[:6]}"
-                memory_write("user", k, fact)
+                memory_write(mem_scope, k, fact)
         except Exception:
             pass
 
@@ -139,7 +151,11 @@ async def _exec_knowledge(ctx: NodeContext) -> dict[str, Any]:
     if not isinstance(chunks, list):
         chunks = []
     try:
-        results = await search_chunks(chunks, str(query), top_k)
+        if chunks:
+            results = await search_chunks(chunks, str(query), top_k)
+        else:
+            # 无内嵌 chunks：走方隅·知全局知识库
+            results = await search_knowledge_store(str(query), top_k)
         if min_score > 0:
             results = [r for r in results if r.get("score", 1.0) >= min_score]
         context = "\n\n".join(f'[{i + 1}] {m.get("content", "")}' for i, m in enumerate(results))

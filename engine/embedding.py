@@ -61,6 +61,26 @@ async def get_embedding(text: str) -> Optional[list[float]]:
         return None
 
 
+def get_embedding_sync(text: str) -> Optional[list[float]]:
+    """同步嵌入（记忆写入等非 async 路径）。"""
+    try:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop and loop.is_running():
+            # 已在事件循环中：仅尝试已加载的 encoder，避免死锁
+            global _encoder
+            if _encoder is None:
+                return None
+            emb = _encoder.encode(text, normalize_embeddings=True)
+            return emb.tolist()
+        return asyncio.run(get_embedding(text))
+    except Exception as e:
+        logger.warning(f"Sync embedding failed: {e}")
+        return None
+
+
 async def get_embeddings_batch(texts: list[str]) -> list[Optional[list[float]]]:
     enc = await _get_encoder()
     if enc is None or not texts:

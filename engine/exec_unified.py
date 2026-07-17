@@ -51,7 +51,7 @@ async def _exec_memory(ctx: NodeContext) -> dict[str, Any]:
         _exec_extract_memory,
         _exec_memory_read,
         _exec_memory_write,
-        _exec_search_sessions,
+        _exec_memory_vector_search,
     )
 
     op = str(ctx.config.get("operation", "read"))
@@ -74,7 +74,7 @@ async def _exec_memory(ctx: NodeContext) -> dict[str, Any]:
         if not patched.get("query") and patched.get("input") is not None:
             patched["query"] = patched["input"]
         ctx.inputs = patched
-        out = await _exec_search_sessions(ctx)
+        out = await _exec_memory_vector_search(ctx)
         return {"result": out, **out}
     out = await _exec_memory_read(ctx)
     return {"result": out.get("value"), **out}

@@ -35,6 +35,7 @@ packages = [
     "fangyu.a2a.trust",
     "fangyu.core",
     "fangyu.engine",
+    "fangyu.engine.vectorstore",
     "fangyu.models",
     "fangyu.routers",
     "fangyu.adapters",

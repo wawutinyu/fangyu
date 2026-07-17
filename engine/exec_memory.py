@@ -2,19 +2,26 @@ import hashlib
 from typing import Any
 
 from .executor import register_executor, NodeContext
-from .memory import memory_read, memory_write, memory_extract_facts, memory_list
-from .search import index_message, search_messages
+from .memory import memory_read, memory_write, memory_extract_facts, memory_search
+from .search import search_messages
+
+
+def _memory_scope(ctx: NodeContext) -> str:
+    cfg = ctx.config.get("scope")
+    if cfg:
+        return str(cfg)
+    return str(ctx.global_vars.get("_agent_scope") or "user")
 
 
 async def _exec_memory_read(ctx: NodeContext) -> dict[str, Any]:
-    scope = ctx.config.get("scope", "user")
+    scope = _memory_scope(ctx)
     key = ctx.inputs.get("key") or ctx.config.get("memory_key", "")
     val = memory_read(scope, key) if key else None
     return {"value": val}
 
 
 async def _exec_memory_write(ctx: NodeContext) -> dict[str, Any]:
-    scope = ctx.config.get("scope", "user")
+    scope = _memory_scope(ctx)
     key = ctx.inputs.get("key") or ctx.config.get("memory_key", "")
     val = ctx.inputs.get("value") or ctx.inputs.get("input") or ctx.config.get("memory_value", "")
     if key and val is not None:
@@ -25,7 +32,7 @@ async def _exec_memory_write(ctx: NodeContext) -> dict[str, Any]:
 async def _exec_extract_memory(ctx: NodeContext) -> dict[str, Any]:
     text = ctx.inputs.get("text") or ctx.inputs.get("input") or ctx.config.get("text", "")
     max_facts = ctx.config.get("max_facts", 3)
-    scope = ctx.config.get("scope", "user")
+    scope = _memory_scope(ctx)
     facts = memory_extract_facts(str(text), max_facts)
     written = []
     for fact in facts:
@@ -36,10 +43,20 @@ async def _exec_extract_memory(ctx: NodeContext) -> dict[str, Any]:
 
 
 async def _exec_search_sessions(ctx: NodeContext) -> dict[str, Any]:
+    """兼容旧会话 JSONL 搜索。"""
     query = ctx.inputs.get("query", ctx.config.get("query", ""))
     limit = ctx.config.get("limit", 10)
     session_id = ctx.inputs.get("session_id") or None
     results = search_messages(str(query), session_id, int(limit))
+    return {"results": results, "count": len(results)}
+
+
+async def _exec_memory_vector_search(ctx: NodeContext) -> dict[str, Any]:
+    """方隅·知：按 scope 语义检索记忆。"""
+    query = ctx.inputs.get("query") or ctx.config.get("query") or ctx.inputs.get("input") or ""
+    limit = int(ctx.config.get("limit", 10))
+    scope = _memory_scope(ctx)
+    results = memory_search(scope, str(query), limit)
     return {"results": results, "count": len(results)}
 
 
