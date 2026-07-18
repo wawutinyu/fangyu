@@ -107,9 +107,10 @@
 ㉑ 托管升级 + Eval 趋势           ✅ restart/upgrade · eval-history/trend
 ㉒ 飞书向导 + Presence 托管回放   ✅ im/status·运维飞书页 · managed.* 帧对齐
 ㉓ 跨机回放样例 + live 可选档     ✅ fixtures/cross-host · --live-tier none/smoke/full
+㉔ Eval 对比页 + A2A 工厂目录 UI  ✅ eval-compare · 观测对比 · 运维·工厂
 ```
 
-下一刀：真 IM（仍暂缓）· Eval 趋势进 Studio 对比页 · A2A 工厂目录 UI。
+下一刀：真 IM（仍暂缓）· Bundle 一键对端探测入库 · 观值班墙跨机筛选默认。
 
 ---
 

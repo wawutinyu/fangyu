@@ -61,13 +61,22 @@ export async function saveRemoteFactory(input: {
   label?: string
   rpc_url?: string
   card_name?: string
-}): Promise<void> {
+}): Promise<{ id?: string; base_url?: string; label?: string }> {
   const resp = await fetch('/api/v1/a2a/factories', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   })
   if (!resp.ok) throw new Error(`保存工厂失败 (${resp.status})`)
+  const data = await resp.json()
+  return data.factory || data
+}
+
+export async function deleteRemoteFactory(factoryId: string): Promise<void> {
+  const resp = await fetch(`/api/v1/a2a/factories/${encodeURIComponent(factoryId)}`, {
+    method: 'DELETE',
+  })
+  if (!resp.ok) throw new Error(`删除工厂失败 (${resp.status})`)
 }
 
 export async function registerExternalAgent(node: AgentCanvasNode): Promise<void> {

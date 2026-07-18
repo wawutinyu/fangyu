@@ -17,7 +17,7 @@ const PRIMARY_TABS = [
   { key: 'chat', label: '预览', title: '后端真跑 · 本机主路径', icon: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' },
   { key: 'workers', label: '行', icon: 'M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z' },
   { key: 'assets', label: '资产', icon: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z' },
-  { key: 'ops', label: '运维', title: '托管启停 · 组织 ACL', icon: 'M12 15v2m-6 4h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2zm10-10V7a4 4 0 0 0-8 0v4h8z' },
+  { key: 'ops', label: '运维', title: '托管 · ACL · SSO · 飞书 · A2A 工厂', icon: 'M12 15v2m-6 4h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2zm10-10V7a4 4 0 0 0-8 0v4h8z' },
 ]
 
 const MORE_TABS = [

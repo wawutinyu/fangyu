@@ -1,5 +1,5 @@
 import json
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 
@@ -103,6 +103,32 @@ def get_eval_trend(limit: int = Query(10, ge=2, le=50)):
     from fangyu.core.factory_eval import eval_trend
 
     return eval_trend(limit=limit)
+
+
+@router.get("/eval-compare")
+def get_eval_compare(
+    i: int = Query(0, ge=0, le=99, description="历史下标（0=最新）"),
+    j: int = Query(1, ge=0, le=99, description="对比下标"),
+    limit: int = Query(40, ge=2, le=100),
+):
+    """对比两条 Eval 历史（默认 最新 vs 上一次）。"""
+    from fangyu.core.factory_eval import compare_eval_reports, load_eval_history
+
+    hist = load_eval_history(limit=limit)
+    if len(hist) < 1:
+        return {"ok": False, "error": "no history", "history_count": 0}
+    if i >= len(hist) or j >= len(hist):
+        from fastapi import HTTPException
+        raise HTTPException(400, f"下标越界：history_count={len(hist)}")
+    return {
+        "ok": True,
+        "i": i,
+        "j": j,
+        "history_count": len(hist),
+        "left": hist[i],
+        "right": hist[j],
+        "compare": compare_eval_reports(hist[i], hist[j]),
+    }
 
 
 @router.delete("/logs")

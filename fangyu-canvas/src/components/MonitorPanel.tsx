@@ -69,6 +69,28 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
 
   const [evalPath, setEvalPath] = useState<string | null>(null)
   const [evalReport, setEvalReport] = useState<EvalReport | null>(null)
+  const [evalHistory, setEvalHistory] = useState<Array<{
+    ts?: number
+    ok?: boolean
+    exit_code?: number
+    live_skipped?: boolean
+    live_tier?: string
+    stages?: Record<string, { ok?: boolean; skipped?: boolean }>
+  }>>([])
+  const [compareI, setCompareI] = useState(0)
+  const [compareJ, setCompareJ] = useState(1)
+  const [evalCompare, setEvalCompare] = useState<{
+    ok?: boolean
+    left?: { ok?: boolean; exit_code?: number; ts?: number; stages?: Record<string, { ok?: boolean; skipped?: boolean }> }
+    right?: { ok?: boolean; exit_code?: number; ts?: number; stages?: Record<string, { ok?: boolean; skipped?: boolean }> }
+    compare?: {
+      changed?: boolean
+      exit_changed?: boolean
+      stage_diffs?: Array<{ stage: string; from: { ok?: boolean; skipped?: boolean }; to: { ok?: boolean; skipped?: boolean } }>
+      current?: { ok?: boolean; exit_code?: number }
+      previous?: { ok?: boolean; exit_code?: number }
+    }
+  } | null>(null)
   const [evalTrend, setEvalTrend] = useState<{
     points?: Array<{ ts?: number; ok?: boolean; exit_code?: number }>
     ok_streak?: number
@@ -78,6 +100,7 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
       stage_diffs?: Array<{ stage: string; from: { ok?: boolean }; to: { ok?: boolean } }>
     }
   } | null>(null)
+  const [evalView, setEvalView] = useState<'report' | 'compare'>('report')
 
   const fetchLogs = useCallback(async (flowId?: string) => {
     setLoading(true)
@@ -109,15 +132,32 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
   const fetchEval = useCallback(async () => {
     setLoading(true)
     try {
-      const [rep, trend] = await Promise.all([
+      const [rep, trend, hist] = await Promise.all([
         apiFetch('/api/v1/monitor/eval-report').then(r => r.json()),
         apiFetch('/api/v1/monitor/eval-trend?limit=12').then(r => r.json()),
+        apiFetch('/api/v1/monitor/eval-history?limit=24').then(r => r.json()),
       ])
       setEvalPath(rep.path || null)
       setEvalReport(rep.report || null)
       setEvalTrend(trend || null)
+      const rows = hist.history || []
+      setEvalHistory(rows)
+      if (rows.length >= 2) {
+        setCompareJ(prev => (prev >= rows.length ? 1 : prev))
+      }
     } catch { /* ignore */ }
     setLoading(false)
+  }, [])
+
+  const fetchCompare = useCallback(async (i: number, j: number) => {
+    try {
+      const r = await apiFetch(`/api/v1/monitor/eval-compare?i=${i}&j=${j}&limit=40`)
+      const body = await r.json()
+      if (r.ok) setEvalCompare(body)
+      else setEvalCompare(null)
+    } catch {
+      setEvalCompare(null)
+    }
   }, [])
 
   useEffect(() => {
@@ -125,6 +165,12 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
     if (tab === 'harness') void fetchTraces()
     if (tab === 'eval') void fetchEval()
   }, [tab, fetchLogs, fetchTraces, fetchEval])
+
+  useEffect(() => {
+    if (tab !== 'eval' || evalView !== 'compare') return
+    if (evalHistory.length < 1) return
+    void fetchCompare(compareI, Math.min(compareJ, Math.max(0, evalHistory.length - 1)))
+  }, [tab, evalView, compareI, compareJ, evalHistory.length, fetchCompare])
 
   const handleSearch = useCallback(() => {
     fetchLogs(filterFlowId)
@@ -156,6 +202,26 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
           Eval 报告
         </button>
         <div style={{ flex: 1 }} />
+        {tab === 'eval' && (
+          <>
+            <button
+              className="notion-btn"
+              style={{ fontSize: 11, fontWeight: evalView === 'report' ? 600 : 400 }}
+              onClick={() => setEvalView('report')}
+              data-testid="eval-view-report"
+            >
+              最近
+            </button>
+            <button
+              className="notion-btn"
+              style={{ fontSize: 11, fontWeight: evalView === 'compare' ? 600 : 400 }}
+              onClick={() => setEvalView('compare')}
+              data-testid="eval-view-compare"
+            >
+              对比
+            </button>
+          </>
+        )}
         <button
           className="notion-btn"
           style={{ fontSize: 12 }}
@@ -281,14 +347,16 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
       )}
 
       {tab === 'eval' && (
-        <div style={{ flex: 1, overflow: 'auto', padding: 12, fontSize: 12 }}>
+        <div style={{ flex: 1, overflow: 'auto', padding: 12, fontSize: 12 }} data-testid="eval-panel">
           {loading && <div style={{ color: 'var(--text-muted)' }}>加载中...</div>}
-          {!loading && !evalReport && (
+
+          {evalView === 'report' && !loading && !evalReport && (
             <div style={{ color: 'var(--text-muted)' }}>
               尚无报告。运行 <code>python scripts/factory_gate.py --skip-live</code> 后会出现。
             </div>
           )}
-          {evalReport && (
+
+          {evalView === 'report' && evalReport && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div>
                 状态：{' '}
@@ -306,14 +374,29 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
                   <div style={{ fontWeight: 600, marginBottom: 6 }}>
                     趋势 · 连续通过 {evalTrend.ok_streak ?? 0}
                     {evalTrend.compare?.changed ? ' · 较上次有变化' : ''}
+                    <button
+                      type="button"
+                      className="notion-btn"
+                      style={{ marginLeft: 8, fontSize: 10 }}
+                      onClick={() => setEvalView('compare')}
+                    >
+                      打开对比
+                    </button>
                   </div>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
                     {(evalTrend.points || []).map((p, i) => (
-                      <span
+                      <button
                         key={i}
-                        title={`${formatTs(p.ts)} exit=${p.exit_code}`}
+                        type="button"
+                        title={`${formatTs(p.ts)} exit=${p.exit_code} · 点选对比`}
+                        onClick={() => {
+                          const idx = (evalTrend.points?.length || 0) - 1 - i
+                          setCompareI(0)
+                          setCompareJ(Math.max(0, idx))
+                          setEvalView('compare')
+                        }}
                         style={{
-                          width: 14, height: 14, borderRadius: 3,
+                          width: 14, height: 14, borderRadius: 3, border: 'none', padding: 0, cursor: 'pointer',
                           background: p.ok ? '#1a7f37' : '#c0392b',
                           opacity: 0.85,
                         }}
@@ -350,6 +433,136 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+
+          {evalView === 'compare' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }} data-testid="eval-compare">
+              {evalHistory.length < 2 && (
+                <div style={{ color: 'var(--text-muted)' }}>
+                  历史不足 2 条，无法对比。多跑几次 <code>factory_gate</code> 即可。
+                </div>
+              )}
+              {evalHistory.length >= 2 && (
+                <>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <label style={{ fontSize: 11 }}>
+                      左（较新）
+                      <select
+                        className="notion-input"
+                        style={{ marginLeft: 6, fontSize: 11 }}
+                        value={compareI}
+                        onChange={e => setCompareI(Number(e.target.value))}
+                        data-testid="eval-compare-i"
+                      >
+                        {evalHistory.map((h, idx) => (
+                          <option key={idx} value={idx}>
+                            #{idx} · {h.ok ? 'ok' : 'fail'} · exit={h.exit_code} · {formatTs(h.ts)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label style={{ fontSize: 11 }}>
+                      右（对照）
+                      <select
+                        className="notion-input"
+                        style={{ marginLeft: 6, fontSize: 11 }}
+                        value={compareJ}
+                        onChange={e => setCompareJ(Number(e.target.value))}
+                        data-testid="eval-compare-j"
+                      >
+                        {evalHistory.map((h, idx) => (
+                          <option key={idx} value={idx}>
+                            #{idx} · {h.ok ? 'ok' : 'fail'} · exit={h.exit_code} · {formatTs(h.ts)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+                  {evalCompare?.compare && (
+                    <div style={{
+                      padding: 8, borderRadius: 6, border: '1px solid var(--border-light)',
+                      background: 'var(--bg-secondary)',
+                    }}>
+                      <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                        {evalCompare.compare.changed ? '有差异' : '无阶段差异'}
+                        {evalCompare.compare.exit_changed ? ' · exit 变化' : ''}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        左 exit={evalCompare.left?.exit_code} ({evalCompare.left?.ok ? 'ok' : 'fail'})
+                        {' ↔ '}
+                        右 exit={evalCompare.right?.exit_code} ({evalCompare.right?.ok ? 'ok' : 'fail'})
+                      </div>
+                      {(evalCompare.compare.stage_diffs || []).length > 0 ? (
+                        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {(evalCompare.compare.stage_diffs || []).map(d => (
+                            <div key={d.stage} style={{ fontSize: 11 }}>
+                              <code>{d.stage}</code>
+                              {' '}
+                              {d.from?.skipped ? 'skip' : d.from?.ok ? 'ok' : 'fail'}
+                              {' → '}
+                              {d.to?.skipped ? 'skip' : d.to?.ok ? 'ok' : 'fail'}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-muted)' }}>各 stage 状态一致</div>
+                      )}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    {[evalCompare?.left, evalCompare?.right].map((side, col) => (
+                      <div
+                        key={col}
+                        style={{ border: '1px solid var(--border-light)', borderRadius: 6, padding: 8 }}
+                      >
+                        <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                          {col === 0 ? '左' : '右'} · {side?.ok ? '通过' : '未过'}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
+                          {formatTs(side?.ts)} · exit={side?.exit_code}
+                        </div>
+                        {Object.entries(side?.stages || {}).map(([name, st]) => (
+                          <div key={name} style={{ fontSize: 11, marginBottom: 2 }}>
+                            <span style={{ color: st.ok ? '#1a7f37' : '#c0392b' }}>
+                              {st.skipped ? '○' : st.ok ? '✓' : '✗'}
+                            </span>
+                            {' '}{name}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: 8 }}>
+                    <div style={{ fontWeight: 600, marginBottom: 6 }}>历史列表</div>
+                    {evalHistory.map((h, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          if (idx === compareI) setCompareJ(idx)
+                          else if (idx === compareJ) setCompareI(idx)
+                          else setCompareJ(idx)
+                        }}
+                        style={{
+                          display: 'block', width: '100%', textAlign: 'left',
+                          padding: '4px 6px', marginBottom: 2, fontSize: 11,
+                          border: '1px solid var(--border-light)', borderRadius: 4,
+                          background: idx === compareI || idx === compareJ ? 'var(--bg-hover)' : 'transparent',
+                          cursor: 'pointer', color: 'inherit',
+                        }}
+                      >
+                        #{idx} {h.ok ? '✓' : '✗'} exit={h.exit_code}
+                        {h.live_tier ? ` · tier=${h.live_tier}` : ''}
+                        {' · '}{formatTs(h.ts)}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>

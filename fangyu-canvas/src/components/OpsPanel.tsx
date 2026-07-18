@@ -1,4 +1,4 @@
-/** 运维面板 — 托管启停 + 组织 ACL + 人审 + SSO + 飞书凭证向导 */
+/** 运维面板 — 托管启停 + 组织 ACL + 人审 + SSO + 飞书凭证向导 + A2A 工厂目录 */
 import { useCallback, useEffect, useState } from 'react'
 import {
   fetchAuthConfig,
@@ -9,6 +9,12 @@ import {
   type AuthConfig,
   type AuthMe,
 } from '../utils/authApi'
+import {
+  deleteRemoteFactory,
+  listRemoteFactories,
+  probeRemoteFactory,
+  saveRemoteFactory,
+} from '../utils/externalAgent'
 import {
   addAclMember,
   approveApproval,
@@ -39,7 +45,7 @@ interface OpsPanelProps {
 }
 
 export default function OpsPanel({ headerless }: OpsPanelProps) {
-  const [tab, setTab] = useState<'managed' | 'acl' | 'approvals' | 'sso' | 'im'>('managed')
+  const [tab, setTab] = useState<'managed' | 'acl' | 'approvals' | 'sso' | 'im' | 'factories'>('managed')
   const [instances, setInstances] = useState<ManagedInstance[]>([])
   const [acl, setAcl] = useState<AclDoc | null>(null)
   const [approvals, setApprovals] = useState<ApprovalItem[]>([])
@@ -70,6 +76,25 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
   const [imAppSecret, setImAppSecret] = useState('')
   const [imToken, setImToken] = useState('')
   const [imNote, setImNote] = useState<string | null>(null)
+
+  const [facUrl, setFacUrl] = useState('')
+  const [facLabel, setFacLabel] = useState('')
+  const [factories, setFactories] = useState<Array<{
+    id: string
+    base_url: string
+    rpc_url?: string
+    label?: string
+    card_name?: string
+    updated_at?: number
+  }>>([])
+  const [facProbe, setFacProbe] = useState<{
+    ok?: boolean
+    base_url?: string
+    rpc_url?: string
+    card?: { name?: string; version?: string } | null
+    hits?: Array<{ path: string; ok: boolean }>
+  } | null>(null)
+  const [facNote, setFacNote] = useState<string | null>(null)
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -194,6 +219,80 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
       setImNote(`已写入 ${out.im_config || 'config/im.json'} · 回调 ${out.events_url_hint || ''}`)
       setImAppSecret('')
       setImToken('')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+    setLoading(false)
+  }
+
+  const reloadFactories = useCallback(async () => {
+    try {
+      setFactories(await listRemoteFactories())
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }, [])
+
+  useEffect(() => {
+    if (tab !== 'factories') return
+    void reloadFactories()
+  }, [tab, reloadFactories])
+
+  const onProbeFactory = async (urlOverride?: string) => {
+    const url = (urlOverride ?? facUrl).trim()
+    if (!url) {
+      setError('请填写工厂 base_url')
+      return
+    }
+    setFacUrl(url)
+    setLoading(true)
+    setError(null)
+    setFacNote(null)
+    try {
+      const out = await probeRemoteFactory(url)
+      setFacProbe(out)
+      setFacNote(out.ok
+        ? `探测成功 · card=${out.card?.name || '—'} · rpc=${out.rpc_url || '—'}`
+        : '探测未拿到 Card，仍可手动入库')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      setFacProbe(null)
+    }
+    setLoading(false)
+  }
+
+  const onSaveFactory = async () => {
+    const url = (facProbe?.base_url || facUrl).trim()
+    if (!url) {
+      setError('请先探测或填写 base_url')
+      return
+    }
+    setLoading(true)
+    setError(null)
+    setFacNote(null)
+    try {
+      const row = await saveRemoteFactory({
+        base_url: url,
+        label: facLabel || facProbe?.card?.name || '',
+        rpc_url: facProbe?.rpc_url || '',
+        card_name: facProbe?.card?.name || '',
+      })
+      setFacNote(`已入库 ${row.label || row.base_url || url}`)
+      setFacUrl('')
+      setFacLabel('')
+      await reloadFactories()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+    setLoading(false)
+  }
+
+  const onDeleteFactory = async (id: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      await deleteRemoteFactory(id)
+      await reloadFactories()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
@@ -404,6 +503,14 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
           title="飞书凭证配置向导（真机订阅暂缓）"
         >
           飞书
+        </button>
+        <button
+          className="notion-btn"
+          style={{ fontSize: 12, fontWeight: tab === 'factories' ? 600 : 400 }}
+          onClick={() => setTab('factories')}
+          title="A2A 跨厂通讯录"
+        >
+          工厂
         </button>
         <div style={{ flex: 1 }} />
         <button className="notion-btn" style={{ fontSize: 12 }} onClick={reload} disabled={loading}>
@@ -853,6 +960,86 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
           </div>
         </div>
       )}
+
+      {tab === 'factories' && (
+        <div style={{ flex: 1, overflow: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }} data-testid="a2a-factories">
+          {facNote && <div style={{ color: '#1a7f37' }}>{facNote}</div>}
+          <div style={{ color: 'var(--text-muted)', lineHeight: 1.45, fontSize: 11 }}>
+            探测远程工厂根 URL（不必手写 /rpc），入库后供跨厂发现与外部 Agent 使用。
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <input
+              className="notion-input"
+              style={{ flex: 2, minWidth: 180, fontSize: 12 }}
+              placeholder="https://peer.example:8787"
+              value={facUrl}
+              onChange={e => setFacUrl(e.target.value)}
+              data-testid="factory-url"
+            />
+            <input
+              className="notion-input"
+              style={{ flex: 1, minWidth: 100, fontSize: 12 }}
+              placeholder="备注名（可选）"
+              value={facLabel}
+              onChange={e => setFacLabel(e.target.value)}
+            />
+            <button className="notion-btn" style={{ fontSize: 12 }} type="button" onClick={() => void onProbeFactory()} disabled={loading} data-testid="factory-probe">
+              探测
+            </button>
+            <button className="notion-btn primary" style={{ fontSize: 12 }} type="button" onClick={() => void onSaveFactory()} disabled={loading} data-testid="factory-save">
+              入库
+            </button>
+          </div>
+          {facProbe && (
+            <div style={{ fontSize: 11, padding: 8, borderRadius: 6, border: '1px solid var(--border-light)' }}>
+              <div>ok={String(!!facProbe.ok)} · card={facProbe.card?.name || '—'} · rpc=<code>{facProbe.rpc_url || '—'}</code></div>
+              {facProbe.hits && (
+                <div style={{ color: 'var(--text-muted)', marginTop: 4 }}>
+                  {facProbe.hits.map(h => `${h.ok ? '✓' : '✗'} ${h.path}`).join(' · ')}
+                </div>
+              )}
+            </div>
+          )}
+          {factories.length === 0 && (
+            <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 12 }}>通讯录为空</div>
+          )}
+          {factories.map(f => (
+            <div
+              key={f.id}
+              style={{ border: '1px solid var(--border-light)', borderRadius: 6, padding: 10 }}
+            >
+              <div style={{ fontWeight: 600 }}>{f.label || f.card_name || f.id}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', wordBreak: 'break-all' }}>
+                {f.base_url}
+                {f.rpc_url ? ` · rpc ${f.rpc_url}` : ''}
+              </div>
+              <div style={{ marginTop: 6, display: 'flex', gap: 6 }}>
+                <button
+                  className="notion-btn"
+                  style={{ fontSize: 11 }}
+                  type="button"
+                  onClick={() => {
+                    setFacLabel(f.label || '')
+                    void onProbeFactory(f.base_url)
+                  }}
+                  disabled={loading}
+                >
+                  再探测
+                </button>
+                <button
+                  className="notion-btn"
+                  style={{ fontSize: 11, color: '#c0392b' }}
+                  type="button"
+                  onClick={() => void onDeleteFactory(f.id)}
+                  disabled={loading}
+                >
+                  删除
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 
@@ -861,7 +1048,7 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-light)', fontWeight: 600, fontSize: 13 }}>
-        运维 · 托管 / ACL / 人审 / SSO / 飞书
+        运维 · 托管 / ACL / 人审 / SSO / 飞书 / 工厂
       </div>
       {body}
     </div>

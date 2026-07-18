@@ -57,5 +57,8 @@ Studio「观测 → Eval 报告」展示最近结果 + 趋势条；API：
 - `GET /api/v1/monitor/eval-report`
 - `GET /api/v1/monitor/eval-history`
 - `GET /api/v1/monitor/eval-trend`
+- `GET /api/v1/monitor/eval-compare?i=0&j=1`（历史下标对比，0=最新）
+
+Studio「观测 → Eval」含 **最近 / 对比**：选两条历史看 stage 差异与并排摘要。
 
 Harness Trace：`GET /api/v1/monitor/harness-traces`（观测面板默认页）。

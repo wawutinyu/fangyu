@@ -27,3 +27,5 @@
 5. JSON-RPC `a2a.get_agent_card` / `a2a.list_agents`
 
 Studio 外部 Agent「发现」可填工厂根 URL（不必手写 `/rpc`）。
+
+运维面板 **工厂** 页：探测 → 入库 → 列表 / 再探测 / 删除（读写 `DATA_DIR/a2a_factories.json`）。

@@ -57,6 +57,27 @@ def test_eval_history_and_trend(tmp_path):
     assert cmp["ok"] is True
 
 
+def test_eval_compare_api(tmp_path):
+    write_eval_report(
+        {"exit_code": 1, "ok": False, "stages": {"unit": {"ok": False}}},
+        also_workspace=False,
+    )
+    write_eval_report(
+        {"exit_code": 0, "ok": True, "stages": {"unit": {"ok": True}, "card": {"ok": True}}},
+        also_workspace=False,
+    )
+    with TestClient(app) as client:
+        r = client.get("/api/v1/monitor/eval-compare?i=0&j=1")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["ok"] is True
+        assert body["left"]["ok"] is True
+        assert body["right"]["ok"] is False
+        assert body["compare"]["ok"] is True
+        diffs = body["compare"].get("stage_diffs") or []
+        assert any(d["stage"] == "unit" for d in diffs) or body["compare"].get("exit_changed")
+
+
 def test_eval_trend_api(tmp_path):
     write_eval_report(
         {"exit_code": 0, "ok": True, "stages": {"unit": {"ok": True}}},
