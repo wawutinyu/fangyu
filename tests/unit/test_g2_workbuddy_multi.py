@@ -55,6 +55,33 @@ def test_office_write_deliverable(tmp_path, restore_data_dir):
     assert any(p.endswith("hello.md") for p in listed)
 
 
+def test_office_write_xlsx(tmp_path, restore_data_dir):
+    import zipfile
+
+    dest = tmp_path / "wb-xlsx"
+    root = build_from_profile("workbuddy", dest)
+    init_bundle_workspace(root)
+    tools = office_toolbelt()
+    msg = tools["write_deliverable"](
+        path="stats/week",
+        content="项目,状态\n竖切,完成\ndocx,完成\n",
+        kind="xlsx",
+    )
+    assert "xlsx" in msg
+    from fangyu.engine.workspace import get_active_workspace
+    ws = get_active_workspace()
+    assert ws is not None
+    path = ws.resolve("deliverables/stats/week.xlsx")
+    assert path.is_file()
+    with zipfile.ZipFile(path, "r") as zf:
+        assert "xl/worksheets/sheet1.xml" in zf.namelist()
+        xml = zf.read("xl/worksheets/sheet1.xml").decode("utf-8")
+        assert "竖切" in xml
+        assert "完成" in xml
+    listed = tools["list_deliverables"]()
+    assert any(p.endswith("week.xlsx") for p in listed)
+
+
 def test_office_write_docx(tmp_path, restore_data_dir):
     import zipfile
 
@@ -74,7 +101,6 @@ def test_office_write_docx(tmp_path, restore_data_dir):
     docx_path = ws.resolve("deliverables/report/week.docx")
     assert docx_path.is_file()
     assert docx_path.stat().st_size > 500
-    # 合法 zip/OOXML
     with zipfile.ZipFile(docx_path, "r") as zf:
         names = zf.namelist()
         assert "word/document.xml" in names
