@@ -43,6 +43,20 @@ def build_parser() -> argparse.ArgumentParser:
     orch_p.add_argument("--workspace", default="", help="绑定外部工作区")
     orch_p.add_argument("--max-turns", type=int, default=8)
 
+    im_p = sub.add_parser("im-bind", help="绑定 IM 通道（默认飞书）到 Bundle")
+    im_p.add_argument("bundle_dir")
+    im_p.add_argument("--channel", default="feishu", choices=["feishu"])
+    im_p.add_argument("--mode", default="chat", choices=["chat", "orchestrate"])
+    im_p.add_argument("--verification-token", default="")
+    im_p.add_argument("--app-id", default="")
+    im_p.add_argument("--app-secret", default="")
+
+    im_in_p = sub.add_parser("im-inbound", help="模拟一条 IM 文本入站（本地测）")
+    im_in_p.add_argument("bundle_dir")
+    im_in_p.add_argument("-m", "--message", required=True)
+    im_in_p.add_argument("--workspace", default="")
+    im_in_p.add_argument("--mode", default="", choices=["", "chat", "orchestrate"])
+
     rpc_p = sub.add_parser("rpc", help="向 Bundle RPC 发送 a2a.send_message")
     rpc_p.add_argument("bundle_dir", help="调用方 Bundle（用于签名身份）")
     rpc_p.add_argument("--url", required=True, help="目标 RPC URL")
@@ -175,6 +189,38 @@ def cmd_orchestrate(args: argparse.Namespace) -> int:
     return 0 if result.get("success") else 1
 
 
+def cmd_im_bind(args: argparse.Namespace) -> int:
+    from fangyu.engine.im_feishu import bind_feishu_channel
+
+    path = bind_feishu_channel(
+        args.bundle_dir,
+        mode=args.mode,
+        verification_token=args.verification_token,
+        app_id=args.app_id,
+        app_secret=args.app_secret,
+    )
+    print(json.dumps({
+        "ok": True,
+        "channel": args.channel,
+        "im_config": str(path),
+        "hint": "飞书事件订阅 URL → Bundle 的 POST /im/feishu，或平台 /api/v1/im/feishu",
+    }, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_im_inbound(args: argparse.Namespace) -> int:
+    from fangyu.engine.im_inbound import handle_inbound_text
+
+    result = handle_inbound_text(
+        args.bundle_dir,
+        args.message,
+        workspace=args.workspace or None,
+        mode=args.mode or None,  # type: ignore[arg-type]
+    )
+    print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+    return 0 if result.get("success") else 1
+
+
 def cmd_rpc(args: argparse.Namespace) -> int:
     from fangyu.core.agent_bundle import load_agent_bundle
     from fangyu.engine.bundle_a2a_client import identity_from_bundle, rpc_call
@@ -276,6 +322,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_chat(args)
     if args.command == "orchestrate":
         return cmd_orchestrate(args)
+    if args.command == "im-bind":
+        return cmd_im_bind(args)
+    if args.command == "im-inbound":
+        return cmd_im_inbound(args)
     if args.command == "run":
         return cmd_run(args)
     if args.command == "rpc":

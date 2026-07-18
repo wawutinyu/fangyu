@@ -118,6 +118,30 @@ def create_bundle_app(
     def get_card():
         return bundle["agent_card"]
 
+    @app.post("/im/feishu")
+    async def im_feishu(body: dict):
+        """飞书事件 → 本 Bundle（毕业 G2-B 导出态入口）。"""
+        from fangyu.engine.im_feishu import handle_feishu_event
+        from fastapi.responses import JSONResponse
+
+        result = handle_feishu_event(bundle_path, body, workspace=workspace)
+        if result.get("challenge") is not None:
+            return JSONResponse({"challenge": result["challenge"]})
+        if result.get("status") == 403:
+            return JSONResponse({"error": result.get("error")}, status_code=403)
+        return result
+
+    @app.post("/im/inbound")
+    def im_inbound(body: dict):
+        """通用 IM 文本入站（任意通道适配后可调）。"""
+        from fangyu.engine.im_inbound import handle_inbound_text
+
+        text = str(body.get("text") or "")
+        mode = body.get("mode") or None
+        return handle_inbound_text(
+            bundle_path, text, workspace=workspace, mode=mode,
+        )
+
     @app.post("/rpc")
     def a2a_rpc(body: JsonRpcRequest, request: Request):
         body_json = json.dumps(
@@ -191,6 +215,7 @@ def run_bundle_server(
     print(f"  health    http://{host}:{port}/health")
     print(f"  identity  http://{host}:{port}/identity/public")
     print(f"  rpc       http://{host}:{port}/rpc")
+    print(f"  im        http://{host}:{port}/im/feishu  ·  /im/inbound")
     if workspace:
         print(f"  workspace {workspace}")
     if daemon:
