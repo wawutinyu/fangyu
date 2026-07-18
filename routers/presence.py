@@ -43,10 +43,58 @@ class SaveReplayRequest(BaseModel):
     pack: dict = Field(default_factory=dict)
 
 
+class HostHeartbeatRequest(BaseModel):
+    host_id: str = ""
+    label: str = ""
+    base_url: str = ""
+    role: str = "studio"
+    ttl_sec: float = 90
+    meta: dict = Field(default_factory=dict)
+
+
 @router.get("")
 def get_presence_snapshot(event_limit: int = Query(80, ge=1, le=500)):
     """观：Presence + 时间线快照。"""
     return snapshot(event_limit=event_limit)
+
+
+@router.post("/hosts/heartbeat")
+def post_host_heartbeat(body: HostHeartbeatRequest):
+    """跨机主机心跳 — 写入 Presence（kind=host），TTL 过期离线。"""
+    from fangyu.core.remote_hosts import upsert_remote_host
+    from fangyu.core.collaboration import emit_event
+
+    host = upsert_remote_host(
+        host_id=body.host_id or None,
+        label=body.label,
+        base_url=body.base_url,
+        role=body.role,
+        meta=body.meta,
+        ttl_sec=body.ttl_sec,
+    )
+    emit_event(
+        "host.heartbeat",
+        actor=host["id"],
+        message=f"主机在线 {host.get('label')}",
+        detail={"base_url": host.get("base_url"), "role": host.get("role")},
+    )
+    return {"ok": True, "host": host}
+
+
+@router.get("/hosts")
+def get_hosts():
+    from fangyu.core.remote_hosts import list_remote_hosts
+
+    return {"hosts": list_remote_hosts()}
+
+
+@router.delete("/hosts/{host_id}")
+def delete_host(host_id: str):
+    from fangyu.core.remote_hosts import remove_remote_host
+
+    if not remove_remote_host(host_id):
+        raise HTTPException(404, "主机不存在或已过期")
+    return {"ok": True}
 
 
 @router.get("/events")

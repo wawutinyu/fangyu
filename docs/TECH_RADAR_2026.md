@@ -65,8 +65,8 @@
 ### 以后（不挡主线）
 
 9. 真 IM、平级 Teams、Computer-use / 浏览器、SSO（**真 IM 仍暂缓**）  
-10. MCP Tasks 扩展 ✅ 最小子集 [MCP_TASKS](MCP_TASKS.md)；无状态 HTTP 部署继续跟进上游  
-11. 云托管升级与跨机 Presence  
+10. MCP Tasks 扩展 ✅；无状态 HTTP ✅ `POST /mcp/v1/messages`  
+11. 云托管升级与跨机 Presence ✅ 托管进观 + `/presence/hosts/heartbeat`  
 12. 领域技能包 · 人审 UI ✅ legal/compliance + 运维人审
 
 ---
@@ -96,9 +96,10 @@
 ⑩ factory_gate Eval 加厚         ✅ 更多单测 + multi/skills card 检
 ⑪ 领域技能 + 人审 UI             ✅ customer/data-brief + 运维·人审
 ⑫ 法务/合规技能 + MCP Tasks      ✅ legal/compliance + SEP-2663 最小子集
+⑬ 无状态 MCP HTTP + 跨机 Presence ✅ /mcp/v1/messages + hosts heartbeat
 ```
 
-下一刀：真 IM（仍暂缓）· 无状态 MCP HTTP 部署加厚 · 云托管/Presence。
+下一刀：真 IM（仍暂缓）· Computer-use / 浏览器 · SSO。
 
 ---
 

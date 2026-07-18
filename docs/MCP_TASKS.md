@@ -4,9 +4,41 @@
 
 > 真 IM 仍暂缓；本能力服务「长耗时 MCP 工具」与无状态 HTTP 部署方向。
 
-## 能力声明
+## 无状态 HTTP 传输
 
-`GET /api/v1/mcp/discover`
+端点：`POST /mcp/v1/messages`（JSON-RPC 2.0，**无 session**）
+
+`GET /mcp/v1/messages` 返回能力发现。
+
+与 Studio REST 面并存：
+
+| REST | JSON-RPC method |
+|------|-----------------|
+| `GET /api/v1/mcp/discover` | `initialize` / `server/discover` |
+| `GET /api/v1/mcp/tools` | `tools/list` |
+| `POST /api/v1/mcp/call` | `tools/call` |
+| `GET /api/v1/mcp/tasks/{id}` | `tasks/get` |
+
+示例：
+
+```bash
+curl -s http://127.0.0.1:8000/mcp/v1/messages -H 'Content-Type: application/json' -d '{
+  "jsonrpc":"2.0","id":1,"method":"tools/list","params":{}
+}'
+```
+
+Tasks 调用在 `params._meta` 中声明扩展：
+
+```json
+"_meta": {
+  "io.modelcontextprotocol/clientCapabilities": {
+    "extensions": { "io.modelcontextprotocol/tasks": {} }
+  }
+}
+```
+
+外连客户端（`McpServerConnection`）默认 POST 到对方的 `/mcp/v1/messages`。
+
 
 ```json
 {

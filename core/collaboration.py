@@ -284,6 +284,58 @@ def build_presence() -> list[dict[str, Any]]:
     except Exception:
         pass
 
+    # 本机托管 Bundle 实例
+    try:
+        from fangyu.engine.managed_host import list_instances
+
+        for inst in list_instances():
+            iid = inst.get("id") or ""
+            alive = bool(inst.get("alive"))
+            entities.append({
+                "id": f"managed:{iid}",
+                "kind": "managed",
+                "name": inst.get("name") or iid,
+                "label": inst.get("name") or iid,
+                "status": "online" if alive else "offline",
+                "online": alive,
+                "external": False,
+                "authorized": True,
+                "current_skill": None,
+                "task_id": None,
+                "host": inst.get("host"),
+                "port": inst.get("port"),
+                "health_url": f"http://{inst.get('host')}:{inst.get('port')}/health" if inst.get("port") else None,
+                "bundle_dir": inst.get("bundle_dir"),
+                "updated_at": inst.get("started_at") or now,
+                "department": "托管",
+                "department_id": "dept-managed",
+            })
+    except Exception:
+        pass
+
+    # 跨机心跳主机
+    try:
+        from fangyu.core.remote_hosts import list_remote_hosts
+
+        for h in list_remote_hosts():
+            entities.append({
+                "id": f"host:{h.get('id')}",
+                "kind": "host",
+                "name": h.get("name") or h.get("id"),
+                "label": h.get("label") or h.get("name") or h.get("id"),
+                "status": h.get("status") or "online",
+                "online": bool(h.get("online")),
+                "external": True,
+                "authorized": True,
+                "base_url": h.get("base_url"),
+                "role": h.get("role"),
+                "updated_at": h.get("last_seen") or now,
+                "department": "跨机",
+                "department_id": "dept-hosts",
+            })
+    except Exception:
+        pass
+
     # 演示剧本注入的同行者（TTL）
     if now < _demo_until and _demo_cast:
         seen = {e.get("id") for e in entities}
@@ -535,6 +587,8 @@ def snapshot(*, event_limit: int = 80) -> dict[str, Any]:
     departments = build_departments(presence)
     agents = [p for p in presence if p.get("kind") == "agent"]
     workers = [p for p in presence if p.get("kind") == "worker"]
+    managed = [p for p in presence if p.get("kind") == "managed"]
+    hosts = [p for p in presence if p.get("kind") == "host"]
     return {
         "presence": presence,
         "events": events,
@@ -545,6 +599,10 @@ def snapshot(*, event_limit: int = 80) -> dict[str, Any]:
             "agents_busy": sum(1 for a in agents if a.get("status") == "busy"),
             "workers": len(workers),
             "workers_online": sum(1 for w in workers if w.get("online")),
+            "managed": len(managed),
+            "managed_online": sum(1 for m in managed if m.get("online")),
+            "hosts": len(hosts),
+            "hosts_online": sum(1 for h in hosts if h.get("online")),
             "events": len(events),
             "edges": len(edges),
             "departments": len(departments),

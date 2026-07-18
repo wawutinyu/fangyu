@@ -243,6 +243,18 @@ def start_instance(
         reg["instances"][iid] = inst
         _save_registry(reg)
 
+    try:
+        from fangyu.core.collaboration import emit_event
+        emit_event(
+            "managed.start",
+            actor=iid,
+            target=display,
+            message=f"托管启动 {display} :{use_port}",
+            detail={"instance_id": iid, "host": host, "port": use_port, "bundle_dir": str(root)},
+        )
+    except Exception:
+        pass
+
     return _enrich(inst)
 
 
@@ -327,6 +339,17 @@ def stop_instance(instance_id: str, *, timeout_sec: float = 10.0) -> dict[str, A
         if not _pid_alive(pid):
             reg["instances"][iid]["pid"] = 0
         _save_registry(reg)
+    try:
+        from fangyu.core.collaboration import emit_event
+        emit_event(
+            "managed.stop",
+            actor=iid,
+            target=str(inst.get("name") or iid),
+            message=f"托管停止 {inst.get('name') or iid}",
+            detail={"instance_id": iid, "host": host, "port": port},
+        )
+    except Exception:
+        pass
     return get_instance(iid) or {"id": iid, "status": "stopped", "alive": False}
 
 
