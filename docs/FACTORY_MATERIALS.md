@@ -27,7 +27,7 @@
 工具货架     ██████░░░░  coding 已进 glob/grep/webfetch/websearch/question；MCP 外挂仍待声明进包
 技能货架     ███░░░░░░░  角色级方法有了；独立 skills/*.md 包仍少
 角色模板     ██████░░░░  + scout；缺只读 Plan 主角色
-装配能力     ███████░░░  materials.json 注册表已进 Bundle；人审 ask 闸仍弱
+装配能力     ████████░░  materials + 人审 UI；真 IM 仍暂缓
 ```
 
 **关键裂缝（已收一刀）：** 平台 `web_search`/`read_url` 占位实现已由 harness 原料 **`websearch`/`webfetch`** 实装进产线；统一 **`config/materials.json`** 与 toolbelt 清单对齐。
@@ -100,7 +100,7 @@
 | `research-web` | ✅ md | P0 | `skills/factory/research-web.md` |
 | `office-decompose` | ✅ md | P1 | `skills/factory/office-decompose.md` |
 | `multi-agent-split` | ✅ md | P1 | `skills/factory/multi-agent-split.md`；意图→拓扑 |
-| 领域包（法务/客服/数据…） | ❌ | P2 | 行业原料，后置 |
+| 领域包（客服/数据） | ✅ md | P2 | `customer-support` · `data-brief` |
 
 **缺口本质：** Flow 里的 skill 与 harness 方法仍需继续统一成「工厂 SKU」；已有 `skills/factory/*.md` + materials 注册。
 
@@ -135,7 +135,7 @@
 | `require_plan` / `enable_task` | ✅ | P0 | flow config |
 | 拓扑 pipeline | ✅ 串行+并行+depends | P1 | 边波次 / stages / pipeline；见 [TOPOLOGY_AND_TASK](TOPOLOGY_AND_TASK.md) |
 | 托管 manage | ✅ | P1 | 升级/跨机仍弱 |
-| 人审闸（ask） | ✅ 简 | P0 | shell ask + confirm；完整 UI 审批仍待 |
+| 人审闸（ask） | ✅ UI | P0 | shell 队列 + 运维「人审」批准/拒绝/执行 |
 | 原料注册表（统一 ID） | ✅ | P0 | `core/materials.py` + Bundle `config/materials.json` |
 | MCP 进包声明 | ✅ 简 | P0 | materials.mcp → `mcp_*` 工具（默认 current_time） |
 | 技能包 md | ✅ | P0 | explore / research / review / implement / office-decompose |

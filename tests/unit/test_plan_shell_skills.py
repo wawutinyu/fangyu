@@ -37,6 +37,9 @@ def test_materials_has_plan_role_and_mcp():
 
 
 def test_shell_ask_needs_confirm(tmp_path):
+    from fangyu.engine.approval_queue import clear_approvals, resolve_approval
+
+    clear_approvals()
     root = tmp_path / "b"
     (root / "workspace").mkdir(parents=True)
     init_bundle_workspace(root)
@@ -44,7 +47,12 @@ def test_shell_ask_needs_confirm(tmp_path):
     try:
         blocked = tool_shell(command="echo hi > out.txt")
         assert blocked.get("status") == "needs_approval"
-        ok = tool_shell(command="echo hi > out.txt", confirm=True)
+        aid = blocked["approval_id"]
+        # 仅 confirm 不够，必须先人审
+        still = tool_shell(command="echo hi > out.txt", confirm=True, approval_id=aid)
+        assert still.get("status") == "needs_approval"
+        resolve_approval(aid, approve=True)
+        ok = tool_shell(command="echo hi > out.txt", confirm=True, approval_id=aid)
         assert ok.get("exit_code") == 0
         assert (root / "workspace" / "out.txt").read_text(encoding="utf-8").startswith("hi")
         # 只读无需 confirm
@@ -52,6 +60,7 @@ def test_shell_ask_needs_confirm(tmp_path):
         assert "exit_code" in ro and ro.get("status") != "needs_approval"
     finally:
         reset_shell_policy(tok)
+        clear_approvals()
 
 
 def test_resolve_includes_mcp_current_time():

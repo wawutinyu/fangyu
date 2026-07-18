@@ -94,9 +94,10 @@
 ⑧ 拓扑并行段 + 职责文档          ✅ bundle_orchestrate + TOPOLOGY_AND_TASK
 ⑨ multi-agent-split + depends    ✅ 技能 + 边波次调度
 ⑩ factory_gate Eval 加厚         ✅ 更多单测 + multi/skills card 检
+⑪ 领域技能 + 人审 UI             ✅ customer/data-brief + 运维·人审
 ```
 
-下一刀：领域技能包 · 完整人审 UI · 真 IM（仍暂缓）。
+下一刀：真 IM（仍暂缓）· 法务等领域包 · MCP Tasks / 无状态部署跟进。
 
 ---
 

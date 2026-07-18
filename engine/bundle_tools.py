@@ -236,14 +236,20 @@ def tool_shell(
     command: str = "",
     timeout_sec: float = 30,
     confirm: bool = False,
+    approval_id: str = "",
 ) -> dict[str, Any]:
     """在 workspace 根目录执行 shell。
 
     策略（contextvar shell_policy）：
       - deny: 一律拒绝
-      - ask: 非只读命令需 confirm=true，否则返回 needs_approval
+      - ask: 非只读命令需人审批准（approval_id），否则返回 needs_approval
       - allow: 仅受危险命令黑名单约束
     """
+    from fangyu.engine.approval_queue import (
+        consume_shell_approval,
+        enqueue_shell_approval,
+        get_approval,
+    )
     from fangyu.engine.shell_policy import get_shell_policy, shell_needs_confirm
 
     cmd = (command or "").strip()
@@ -254,13 +260,32 @@ def tool_shell(
         raise PermissionError("shell 策略为 deny，禁止执行")
     if _SHELL_DENY.search(cmd):
         raise PermissionError(f"命令被策略拒绝: {cmd[:80]}")
-    if shell_needs_confirm(cmd) and not confirm:
-        return {
-            "status": "needs_approval",
-            "command": cmd,
-            "policy": "ask",
-            "hint": "非只读 shell。若确需执行，再次调用并传 confirm=true。",
-        }
+    if shell_needs_confirm(cmd):
+        aid = (approval_id or "").strip()
+        if confirm and aid and consume_shell_approval(aid, cmd):
+            pass  # 已消费批准，继续执行
+        else:
+            # 复用未决/已批同一命令的 pending/approved 项，避免刷屏
+            existing = None
+            if aid:
+                existing = get_approval(aid)
+            if not existing or existing.get("command") != cmd or existing.get("status") not in (
+                "pending", "approved",
+            ):
+                existing = enqueue_shell_approval(cmd)
+            return {
+                "status": "needs_approval",
+                "approval_id": existing["id"],
+                "command": cmd,
+                "policy": "ask",
+                "approval_status": existing.get("status"),
+                "hint": (
+                    "非只读 shell，已进入人审队列。"
+                    "请在 Studio「运维 → 人审」批准；"
+                    "批准后可用同一 approval_id 且 confirm=true 重试，"
+                    "或在人审面板点「批准并执行」。"
+                ),
+            }
     ws = _ws()
     proc = subprocess.run(
         cmd,
@@ -275,6 +300,7 @@ def tool_shell(
         "stdout": (proc.stdout or "")[:8000],
         "stderr": (proc.stderr or "")[:4000],
         "confirmed": bool(confirm),
+        "approval_id": (approval_id or "").strip() or None,
     }
 
 

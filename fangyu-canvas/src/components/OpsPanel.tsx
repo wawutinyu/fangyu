@@ -2,16 +2,20 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   addAclMember,
+  approveApproval,
   checkAcl,
+  denyApproval,
   enableAcl,
   fetchAcl,
   fetchManagedLogs,
   initAcl,
+  listApprovals,
   listManagedInstances,
   quickStartDemo,
   startManaged,
   stopManaged,
   type AclDoc,
+  type ApprovalItem,
   type ManagedInstance,
 } from '../utils/opsApi'
 
@@ -20,15 +24,18 @@ interface OpsPanelProps {
 }
 
 export default function OpsPanel({ headerless }: OpsPanelProps) {
-  const [tab, setTab] = useState<'managed' | 'acl'>('managed')
+  const [tab, setTab] = useState<'managed' | 'acl' | 'approvals'>('managed')
   const [instances, setInstances] = useState<ManagedInstance[]>([])
   const [acl, setAcl] = useState<AclDoc | null>(null)
+  const [approvals, setApprovals] = useState<ApprovalItem[]>([])
+  const [pendingCount, setPendingCount] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [bundleDir, setBundleDir] = useState('')
   const [instanceName, setInstanceName] = useState('')
   const [logLines, setLogLines] = useState<string[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [execNote, setExecNote] = useState<string | null>(null)
 
   const [memberId, setMemberId] = useState('')
   const [memberName, setMemberName] = useState('')
@@ -41,9 +48,18 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
     setLoading(true)
     setError(null)
     try {
-      const [inst, a] = await Promise.all([listManagedInstances(), fetchAcl()])
+      const [inst, a, ap] = await Promise.all([
+        listManagedInstances(),
+        fetchAcl(),
+        listApprovals(),
+      ])
       setInstances(inst)
       setAcl(a)
+      setApprovals(ap.approvals)
+      setPendingCount(
+        ap.pending_count
+        ?? ap.approvals.filter(x => x.status === 'pending').length,
+      )
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
@@ -53,6 +69,12 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
   useEffect(() => {
     reload()
   }, [reload])
+
+  useEffect(() => {
+    if (tab !== 'approvals') return
+    const t = window.setInterval(() => { void reload() }, 3000)
+    return () => window.clearInterval(t)
+  }, [tab, reload])
 
   const onQuickDemo = async () => {
     setLoading(true)
@@ -153,7 +175,42 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
     )
   }
 
+  const onApprove = async (id: string, execute: boolean) => {
+    setLoading(true)
+    setError(null)
+    setExecNote(null)
+    try {
+      const out = await approveApproval(id, execute)
+      if (execute && out.execution) {
+        const ex = out.execution
+        setExecNote(
+          ex.status === 'needs_approval'
+            ? `仍待确认: ${ex.status}`
+            : `已执行 exit=${ex.exit_code ?? '?'}${(ex.stdout || '').trim() ? ` · ${(ex.stdout || '').trim().slice(0, 80)}` : ''}`,
+        )
+      }
+      await reload()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+    setLoading(false)
+  }
+
+  const onDeny = async (id: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      await denyApproval(id)
+      await reload()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+    setLoading(false)
+  }
+
   const members = acl?.members ? Object.entries(acl.members) : []
+  const pending = approvals.filter(a => a.status === 'pending')
+  const recent = approvals.filter(a => a.status !== 'pending').slice(0, 12)
 
   const body = (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', fontSize: 12 }}>
@@ -174,6 +231,14 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
           onClick={() => setTab('acl')}
         >
           组织 ACL
+        </button>
+        <button
+          className="notion-btn"
+          style={{ fontSize: 12, fontWeight: tab === 'approvals' ? 600 : 400 }}
+          onClick={() => setTab('approvals')}
+          title="shell ask 人审队列"
+        >
+          人审{pendingCount > 0 ? ` · ${pendingCount}` : ''}
         </button>
         <div style={{ flex: 1 }} />
         <button className="notion-btn" style={{ fontSize: 12 }} onClick={reload} disabled={loading}>
@@ -346,6 +411,90 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
           </div>
         </div>
       )}
+
+      {tab === 'approvals' && (
+        <div style={{ flex: 1, overflow: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+            ask 策略下，非只读 shell 会进入此队列。批准并执行会立刻跑命令；也可只批准，由 Agent 带 approval_id 重试。
+          </div>
+          {execNote && (
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{execNote}</div>
+          )}
+          {pending.length === 0 && (
+            <div style={{ color: 'var(--text-muted)', padding: 8 }}>暂无待审请求</div>
+          )}
+          {pending.map(item => (
+            <div
+              key={item.id}
+              style={{
+                border: '1px solid var(--border-light)',
+                borderRadius: 6,
+                padding: '8px 10px',
+                background: 'var(--bg-secondary)',
+              }}
+            >
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
+                <strong style={{ color: '#ca8a04' }}>pending</strong>
+                <code style={{ fontSize: 10, color: 'var(--text-muted)' }}>{item.id}</code>
+                <div style={{ flex: 1 }} />
+                <button
+                  className="notion-btn primary"
+                  style={{ fontSize: 11 }}
+                  disabled={loading}
+                  onClick={() => onApprove(item.id, true)}
+                >
+                  批准并执行
+                </button>
+                <button
+                  className="notion-btn"
+                  style={{ fontSize: 11 }}
+                  disabled={loading}
+                  onClick={() => onApprove(item.id, false)}
+                >
+                  仅批准
+                </button>
+                <button
+                  className="notion-btn"
+                  style={{ fontSize: 11 }}
+                  disabled={loading}
+                  onClick={() => onDeny(item.id)}
+                >
+                  拒绝
+                </button>
+              </div>
+              <pre style={{
+                margin: 0, fontSize: 11, whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+              }}>
+                {item.command || '(空命令)'}
+              </pre>
+            </div>
+          ))}
+
+          {recent.length > 0 && (
+            <div>
+              <div className="section-title" style={{ marginBottom: 6 }}>最近</div>
+              {recent.map(item => (
+                <div key={item.id} style={{
+                  display: 'flex', gap: 8, padding: '4px 0',
+                  borderBottom: '1px solid var(--border-light)', fontSize: 11,
+                }}>
+                  <span style={{
+                    color: item.status === 'consumed' || item.status === 'approved' ? '#1a7f37' : '#c0392b',
+                    minWidth: 64,
+                  }}>
+                    {item.status}
+                  </span>
+                  <code style={{ color: 'var(--text-muted)' }}>{item.id}</code>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {item.command}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 
@@ -354,7 +503,7 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-light)', fontWeight: 600, fontSize: 13 }}>
-        运维 · 托管与组织 ACL
+        运维 · 托管 / ACL / 人审
       </div>
       {body}
     </div>

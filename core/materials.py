@@ -74,6 +74,8 @@ DEFAULT_MATERIALS: dict[str, Any] = {
         {"id": "implement-and-verify", "status": "active", "path": "skills/factory/implement-and-verify.md"},
         {"id": "office-decompose", "status": "active", "path": "skills/factory/office-decompose.md"},
         {"id": "multi-agent-split", "status": "active", "path": "skills/factory/multi-agent-split.md"},
+        {"id": "customer-support", "status": "active", "path": "skills/factory/customer-support.md"},
+        {"id": "data-brief", "status": "active", "path": "skills/factory/data-brief.md"},
     ],
     "mcp": [
         {"id": "__internal__", "tools": ["current_time"]},

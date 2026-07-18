@@ -128,3 +128,46 @@ export async function checkAcl(input: {
   })
   return res.json()
 }
+
+/** 人审 — shell ask */
+export interface ApprovalItem {
+  id: string
+  kind?: string
+  command?: string
+  status: string
+  created_at?: number
+  resolved_at?: number | null
+}
+
+export async function listApprovals(status = ''): Promise<{
+  approvals: ApprovalItem[]
+  pending_count: number | null
+}> {
+  const q = status ? `?status=${encodeURIComponent(status)}` : ''
+  const res = await apiFetch(`/api/v1/approvals${q}`)
+  if (!res.ok) return { approvals: [], pending_count: 0 }
+  return res.json()
+}
+
+export async function approveApproval(
+  id: string,
+  execute = true,
+): Promise<{ ok: boolean; approval: ApprovalItem; execution?: { exit_code?: number; stdout?: string; stderr?: string; status?: string } }> {
+  const res = await apiFetch(`/api/v1/approvals/${encodeURIComponent(id)}/approve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ execute }),
+  })
+  const body = await res.json()
+  if (!res.ok) throw new Error(body.detail || '批准失败')
+  return body
+}
+
+export async function denyApproval(id: string): Promise<{ ok: boolean; approval: ApprovalItem }> {
+  const res = await apiFetch(`/api/v1/approvals/${encodeURIComponent(id)}/deny`, {
+    method: 'POST',
+  })
+  const body = await res.json()
+  if (!res.ok) throw new Error(body.detail || '拒绝失败')
+  return body
+}
