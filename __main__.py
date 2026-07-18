@@ -6,6 +6,9 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] == "bundle":
         from .engine.bundle_cli import main as bundle_main
         sys.exit(bundle_main(sys.argv[2:]))
+    if len(sys.argv) > 1 and sys.argv[1] == "acl":
+        from .engine.acl_cli import main as acl_main
+        sys.exit(acl_main(sys.argv[2:]))
     if "--run-bundle" in sys.argv:
         idx = sys.argv.index("--run-bundle")
         if idx + 1 >= len(sys.argv):

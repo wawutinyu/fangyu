@@ -16,6 +16,7 @@ data/workers.db
 data/worker-local.json
 data/worker-mqtt-triggers.json
 data/managed/
+data/org_acl.json
 
 # Node workspaces
 node_modules/

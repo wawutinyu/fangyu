@@ -134,6 +134,15 @@ async def run_agent_loop(
             continue
 
         try:
+            from fangyu.core.org_acl import assert_org_allowed, get_principal
+            assert_org_allowed(get_principal(), tool=name)
+        except Exception as exc:
+            obs = json.dumps({"tool": name, "ok": False, "error": str(exc)}, ensure_ascii=False)
+            messages.append({"role": "user", "content": f"工具结果：{obs}"})
+            trace.append({"turn": turn, "tool": name, "args": args, "observation": obs})
+            continue
+
+        try:
             out = _invoke_tool(tools[name], args)
             # 支持 async tool
             if hasattr(out, "__await__"):

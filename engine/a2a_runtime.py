@@ -240,6 +240,21 @@ class AgentBus:
         from .trust_runtime import assert_agent_authorized
         assert_agent_authorized(agent_name, skill_id or "default", trust)
 
+        # G2-C 组织 ACL（principal 来自 message.metadata）
+        meta = message.get("metadata") or {}
+        principal = meta.get("principal_id") or meta.get("principal")
+        from fangyu.core.org_acl import assert_org_allowed, reset_principal, set_principal
+        _acl_token = set_principal(str(principal) if principal else None)
+        try:
+            assert_org_allowed(
+                str(principal) if principal else None,
+                agent=agent_name,
+                skill=skill_id or "default",
+            )
+        except Exception:
+            reset_principal(_acl_token)
+            raise
+
         if flow and isinstance(flow, dict) and flow.get("nodes"):
             from ..core.constitution import assert_flow_allowed, check_agent_action
             check_agent_action(agent=agent_name, skill_id=skill_id)
@@ -251,6 +266,7 @@ class AgentBus:
                 "role": "agent",
                 "parts": [{"type": "text", "text": reply}],
             })
+            reset_principal(_acl_token)
             return {"output": {"result": reply}, "history": task.get("history", [])}
 
         from .scheduler import run_flow
@@ -261,16 +277,20 @@ class AgentBus:
             ext_inputs.setdefault("query", text)
             ext_inputs.setdefault("input", text)
         agent_scope = f"agent:{agent_name}"
-        result = asyncio.run(run_flow(
-            nodes=flow.get("nodes", []),
-            edges=flow.get("edges", []),
-            external_inputs=ext_inputs,
-            global_vars={
-                "_agent_name": agent_name,
-                "_agent_scope": agent_scope,
-                "_skill_id": skill_id or "",
-            },
-        ))
+        try:
+            result = asyncio.run(run_flow(
+                nodes=flow.get("nodes", []),
+                edges=flow.get("edges", []),
+                external_inputs=ext_inputs,
+                global_vars={
+                    "_agent_name": agent_name,
+                    "_agent_scope": agent_scope,
+                    "_skill_id": skill_id or "",
+                    "_principal_id": str(principal) if principal else "",
+                },
+            ))
+        finally:
+            reset_principal(_acl_token)
         last = (result.get("results") or [])[-1] if result.get("results") else {}
         summary = last.get("outputs", {}).get("result") or last.get("outputs", {})
         # episodic 写入方隅·知（scope=agent:{name}）

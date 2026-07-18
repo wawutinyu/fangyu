@@ -73,6 +73,12 @@ def create_bundle_app(
     register_executors()
     bundle = load_agent_bundle(bundle_path)
     data_dir = activate_bundle_runtime_context(bundle["root"])
+    # Bundle 内组织 ACL（若有）
+    try:
+        from fangyu.core.org_acl import activate_bundle_acl
+        activate_bundle_acl(bundle["root"])
+    except Exception:
+        pass
     if workspace:
         bind_external_workspace(bundle["root"], workspace)
         ws = init_bundle_workspace(bundle["root"], workspace_override=workspace)

@@ -72,6 +72,17 @@ def get_tool(name: str) -> dict | None:
 async def execute_tool(name: str, args: dict, global_vars: dict) -> Any:
     from ..core.constitution import check_tool_allowed
     check_tool_allowed(name)
+    # G2-C：组织 ACL 工具闸（principal 来自 contextvar 或 global_vars）
+    from fangyu.core.org_acl import assert_org_allowed, get_principal, set_principal, reset_principal
+    principal = get_principal() or global_vars.get("_principal_id") or None
+    token = None
+    if principal and not get_principal():
+        token = set_principal(str(principal))
+    try:
+        assert_org_allowed(get_principal(), tool=name)
+    finally:
+        if token is not None:
+            reset_principal(token)
     tool = get_tool(name)
     if not tool:
         raise ValueError(f"工具 '{name}' 未注册")

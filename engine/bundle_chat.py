@@ -73,6 +73,11 @@ def prepare_bundle_chat(
     root = Path(bundle_dir).resolve()
     bundle = load_agent_bundle(root)
     activate_bundle_runtime_context(root)
+    try:
+        from fangyu.core.org_acl import activate_bundle_acl
+        activate_bundle_acl(root)
+    except Exception:
+        pass
     if workspace:
         bind_external_workspace(root, workspace)
         ws = init_bundle_workspace(root, workspace_override=workspace)
@@ -88,15 +93,22 @@ def chat_once(
     workspace: str | Path | None = None,
     llm: Callable[[list[dict[str, str]]], Awaitable[str]] | None = None,
     persist: bool = True,
+    principal_id: str | None = None,
 ) -> dict[str, Any]:
     """单轮对话（内部可多轮 tool-loop）。"""
+    from fangyu.core.org_acl import reset_principal, set_principal
+
     ctx = prepare_bundle_chat(bundle_dir, workspace=workspace)
     text = (message or "").strip()
     if not text:
         return {"success": False, "result": None, "error": "空消息"}
     if persist:
         append_chat("user", text)
-    out = asyncio.run(_run_default_skill(ctx["bundle"], text, llm=llm))
+    token = set_principal(principal_id)
+    try:
+        out = asyncio.run(_run_default_skill(ctx["bundle"], text, llm=llm))
+    finally:
+        reset_principal(token)
     reply = out.get("result") or out.get("error") or "(无输出)"
     if persist:
         append_chat(
