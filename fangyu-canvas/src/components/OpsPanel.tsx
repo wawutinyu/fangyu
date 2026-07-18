@@ -10,11 +10,15 @@ import {
   type AuthMe,
 } from '../utils/authApi'
 import {
+  alignFactoriesPresence,
   deleteRemoteFactory,
+  fetchFactoryHeartbeatLoop,
   heartbeatFactories,
   listRemoteFactories,
   probeAndSaveFactory,
   probeRemoteFactory,
+  setFactoryHeartbeatLoop,
+  type FactoryHeartbeatLoopStatus,
 } from '../utils/externalAgent'
 import {
   addAclMember,
@@ -98,6 +102,8 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
     hits?: Array<{ path: string; ok: boolean }>
   } | null>(null)
   const [facNote, setFacNote] = useState<string | null>(null)
+  const [facLoop, setFacLoop] = useState<FactoryHeartbeatLoopStatus | null>(null)
+  const [facLoopSec, setFacLoopSec] = useState(90)
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -231,6 +237,13 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
   const reloadFactories = useCallback(async () => {
     try {
       setFactories(await listRemoteFactories())
+      try {
+        const st = await fetchFactoryHeartbeatLoop()
+        setFacLoop(st)
+        if (st.interval_sec) setFacLoopSec(st.interval_sec)
+      } catch {
+        /* ignore */
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
@@ -329,6 +342,41 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
       if (out.factories) setFactories(out.factories)
       else await reloadFactories()
       setFacNote(`批量心跳：在线 ${out.online}/${out.total}（已同步 Presence）`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+    setLoading(false)
+  }
+
+  const onAlignFactories = async () => {
+    setLoading(true)
+    setError(null)
+    setFacNote(null)
+    try {
+      const out = await alignFactoriesPresence({ import_hosts: true, export_factories: true, probe: false })
+      if (out.factories) setFactories(out.factories)
+      else await reloadFactories()
+      setFacNote(`对齐完成：导入 ${out.imported} · 导出 ${out.exported}`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+    setLoading(false)
+  }
+
+  const onToggleFacLoop = async (enabled: boolean) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const st = await setFactoryHeartbeatLoop({
+        enabled,
+        interval_sec: facLoopSec,
+        sync_presence: true,
+        align: true,
+      })
+      setFacLoop(st)
+      setFacNote(enabled
+        ? `定时心跳已开启（每 ${st.interval_sec}s）`
+        : '定时心跳已关闭')
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
@@ -1044,6 +1092,50 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
             >
               批量心跳
             </button>
+            <button
+              className="notion-btn"
+              style={{ fontSize: 12 }}
+              type="button"
+              onClick={() => void onAlignFactories()}
+              disabled={loading}
+              data-testid="factory-align"
+              title="Presence 主机 ↔ 工厂通讯录双向对齐"
+            >
+              对齐 Presence
+            </button>
+          </div>
+          <div style={{
+            display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center',
+            padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border-light)', fontSize: 11,
+          }} data-testid="factory-heartbeat-loop">
+            <span style={{ color: 'var(--text-muted)' }}>
+              定时心跳 {facLoop?.running ? '运行中' : '关闭'}
+              {facLoop?.runs != null ? ` · 已跑 ${facLoop.runs} 次` : ''}
+            </span>
+            <input
+              className="notion-input"
+              style={{ width: 64, fontSize: 11 }}
+              type="number"
+              min={15}
+              value={facLoopSec}
+              onChange={e => setFacLoopSec(Math.max(15, Number(e.target.value) || 90))}
+              title="间隔秒"
+            />
+            <span style={{ color: 'var(--text-muted)' }}>秒</span>
+            <button
+              className="notion-btn"
+              style={{ fontSize: 11 }}
+              type="button"
+              disabled={loading}
+              onClick={() => void onToggleFacLoop(!(facLoop?.running || facLoop?.enabled))}
+            >
+              {facLoop?.running || facLoop?.enabled ? '停止定时' : '开启定时'}
+            </button>
+            {facLoop?.env_interval_sec ? (
+              <span style={{ color: 'var(--text-muted)' }}>
+                env={facLoop.env_interval_sec}s
+              </span>
+            ) : null}
           </div>
           {facProbe && (
             <div style={{ fontSize: 11, padding: 8, borderRadius: 6, border: '1px solid var(--border-light)' }}>

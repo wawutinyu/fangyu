@@ -64,3 +64,20 @@ def list_remote_hosts(*, include_expired: bool = False) -> list[dict[str, Any]]:
 def remove_remote_host(host_id: str) -> bool:
     with _lock:
         return _HOSTS.pop(host_id, None) is not None
+
+
+def mark_host_offline(host_id: str) -> dict[str, Any] | None:
+    """将主机标为离线（保留条目，缩短过期）。"""
+    hid = (host_id or "").strip()
+    if not hid:
+        return None
+    now = time.time()
+    with _lock:
+        item = _HOSTS.get(hid)
+        if not item:
+            return None
+        item["online"] = False
+        item["status"] = "offline"
+        item["updated_at"] = now
+        item["expires_at"] = now + 30.0
+        return dict(item)

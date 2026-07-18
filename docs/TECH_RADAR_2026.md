@@ -110,9 +110,10 @@
 ㉔ Eval 对比页 + A2A 工厂目录 UI  ✅ eval-compare · 观测对比 · 运维·工厂
 ㉕ 对端一键入库 + 值班墙跨机默认  ✅ probe-save/peer-probe · 墙默认 host
 ㉖ 工厂批量心跳 + Eval smoke CI    ✅ factories/heartbeat · factory-gate.yml
+㉗ 定时心跳 + Presence↔通讯录对齐  ✅ heartbeat-loop · factories/align
 ```
 
-下一刀：真 IM（仍暂缓）· 工厂心跳定时任务 · Presence 主机与工厂通讯录双向对齐。
+下一刀：真 IM（仍暂缓）· 工厂离线告警进观测 · A2A 外部 Agent 从通讯录一键拉入画布。
 
 ---
 

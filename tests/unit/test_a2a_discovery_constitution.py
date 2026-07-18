@@ -162,6 +162,78 @@ def test_factories_batch_heartbeat(monkeypatch, tmp_path):
         assert any(h.get("role") == "factory" for h in hosts)
 
 
+def test_factories_align_and_heartbeat_loop(monkeypatch, tmp_path):
+    from fangyu.core import a2a_discovery as disc
+    from fangyu.core import a2a_factories as fac
+    from fangyu.core import config as config_mod
+    from fangyu.core import factory_heartbeat_loop as loop
+    from fangyu.core.remote_hosts import clear_remote_hosts, upsert_remote_host
+
+    config_mod.set_data_dir(tmp_path / "data")
+    (tmp_path / "data").mkdir(parents=True, exist_ok=True)
+    clear_remote_hosts()
+    fac.save_factories([])
+    loop.stop_factory_heartbeat_loop()
+
+    monkeypatch.setattr(
+        disc,
+        "probe_factory",
+        lambda url: {
+            "ok": True,
+            "base_url": url.rstrip("/"),
+            "rpc_url": url.rstrip("/") + "/api/v1/a2a/rpc",
+            "card": {"name": "X"},
+            "hits": [],
+        },
+    )
+
+    upsert_remote_host(
+        host_id="studio-east",
+        label="东厂",
+        base_url="http://east.example:8787",
+        role="studio",
+    )
+    upsert_factory(base_url="http://west.example:8787", label="西厂")
+    # 标记西厂曾在线以便导出
+    rows = fac.load_factories()
+    rows[0]["online"] = True
+    fac.save_factories(rows)
+
+    with TestClient(app) as client:
+        aligned = client.post("/api/v1/a2a/factories/align", json={
+            "import_hosts": True,
+            "export_factories": True,
+            "probe": False,
+        })
+        assert aligned.status_code == 200
+        body = aligned.json()
+        assert body["imported"] >= 1
+        assert body["exported"] >= 1
+        bases = {f["base_url"] for f in fac.load_factories()}
+        assert "http://east.example:8787" in bases
+        assert "http://west.example:8787" in bases
+
+        st = client.get("/api/v1/a2a/factories/heartbeat-loop")
+        assert st.status_code == 200
+        assert st.json()["running"] is False
+
+        on = client.post("/api/v1/a2a/factories/heartbeat-loop", json={
+            "enabled": True,
+            "interval_sec": 30,
+            "sync_presence": True,
+            "align": True,
+        })
+        assert on.status_code == 200
+        assert on.json()["enabled"] is True
+        assert on.json()["running"] is True
+
+        off = client.post("/api/v1/a2a/factories/heartbeat-loop", json={"enabled": False})
+        assert off.status_code == 200
+        assert off.json()["running"] is False
+
+    loop.stop_factory_heartbeat_loop()
+
+
 def test_constitution_bundle_roundtrip(tmp_path):
     bundle = tmp_path / "b"
     bundle.mkdir()

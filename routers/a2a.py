@@ -219,6 +219,19 @@ class FactoryHeartbeatBody(BaseModel):
     ttl_sec: float = 120
 
 
+class FactoryAlignBody(BaseModel):
+    import_hosts: bool = True
+    export_factories: bool = True
+    probe: bool = False
+
+
+class FactoryHeartbeatLoopBody(BaseModel):
+    enabled: bool = True
+    interval_sec: float = 90
+    sync_presence: bool = True
+    align: bool = True
+
+
 @router.get("/discovery")
 def local_discovery():
     """本厂公开发现目录：已注册 Agent + well-known 提示。"""
@@ -348,6 +361,48 @@ def factories_heartbeat(body: FactoryHeartbeatBody | None = None):
         factory_ids=req.factory_ids or None,
         sync_presence=req.sync_presence,
         ttl_sec=req.ttl_sec,
+    )
+
+
+@router.post("/factories/align")
+def factories_align(body: FactoryAlignBody | None = None):
+    """Presence 主机 ↔ 工厂通讯录双向对齐。"""
+    from fangyu.core.a2a_factories import align_factories_and_presence
+
+    req = body or FactoryAlignBody()
+    return align_factories_and_presence(
+        import_hosts=req.import_hosts,
+        export_factories=req.export_factories,
+        probe=req.probe,
+    )
+
+
+@router.get("/factories/heartbeat-loop")
+def factories_heartbeat_loop_status():
+    from fangyu.core.factory_heartbeat_loop import loop_status
+
+    return loop_status()
+
+
+@router.post("/factories/heartbeat-loop")
+def factories_heartbeat_loop_control(body: FactoryHeartbeatLoopBody):
+    from fangyu.core.factory_heartbeat_loop import (
+        configure_loop,
+        start_factory_heartbeat_loop,
+        stop_factory_heartbeat_loop,
+    )
+
+    if not body.enabled:
+        return stop_factory_heartbeat_loop()
+    configure_loop(
+        interval_sec=body.interval_sec,
+        sync_presence=body.sync_presence,
+        align=body.align,
+    )
+    return start_factory_heartbeat_loop(
+        interval_sec=body.interval_sec,
+        sync_presence=body.sync_presence,
+        align=body.align,
     )
 
 

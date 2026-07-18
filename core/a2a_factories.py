@@ -191,3 +191,115 @@ def heartbeat_factories(
         "results": results,
         "factories": rows,
     }
+
+
+def _norm_base(url: str) -> str:
+    from fangyu.core.a2a_discovery import normalize_factory_base
+
+    try:
+        return normalize_factory_base(url)
+    except ValueError:
+        return (url or "").rstrip("/")
+
+
+def align_factories_and_presence(
+    *,
+    import_hosts: bool = True,
+    export_factories: bool = True,
+    probe: bool = False,
+) -> dict[str, Any]:
+    """Presence 主机 ↔ 工厂通讯录双向对齐。
+
+    - import_hosts: 有 base_url 的远程主机写入通讯录
+    - export_factories: 通讯录条目 upsert 到 Presence（role=factory）
+    - probe: 对齐前先跑一轮批量心跳
+    """
+    from fangyu.core.remote_hosts import list_remote_hosts, upsert_remote_host
+
+    hb = None
+    if probe:
+        hb = heartbeat_factories(sync_presence=False)
+
+    imported: list[dict[str, Any]] = []
+    exported: list[dict[str, Any]] = []
+    now = time.time()
+
+    if import_hosts:
+        known = {_norm_base(str(r.get("base_url") or "")) for r in load_factories()}
+        known.discard("")
+        for h in list_remote_hosts():
+            base = _norm_base(str(h.get("base_url") or ""))
+            if not base or base in known:
+                continue
+            # 本机托管/无 URL 跳过；仅导入可发现的对端
+            row = upsert_factory(
+                base_url=base,
+                label=str(h.get("label") or h.get("name") or base),
+                meta={
+                    "source": "presence_host",
+                    "host_id": h.get("id"),
+                    "role": h.get("role"),
+                    "imported_at": now,
+                },
+            )
+            known.add(base)
+            imported.append({"factory_id": row.get("id"), "base_url": base, "host_id": h.get("id")})
+
+    if export_factories:
+        for row in load_factories():
+            fid = str(row.get("id") or "")
+            base = str(row.get("base_url") or "")
+            if not base:
+                continue
+            online = bool(row.get("online"))
+            host_id = f"factory:{fid or base}"
+            if online or row.get("last_probe_ok"):
+                host = upsert_remote_host(
+                    host_id=host_id,
+                    label=str(row.get("label") or row.get("card_name") or base),
+                    base_url=base,
+                    role="factory",
+                    meta={"factory_id": fid, "source": "a2a_factories_align"},
+                    ttl_sec=120.0,
+                )
+                exported.append({
+                    "factory_id": fid,
+                    "host_id": host.get("id"),
+                    "base_url": base,
+                    "online": True,
+                })
+            else:
+                # 离线：仍登记短 TTL，便于值班墙看到「曾在通讯录」
+                host = upsert_remote_host(
+                    host_id=host_id,
+                    label=str(row.get("label") or row.get("card_name") or base),
+                    base_url=base,
+                    role="factory",
+                    meta={
+                        "factory_id": fid,
+                        "source": "a2a_factories_align",
+                        "online": False,
+                    },
+                    ttl_sec=30.0,
+                )
+                # 标记离线
+                from fangyu.core.remote_hosts import mark_host_offline
+
+                mark_host_offline(host_id)
+                exported.append({
+                    "factory_id": fid,
+                    "host_id": host.get("id"),
+                    "base_url": base,
+                    "online": False,
+                })
+
+    return {
+        "ok": True,
+        "ts": now,
+        "imported": len(imported),
+        "exported": len(exported),
+        "import_details": imported,
+        "export_details": exported,
+        "heartbeat": hb,
+        "factories": load_factories(),
+    }

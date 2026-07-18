@@ -139,6 +139,71 @@ export async function heartbeatFactories(input?: {
   return data
 }
 
+export async function alignFactoriesPresence(input?: {
+  import_hosts?: boolean
+  export_factories?: boolean
+  probe?: boolean
+}): Promise<{
+  ok: boolean
+  imported: number
+  exported: number
+  factories?: Array<{ id: string; base_url: string; label?: string; online?: boolean }>
+}> {
+  const resp = await fetch('/api/v1/a2a/factories/align', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      import_hosts: input?.import_hosts !== false,
+      export_factories: input?.export_factories !== false,
+      probe: !!input?.probe,
+    }),
+  })
+  const data = await resp.json()
+  if (!resp.ok) throw new Error(data.detail || `对齐失败 (${resp.status})`)
+  return data
+}
+
+export interface FactoryHeartbeatLoopStatus {
+  enabled: boolean
+  running: boolean
+  interval_sec: number
+  sync_presence?: boolean
+  align?: boolean
+  last_run_at?: number | null
+  last_ok?: boolean | null
+  last_error?: string | null
+  last_summary?: unknown
+  runs?: number
+  env_interval_sec?: number
+}
+
+export async function fetchFactoryHeartbeatLoop(): Promise<FactoryHeartbeatLoopStatus> {
+  const resp = await fetch('/api/v1/a2a/factories/heartbeat-loop')
+  if (!resp.ok) throw new Error(`读取定时心跳失败 (${resp.status})`)
+  return resp.json()
+}
+
+export async function setFactoryHeartbeatLoop(input: {
+  enabled: boolean
+  interval_sec?: number
+  sync_presence?: boolean
+  align?: boolean
+}): Promise<FactoryHeartbeatLoopStatus> {
+  const resp = await fetch('/api/v1/a2a/factories/heartbeat-loop', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      enabled: input.enabled,
+      interval_sec: input.interval_sec ?? 90,
+      sync_presence: input.sync_presence !== false,
+      align: input.align !== false,
+    }),
+  })
+  const data = await resp.json()
+  if (!resp.ok) throw new Error(data.detail || `设置定时心跳失败 (${resp.status})`)
+  return data
+}
+
 export async function deleteRemoteFactory(factoryId: string): Promise<void> {
   const resp = await fetch(`/api/v1/a2a/factories/${encodeURIComponent(factoryId)}`, {
     method: 'DELETE',

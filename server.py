@@ -58,7 +58,17 @@ async def lifespan(app: FastAPI):
     get_worker_mqtt_bridge().start()
     async with async_session() as session:
         await maintain_asset_library(session)
+    try:
+        from .core.factory_heartbeat_loop import maybe_autostart_from_env
+        maybe_autostart_from_env()
+    except Exception:
+        pass
     yield
+    try:
+        from .core.factory_heartbeat_loop import stop_factory_heartbeat_loop
+        stop_factory_heartbeat_loop()
+    except Exception:
+        pass
 
 
 app = FastAPI(
