@@ -19,6 +19,10 @@ _SHELL_READONLY = re.compile(
 
 
 def get_shell_policy() -> str:
+    import os
+    env = (os.environ.get("FANGYU_SHELL_POLICY") or "").strip().lower()
+    if env in ("allow", "ask", "deny"):
+        return env
     return (_shell_policy.get() or "ask").strip().lower()
 
 

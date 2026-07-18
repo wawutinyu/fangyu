@@ -59,6 +59,10 @@ async def _exec_agent_loop(ctx: NodeContext) -> dict[str, Any]:
         or (materials.get("policies") or {}).get("shell")
         or "ask"
     ).strip().lower()
+    import os
+    env_policy = (os.environ.get("FANGYU_SHELL_POLICY") or "").strip().lower()
+    if env_policy in ("allow", "ask", "deny"):
+        shell_policy = env_policy
 
     if ctx.config.get("system"):
         system = str(ctx.config.get("system"))

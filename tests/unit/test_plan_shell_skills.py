@@ -63,6 +63,29 @@ def test_shell_ask_needs_confirm(tmp_path):
         clear_approvals()
 
 
+def test_fangyu_shell_policy_env_overrides_ask(tmp_path, monkeypatch):
+    """live 脚本用 FANGYU_SHELL_POLICY=allow，避免人审卡死。"""
+    from fangyu.engine.approval_queue import clear_approvals
+    from fangyu.engine.shell_policy import get_shell_policy
+
+    clear_approvals()
+    root = tmp_path / "env-shell"
+    (root / "workspace").mkdir(parents=True)
+    init_bundle_workspace(root)
+    tok = set_shell_policy("ask")
+    monkeypatch.setenv("FANGYU_SHELL_POLICY", "allow")
+    try:
+        assert get_shell_policy() == "allow"
+        out = tool_shell(command="echo env-allow > env.txt")
+        assert out.get("status") != "needs_approval"
+        assert out.get("exit_code") == 0
+        assert (root / "workspace" / "env.txt").read_text(encoding="utf-8").startswith("env-allow")
+    finally:
+        monkeypatch.delenv("FANGYU_SHELL_POLICY", raising=False)
+        reset_shell_policy(tok)
+        clear_approvals()
+
+
 def test_resolve_includes_mcp_current_time():
     tools = resolve_toolbelt("coding", materials=default_materials())
     assert "mcp_current_time" in tools

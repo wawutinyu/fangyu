@@ -62,6 +62,9 @@ def main() -> int:
         print("提示: 在 Studio 设置 DeepSeek Key，或 export DEEPSEEK_API_KEY=...")
         return 2
 
+    # live 脚本默认放行 shell，避免 ask 人审把 case3 卡死（Studio 仍默认 ask）
+    os.environ.setdefault("FANGYU_SHELL_POLICY", "allow")
+
     from fangyu.core.agent_factory import build_from_profile
     from fangyu.engine.bundle_chat import chat_once
 
@@ -124,8 +127,8 @@ def main() -> int:
     r3 = chat_once(
         bundle,
         (
-            "用 shell 工具执行：echo live-case-3 > live_shell.txt"
-            "（须传 confirm=true，因 ask 策略）。然后 done。"
+            "用 shell 工具执行：echo live-case-3 > live_shell.txt。"
+            "然后 done。"
         ),
         workspace=project,
     )

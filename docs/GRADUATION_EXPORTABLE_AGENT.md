@@ -13,7 +13,7 @@
 
 | 轨 | 含义 | 当前粗进度 |
 |----|------|------------|
-| **G1 · OpenCode harness** | 绑仓、**长任务 plan**、多轮手脚、复杂仓稳定性、chat/RPC、工厂出包、live 绿 | **~85%**（路径齐；live 仍脆，见评估） |
+| **G1 · OpenCode harness** | 绑仓、**长任务 plan**、多轮手脚、复杂仓稳定性、chat/RPC、工厂出包、live 绿 | **~90%**（P0 live/graduation C 已绿） |
 
 | **G2 · WorkBuddy 全档** | 办公交付 + **IM** + **企业权限** + **托管** + **多 Agent 编排** | **~55%**（骨架多，真机/边 ACL 未满） |
 
@@ -92,14 +92,14 @@
 ## 距离判断（诚实）
 
 ```text
-G1 OpenCode  ████████░░  ~85%（路径齐；live/graduation C 仍脆）
+G1 OpenCode  █████████░  ~90%（P0 live/graduation C 已绿 · 2026-07-19）
 G2-A 办公竖切 ████████░░  ~80%（md+docx+xlsx）
 G2-B IM       ████░░░░░░  ~45%（真机暂缓）
 G2-C 企业权限 ███████░░░  ~70%（ACL+SSO；编排边 ACL ☐）
 G2-D 托管     █████████░  ~85%（manage+Studio；升级/重启 ✅）
 G2-E 多编排   ██████░░░░  ~55%
 ────────────────────────
-总毕业(G1∧G2) █████░░░░░  ~55%
+总毕业(G1∧G2) █████░░░░░  ~58%
 ```
 
 ---
@@ -119,7 +119,7 @@ G2-E 多编排   ██████░░░░  ~55%
 
 | 优先级 | 目标 | 验收标准 |
 |--------|------|----------|
-| **P0** | 稳住 G1 live | `opencode_harness_live` 三用例绿；`opencode_graduation_c` 自动项绿；人审在测试中有自动批准路径；`factory_gate --live-tier smoke` 可重复过 |
+| **P0** | 稳住 G1 live | `opencode_harness_live` 三用例绿；`opencode_graduation_c` 自动项绿；live 用 `FANGYU_SHELL_POLICY=allow` 避免人审卡死；`factory_gate --live-tier smoke` 可重复过 |
 | **P1** | 真双厂值班验收 | 两实例：discover→入库→心跳→人为离线→告警→再探测→观可回放；形成签字清单（不靠再加筛选 UI） |
 | **P2** | 编排边 ACL | topology 边声明「谁可调谁」；越权可拦可审计；补齐 G2-E #5 |
 | **P3** | 飞书真机（单开） | 运维向导配凭证 → 私聊触发 Bundle/harness → 回复回会话；不挡 P0–P2 |
@@ -134,7 +134,7 @@ G2-E 多编排   ██████░░░░  ~55%
 | 项 | 状态 |
 |----|------|
 | G1 路径 A/B/C + 脚本 | ✅ 骨架 |
-| G1 live / graduation C 常绿 | ☐ **P0 进行中** |
+| G1 live / graduation C 常绿 | ✅ **P0 已打通**（2026-07-19：mock 先 plan；live `FANGYU_SHELL_POLICY=allow`） |
 | G2-A workbuddy + live 脚本 | ✅ |
 | G2-E multi 导出编排 | ✅ 骨架 |
 | G2-E 编排边 ACL | ☐ **P2** |

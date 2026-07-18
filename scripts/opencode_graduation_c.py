@@ -77,8 +77,9 @@ def main() -> int:
     except Exception as exc:
         results.append(_mark(False, "C1 create + workspace → git 仓", str(exc)))
 
-    # C2 + C3
+    # C2 + C3 — mock 须先 plan（opencode require_plan=True）
     replies = [
+        '{"action":"plan","steps":["write GRAD_NOTE.md","done"]}',
         '{"action":"tool","name":"write","args":{"path":"GRAD_NOTE.md","content":"# graduated\\n"}}',
         '{"action":"done","result":"wrote GRAD_NOTE.md"}',
     ]
@@ -124,6 +125,7 @@ def main() -> int:
         build_from_profile("opencode", b2, name="Grad-B", workspace=repo)
         idx["i"] = 0
         replies2 = [
+            '{"action":"plan","steps":["write VARIANT.txt"]}',
             '{"action":"tool","name":"write","args":{"path":"VARIANT.txt","content":"b"}}',
             '{"action":"done","result":"ok"}',
         ]
