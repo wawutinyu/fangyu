@@ -9,22 +9,25 @@ def main():
     if "--run-bundle" in sys.argv:
         idx = sys.argv.index("--run-bundle")
         if idx + 1 >= len(sys.argv):
-            print("Usage: python -m fangyu --run-bundle <bundle_dir> [--host 127.0.0.1] [--port 9001] [--daemon]")
+            print("Usage: python -m fangyu --run-bundle <bundle_dir> [--host 127.0.0.1] [--port 9001] [--daemon] [--workspace DIR]")
             sys.exit(1)
         bundle_path = sys.argv[idx + 1]
         host = os.getenv("BUNDLE_HOST", "127.0.0.1")
         port = int(os.getenv("BUNDLE_PORT", "9001"))
         daemon = "--daemon" in sys.argv
+        workspace = None
         args = sys.argv[idx + 2:]
         for i, a in enumerate(args):
             if a == "--host" and i + 1 < len(args):
                 host = args[i + 1]
             elif a == "--port" and i + 1 < len(args):
                 port = int(args[i + 1])
+            elif a == "--workspace" and i + 1 < len(args):
+                workspace = args[i + 1]
         from .engine.executor import register_executors
         register_executors()
         from .engine.bundle_runtime import run_bundle_server
-        run_bundle_server(bundle_path, host=host, port=port, daemon=daemon)
+        run_bundle_server(bundle_path, host=host, port=port, daemon=daemon, workspace=workspace)
         return
     if "--server" in sys.argv or "-s" in sys.argv:
         import uvicorn

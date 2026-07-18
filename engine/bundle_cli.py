@@ -16,6 +16,7 @@ def build_parser() -> argparse.ArgumentParser:
     create_p.add_argument("--name", default=None, help="Agent 显示名")
     create_p.add_argument("--port", type=int, default=9001)
     create_p.add_argument("--max-turns", type=int, default=12)
+    create_p.add_argument("--workspace", default="", help="绑定外部项目根目录")
     create_p.add_argument("--list-profiles", action="store_true", help="列出可用 profile")
 
     run_p = sub.add_parser("run", help="启动 Bundle A2A daemon")
@@ -23,6 +24,13 @@ def build_parser() -> argparse.ArgumentParser:
     run_p.add_argument("--host", default="127.0.0.1")
     run_p.add_argument("--port", type=int, default=9001)
     run_p.add_argument("--daemon", action="store_true", help="daemon 模式（常驻等待 A2A）")
+    run_p.add_argument("--workspace", default="", help="覆盖/绑定外部项目根目录")
+
+    chat_p = sub.add_parser("chat", help="本机对话壳（harness 多轮，会话写入 workspace/.fangyu）")
+    chat_p.add_argument("bundle_dir", help="Bundle 目录路径")
+    chat_p.add_argument("-m", "--message", default="", help="单轮消息（省略则进入交互）")
+    chat_p.add_argument("--workspace", default="", help="绑定外部项目根目录")
+    chat_p.add_argument("--clear", action="store_true", help="清空会话历史后开始")
 
     rpc_p = sub.add_parser("rpc", help="向 Bundle RPC 发送 a2a.send_message")
     rpc_p.add_argument("bundle_dir", help="调用方 Bundle（用于签名身份）")
@@ -59,12 +67,16 @@ def cmd_create(args: argparse.Namespace) -> int:
         name=args.name,
         a2a_port=args.port,
         max_turns=args.max_turns,
+        workspace=args.workspace or None,
     )
     print(json.dumps({
         "ok": True,
         "profile": args.profile,
         "bundle": str(root),
+        "workspace": args.workspace or str(root / "workspace"),
         "run": f"python -m fangyu --run-bundle {root}",
+        "chat": f"python -m fangyu bundle chat {root}"
+        + (f" --workspace {args.workspace}" if args.workspace else ""),
     }, ensure_ascii=False, indent=2))
     return 0
 
@@ -74,8 +86,59 @@ def cmd_run(args: argparse.Namespace) -> int:
     from fangyu.engine.bundle_runtime import run_bundle_server
 
     register_executors()
-    run_bundle_server(args.bundle_dir, host=args.host, port=args.port, daemon=args.daemon)
+    run_bundle_server(
+        args.bundle_dir,
+        host=args.host,
+        port=args.port,
+        daemon=args.daemon,
+        workspace=args.workspace or None,
+    )
     return 0
+
+
+def cmd_chat(args: argparse.Namespace) -> int:
+    from fangyu.engine.bundle_chat import chat_once, format_failure_hint, prepare_bundle_chat
+    from fangyu.engine.bundle_session import clear_chat, load_chat
+
+    ws = args.workspace or None
+    prepare_bundle_chat(args.bundle_dir, workspace=ws)
+    if args.clear:
+        clear_chat()
+
+    def _one(msg: str) -> int:
+        out = chat_once(args.bundle_dir, msg, workspace=ws)
+        agent = out.get("agent") or "agent"
+        if out.get("success"):
+            print(f"{agent}> {out.get('result')}")
+            return 0
+        hint = format_failure_hint(out.get("error") or out.get("result"))
+        print(f"{agent}> {hint or out.get('error') or '失败'}", file=sys.stderr)
+        return 1
+
+    if args.message:
+        return _one(args.message)
+
+    print(f"fangyu bundle chat → {args.bundle_dir}")
+    if ws:
+        print(f"workspace: {ws}")
+    hist = load_chat(limit=5)
+    if hist:
+        print(f"(已有 {len(load_chat())} 条会话，输入 /quit 退出，/clear 清空)")
+    while True:
+        try:
+            line = input("you> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return 0
+        if not line:
+            continue
+        if line in ("/quit", "/exit", ":q"):
+            return 0
+        if line == "/clear":
+            clear_chat()
+            print("(会话已清空)")
+            continue
+        _one(line)
 
 
 def cmd_rpc(args: argparse.Namespace) -> int:
@@ -175,6 +238,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "create":
         return cmd_create(args)
+    if args.command == "chat":
+        return cmd_chat(args)
     if args.command == "run":
         return cmd_run(args)
     if args.command == "rpc":

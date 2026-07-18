@@ -46,6 +46,7 @@ def build_from_profile(
     a2a_port: int = 9001,
     require_envelope: bool | None = None,
     max_turns: int = 12,
+    workspace: str | Path | None = None,
 ) -> Path:
     """按 profile 生成 Bundle 目录。"""
     pid = (profile or "").strip().lower()
@@ -73,6 +74,9 @@ def build_from_profile(
         toolbelt=meta.get("toolbelt"),
         profile=pid,
     )
+    if workspace:
+        from fangyu.engine.workspace import bind_external_workspace
+        bind_external_workspace(root, workspace)
     return root
 
 

@@ -1,4 +1,4 @@
-"""Agent Workspace — Bundle 内可读写的工作目录（单 Agent 持久化状态）。"""
+"""Agent Workspace — Bundle 内可读写的工作目录（可绑外部项目根）。"""
 from __future__ import annotations
 
 import json
@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Any
 
 _active: "AgentWorkspace | None" = None
+
+WORKSPACE_CONFIG = "config/workspace.json"
 
 
 class WorkspaceError(PermissionError):
@@ -58,10 +60,58 @@ class AgentWorkspace:
         state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def init_bundle_workspace(bundle_root: str | Path) -> AgentWorkspace:
-    """Bundle runtime 启动时初始化 workspace（幂等）。"""
+def resolve_workspace_root(
+    bundle_root: str | Path,
+    *,
+    workspace_override: str | Path | None = None,
+) -> Path:
+    """决定 harness 工作区根：override > config/workspace.json > bundle/workspace。"""
+    root = Path(bundle_root).resolve()
+    if workspace_override:
+        return Path(workspace_override).expanduser().resolve()
+    cfg = root / WORKSPACE_CONFIG
+    if cfg.is_file():
+        try:
+            data = json.loads(cfg.read_text(encoding="utf-8"))
+            path = data.get("path")
+            if path:
+                return Path(str(path)).expanduser().resolve()
+        except (json.JSONDecodeError, OSError, TypeError):
+            pass
+    return root / "workspace"
+
+
+def bind_external_workspace(bundle_root: str | Path, external: str | Path) -> Path:
+    """把外部项目根写入 bundle config，供 run/chat 使用。"""
+    root = Path(bundle_root).resolve()
+    target = Path(external).expanduser().resolve()
+    if not target.is_dir():
+        raise WorkspaceError(f"workspace 不是目录: {target}")
+    cfg_dir = root / "config"
+    cfg_dir.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "path": str(target),
+        "mode": "external",
+        "bound_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+        .replace(microsecond=0)
+        .isoformat(),
+    }
+    (cfg_dir / "workspace.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8",
+    )
+    (target / ".fangyu").mkdir(exist_ok=True)
+    return target
+
+
+def init_bundle_workspace(
+    bundle_root: str | Path,
+    *,
+    workspace_override: str | Path | None = None,
+) -> AgentWorkspace:
+    """Bundle runtime / chat 启动时初始化 workspace（幂等）。"""
     global _active
-    ws = AgentWorkspace(Path(bundle_root) / "workspace")
+    ws_root = resolve_workspace_root(bundle_root, workspace_override=workspace_override)
+    ws = AgentWorkspace(ws_root)
     _active = ws
     return ws
 
