@@ -37,5 +37,14 @@ export function resolveApiUrl(path: string): string {
 }
 
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
-  return fetch(resolveApiUrl(path), init)
+  const headers = new Headers(init?.headers || {})
+  if (!headers.has('Authorization')) {
+    try {
+      const token = localStorage.getItem('fangyu_access_token')
+      if (token) headers.set('Authorization', `Bearer ${token}`)
+    } catch {
+      /* ignore */
+    }
+  }
+  return fetch(resolveApiUrl(path), { ...init, headers })
 }

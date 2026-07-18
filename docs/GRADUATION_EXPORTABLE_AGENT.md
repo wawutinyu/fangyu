@@ -65,7 +65,7 @@
 |---|----|------|
 | 1 | 组织/成员/角色或等价 ACL（谁能调哪个 Agent、哪些工具） | ✅ `org_acl` + admin/operator/viewer |
 | 2 | 与律（宪法/审计）打通：越权可拦可查 | ✅ 拒绝写 `acl_violation` 审计 |
-| 3 | 授权/吊销产品路径（非只改 JSON） | ✅ Studio「运维 → 组织 ACL」+ CLI/API（SSO ☐） |
+| 3 | 授权/吊销产品路径（非只改 JSON） | ✅ Studio「运维 → 组织 ACL」+ CLI/API；SSO ✅ 运维 SSO / OIDC |
 
 ### G2-D 托管常驻（在毕业范围内）
 

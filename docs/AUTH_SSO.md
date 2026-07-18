@@ -28,15 +28,28 @@ Authorization: Bearer <access_token>
 
 ## OIDC / JWKS（企业）
 
-1. 把 IdP 的 `issuer` / `audience` 写入 `sso.json`（须与 token 声明一致）。
-2. 配置 `oidc.jwks_uri`（公开 JWKS 端点）。
-3. 可选：`authorization_endpoint` / `token_endpoint` / `client_id` 给前端登录页用。
+1. 把 IdP 的 `issuer` / `audience`（本地 JWT 用）写入 `sso.json`。
+2. 配置 `oidc.jwks_uri`、`authorization_endpoint`、`token_endpoint`、`client_id`（可选 `client_secret` / `redirect_uri` / `scope`）。
+3. Studio「运维 → SSO」或 API：
 
-校验规则：
+```bash
+# 开始登录
+curl -s -X POST http://127.0.0.1:8000/api/v1/auth/oidc/start \
+  -H 'Content-Type: application/json' \
+  -d '{"redirect_uri":"http://127.0.0.1:5173/"}'
 
-| `alg` | 路径 |
-|-------|------|
-| `HS256` | 本地 `shared_secret`（开发签发） |
-| `RS256` | 拉取并缓存 `oidc.jwks_uri`，按 `kid` 验签 |
+# IdP 回调后换票
+curl -s -X POST http://127.0.0.1:8000/api/v1/auth/oidc/callback \
+  -H 'Content-Type: application/json' \
+  -d '{"code":"...","state":"..."}'
+```
 
-JWKS 默认缓存约 1 小时；改配置会清缓存。当前仅支持 **RS256**（常见企业 IdP）。
+流程：授权码 → IdP token → 验 **id_token**（RS256 + JWKS，`aud=client_id`）→ 签发方隅本地 HS256 Bearer。
+
+| `alg` / 场景 | 路径 |
+|--------------|------|
+| 本地 `HS256` | `shared_secret`（开发签发 / 换票后本地票） |
+| IdP `RS256` id_token | `oidc.jwks_uri` |
+| API 携带 IdP access_token（若为 RS256 JWT） | 同样走 JWKS，`aud` 须匹配配置 `audience` |
+
+JWKS 默认缓存约 1 小时；改配置会清缓存。Studio 把 Bearer 存 `localStorage.fangyu_access_token`，`apiFetch` 自动带上。

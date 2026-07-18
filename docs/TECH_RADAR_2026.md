@@ -3,7 +3,7 @@
 > 行业已收敛：**MCP（工具）· Skills（方法）· A2A（协作）· Harness（机床）· Eval（质检）**。  
 > 方隅定位是 **Agent 工厂**：批量组装可导出的公民，而不是再做一个聊天壳。
 
-关联：[工厂原料](FACTORY_MATERIALS.md) · [拓扑与 task](TOPOLOGY_AND_TASK.md) · [MCP Tasks](MCP_TASKS.md) · [浏览器](BROWSER_TOOL.md) · [认证 SSO](AUTH_SSO.md) · [毕业标准](GRADUATION_EXPORTABLE_AGENT.md) · [愿景](VISION_AND_PRODUCT.md)
+关联：[工厂原料](FACTORY_MATERIALS.md) · [拓扑与 task](TOPOLOGY_AND_TASK.md) · [MCP Tasks](MCP_TASKS.md) · [浏览器](BROWSER_TOOL.md) · [认证 SSO](AUTH_SSO.md) · [出厂 Eval](FACTORY_EVAL.md) · [毕业标准](GRADUATION_EXPORTABLE_AGENT.md) · [愿景](VISION_AND_PRODUCT.md)
 
 ---
 
@@ -15,7 +15,7 @@
 | 方法知识 | Skills / SKILL.md | `skills/factory/*.md` + skill_pack | 又一个 RPC |
 | Agent 协作 | A2A | Bundle / Agent Card / bus / topology | 工具调用 |
 | 执行系统 | Harness | agent-loop / plan·build / task / ask | 「再换个更强模型」 |
-| 质量 | Eval + 观测 | live 脚本；**缺口：回归套件** | 偶发 demo |
+| 质量 | Eval + 观测 | `FACTORY_EVAL` + gate；trace 落盘 | 偶发 demo |
 
 **口诀：MCP 连世界，Skills 装方法，A2A 连同伴，Harness 当机床，Eval 做出厂质检。**
 
@@ -29,7 +29,7 @@
 | 原料 Tools | 中上 | materials.json + coding 带；MCP 仅 `__internal__` 起头 |
 | Skills | 起步 | 已有 implement-and-verify；缺渐进加载与标准 frontmatter |
 | A2A | 中 | 有 RPC/编排；Agent Card / 任务态 / 跨厂发现未满 |
-| Eval | 弱 | 有 live；缺固定回归集与「出厂必绿」门禁 |
+| Eval | 中 | `FACTORY_EVAL` + `factory_gate` 固定套件；live 仍需 Key |
 | 沙箱/观测 | 部分 | 宪法/ACL/审计有；结构化 trace/eval 平台薄 |
 
 ---
@@ -99,9 +99,10 @@
 ⑬ 无状态 MCP HTTP + 跨机 Presence ✅ /mcp/v1/messages + hosts heartbeat
 ⑭ 浏览器原料 + SSO JWT           ✅ browser_* + /api/v1/auth
 ⑮ playwright 深度 + OIDC JWKS    ✅ wait/scroll/press/screenshot + RS256
+⑯ Eval 回归 + OIDC 登录页        ✅ FACTORY_EVAL + oidc/start·callback + 运维 SSO
 ```
 
-下一刀：真 IM（仍暂缓）· Eval 回归加厚 · 企业 OIDC 登录页对接（前端）。
+下一刀：真 IM（仍暂缓）· workbuddy live 挂进 gate · ACL↔SSO 产品路径打通。
 
 ---
 

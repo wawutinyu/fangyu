@@ -31,8 +31,15 @@ _DEFAULT = {
         "token_endpoint": "",
         "jwks_uri": "",
         "client_id": "",
+        "client_secret": "",
+        "redirect_uri": "",
+        "scope": "openid profile email",
     },
 }
+
+_state_lock = threading.Lock()
+_OIDC_STATES: dict[str, dict[str, Any]] = {}
+_OIDC_STATE_TTL = 600
 
 _jwks_lock = threading.Lock()
 _JWKS_CACHE: dict[str, Any] = {"uri": "", "fetched_at": 0.0, "doc": None}
@@ -348,9 +355,182 @@ def principal_from_payload(payload: dict[str, Any]) -> str:
     return str(payload.get("principal_id") or payload.get("sub") or "").strip()
 
 
+def clear_oidc_states() -> None:
+    with _state_lock:
+        _OIDC_STATES.clear()
+
+
+def _purge_oidc_states(now: float | None = None) -> None:
+    t = now if now is not None else time.time()
+    dead = [k for k, v in _OIDC_STATES.items() if float(v.get("exp") or 0) < t]
+    for k in dead:
+        _OIDC_STATES.pop(k, None)
+
+
+def create_oidc_state(*, redirect_uri: str) -> str:
+    import uuid
+
+    state = uuid.uuid4().hex
+    with _state_lock:
+        _purge_oidc_states()
+        _OIDC_STATES[state] = {
+            "redirect_uri": redirect_uri,
+            "exp": time.time() + _OIDC_STATE_TTL,
+        }
+    return state
+
+
+def consume_oidc_state(state: str) -> dict[str, Any]:
+    sid = (state or "").strip()
+    if not sid:
+        raise ValueError("missing state")
+    with _state_lock:
+        _purge_oidc_states()
+        meta = _OIDC_STATES.pop(sid, None)
+    if not meta:
+        raise ValueError("invalid or expired state")
+    return meta
+
+
+def verify_oidc_id_token(token: str, *, config: dict[str, Any] | None = None) -> dict[str, Any]:
+    """校验 IdP 签发的 id_token（aud = client_id，iss = 配置 issuer）。"""
+    cfg = config or load_sso_config()
+    oidc = cfg.get("oidc") or {}
+    jwks_uri = str(oidc.get("jwks_uri") or "").strip()
+    if not jwks_uri:
+        raise ValueError("oidc.jwks_uri required for id_token")
+    jwks = fetch_jwks(jwks_uri)
+    payload = _verify_rs256(token, jwks)
+    if int(payload.get("exp") or 0) < int(time.time()):
+        raise ValueError("token expired")
+    iss = cfg.get("issuer") or ""
+    if iss and payload.get("iss") and payload.get("iss") != iss:
+        raise ValueError("issuer mismatch")
+    client_id = str(oidc.get("client_id") or "").strip()
+    aud = payload.get("aud")
+    if client_id and aud:
+        if isinstance(aud, list):
+            if client_id not in aud:
+                raise ValueError("audience mismatch")
+        elif aud != client_id:
+            raise ValueError("audience mismatch")
+    return payload
+
+
+def start_oidc_login(
+    *,
+    redirect_uri: str = "",
+    config: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """构造授权码流程 authorization_url（企业登录页入口）。"""
+    from urllib.parse import urlencode
+
+    cfg = config or load_sso_config()
+    oidc = cfg.get("oidc") or {}
+    auth_ep = str(oidc.get("authorization_endpoint") or "").strip()
+    client_id = str(oidc.get("client_id") or "").strip()
+    if not auth_ep or not client_id:
+        raise ValueError("需要配置 oidc.authorization_endpoint 与 oidc.client_id")
+    redir = (redirect_uri or "").strip() or str(oidc.get("redirect_uri") or "").strip()
+    if not redir:
+        raise ValueError("需要 redirect_uri（参数或 oidc.redirect_uri）")
+    state = create_oidc_state(redirect_uri=redir)
+    scope = str(oidc.get("scope") or "openid profile email").strip()
+    q = urlencode({
+        "response_type": "code",
+        "client_id": client_id,
+        "redirect_uri": redir,
+        "scope": scope,
+        "state": state,
+    })
+    sep = "&" if "?" in auth_ep else "?"
+    return {
+        "authorization_url": f"{auth_ep}{sep}{q}",
+        "state": state,
+        "redirect_uri": redir,
+    }
+
+
+def complete_oidc_login(
+    *,
+    code: str,
+    state: str,
+    config: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """授权码换票 → 验 id_token → 签发方隅本地 JWT。"""
+    cfg = config or load_sso_config()
+    oidc = cfg.get("oidc") or {}
+    meta = consume_oidc_state(state)
+    redirect_uri = str(meta.get("redirect_uri") or "")
+    token_ep = str(oidc.get("token_endpoint") or "").strip()
+    client_id = str(oidc.get("client_id") or "").strip()
+    if not token_ep or not client_id:
+        raise ValueError("需要配置 oidc.token_endpoint 与 oidc.client_id")
+    raw_code = (code or "").strip()
+    if not raw_code:
+        raise ValueError("missing code")
+
+    form = {
+        "grant_type": "authorization_code",
+        "code": raw_code,
+        "redirect_uri": redirect_uri,
+        "client_id": client_id,
+    }
+    secret = str(oidc.get("client_secret") or "").strip()
+    if secret:
+        form["client_secret"] = secret
+
+    with httpx.Client(timeout=20.0, follow_redirects=True) as client:
+        resp = client.post(
+            token_ep,
+            data=form,
+            headers={"Accept": "application/json"},
+        )
+        if resp.status_code >= 400:
+            raise ValueError(f"token endpoint {resp.status_code}: {resp.text[:300]}")
+        try:
+            tok = resp.json()
+        except Exception as exc:
+            raise ValueError("token endpoint returned non-json") from exc
+
+    id_token = str(tok.get("id_token") or "").strip()
+    if not id_token:
+        raise ValueError("token endpoint 未返回 id_token（需 scope 含 openid）")
+    claims = verify_oidc_id_token(id_token, config=cfg)
+    principal = (
+        str(claims.get("preferred_username") or "").strip()
+        or str(claims.get("email") or "").strip()
+        or str(claims.get("sub") or "").strip()
+    )
+    if not principal:
+        raise ValueError("id_token 无可用主体声明")
+    name = str(claims.get("name") or claims.get("preferred_username") or principal).strip()
+    minted = mint_access_token(
+        principal_id=principal,
+        name=name,
+        roles=["operator"],
+        ttl_sec=3600,
+        config=cfg,
+    )
+    minted["oidc_sub"] = claims.get("sub")
+    minted["claims"] = {
+        "sub": claims.get("sub"),
+        "email": claims.get("email"),
+        "preferred_username": claims.get("preferred_username"),
+        "name": claims.get("name"),
+    }
+    return minted
+
+
 def public_auth_config() -> dict[str, Any]:
     cfg = load_sso_config()
     oidc = cfg.get("oidc") or {}
+    login_ready = bool(
+        oidc.get("authorization_endpoint")
+        and oidc.get("token_endpoint")
+        and oidc.get("client_id")
+        and oidc.get("jwks_uri")
+    )
     return {
         "enabled": bool(cfg.get("enabled")),
         "issuer": cfg.get("issuer"),
@@ -360,11 +540,14 @@ def public_auth_config() -> dict[str, Any]:
             "token_endpoint": oidc.get("token_endpoint") or "",
             "jwks_uri": oidc.get("jwks_uri") or "",
             "client_id": oidc.get("client_id") or "",
+            "redirect_uri": oidc.get("redirect_uri") or "",
+            "scope": oidc.get("scope") or "openid profile email",
+            "login_ready": login_ready,
         },
-        "modes": ["local_jwt", "oidc_jwks_rs256", "bearer_principal"],
+        "modes": ["local_jwt", "oidc_jwks_rs256", "oidc_auth_code", "bearer_principal"],
         "hint": (
             "Authorization: Bearer <access_token>；"
-            "RS256 需配置 oidc.jwks_uri；"
+            "企业登录：GET /api/v1/auth/oidc/start → 回调 POST /oidc/callback；"
             "或 X-Fangyu-Principal 开发旁路（仅 enabled=false 时）。"
         ),
     }

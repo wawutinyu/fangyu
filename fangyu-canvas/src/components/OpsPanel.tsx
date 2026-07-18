@@ -1,5 +1,14 @@
-/** 运维面板 — 托管启停 + 组织 ACL（G2-D / G2-C Studio 面） */
+/** 运维面板 — 托管启停 + 组织 ACL + 人审 + SSO（G2-D / G2-C Studio 面） */
 import { useCallback, useEffect, useState } from 'react'
+import {
+  fetchAuthConfig,
+  fetchAuthMe,
+  setStoredAccessToken,
+  startOidcLogin,
+  tryConsumeOidcCallbackFromUrl,
+  type AuthConfig,
+  type AuthMe,
+} from '../utils/authApi'
 import {
   addAclMember,
   approveApproval,
@@ -24,7 +33,7 @@ interface OpsPanelProps {
 }
 
 export default function OpsPanel({ headerless }: OpsPanelProps) {
-  const [tab, setTab] = useState<'managed' | 'acl' | 'approvals'>('managed')
+  const [tab, setTab] = useState<'managed' | 'acl' | 'approvals' | 'sso'>('managed')
   const [instances, setInstances] = useState<ManagedInstance[]>([])
   const [acl, setAcl] = useState<AclDoc | null>(null)
   const [approvals, setApprovals] = useState<ApprovalItem[]>([])
@@ -43,6 +52,10 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
   const [checkPrincipal, setCheckPrincipal] = useState('operator')
   const [checkTool, setCheckTool] = useState('shell')
   const [checkResult, setCheckResult] = useState<string | null>(null)
+
+  const [authCfg, setAuthCfg] = useState<AuthConfig | null>(null)
+  const [authMe, setAuthMe] = useState<AuthMe | null>(null)
+  const [authNote, setAuthNote] = useState<string | null>(null)
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -71,10 +84,51 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
   }, [reload])
 
   useEffect(() => {
+    void (async () => {
+      try {
+        const consumed = await tryConsumeOidcCallbackFromUrl()
+        if (consumed) setAuthNote('OIDC 登录成功，已写入本地 Bearer')
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+      }
+      try {
+        setAuthCfg(await fetchAuthConfig())
+        setAuthMe(await fetchAuthMe())
+      } catch {
+        /* 配置可读失败不挡运维 */
+      }
+    })()
+  }, [])
+
+  useEffect(() => {
     if (tab !== 'approvals') return
     const t = window.setInterval(() => { void reload() }, 3000)
     return () => window.clearInterval(t)
   }, [tab, reload])
+
+  const reloadAuth = async () => {
+    setAuthCfg(await fetchAuthConfig())
+    setAuthMe(await fetchAuthMe())
+  }
+
+  const onOidcLogin = async () => {
+    setLoading(true)
+    setError(null)
+    setAuthNote(null)
+    try {
+      const started = await startOidcLogin(window.location.origin + '/')
+      window.location.href = started.authorization_url
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      setLoading(false)
+    }
+  }
+
+  const onLogout = () => {
+    setStoredAccessToken(null)
+    setAuthMe(null)
+    setAuthNote('已清除本地 Bearer')
+  }
 
   const onQuickDemo = async () => {
     setLoading(true)
@@ -239,6 +293,14 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
           title="shell ask 人审队列"
         >
           人审{pendingCount > 0 ? ` · ${pendingCount}` : ''}
+        </button>
+        <button
+          className="notion-btn"
+          style={{ fontSize: 12, fontWeight: tab === 'sso' ? 600 : 400 }}
+          onClick={() => setTab('sso')}
+          title="企业 OIDC / 本地 Bearer"
+        >
+          SSO
         </button>
         <div style={{ flex: 1 }} />
         <button className="notion-btn" style={{ fontSize: 12 }} onClick={reload} disabled={loading}>
@@ -495,6 +557,49 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
           )}
         </div>
       )}
+
+      {tab === 'sso' && (
+        <div style={{ flex: 1, overflow: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {authNote && <div style={{ color: '#1a7f37' }}>{authNote}</div>}
+          <div>
+            当前主体：{' '}
+            <code>{authMe?.principal_id || '（未登录）'}</code>
+            {authMe?.name ? ` · ${authMe.name}` : ''}
+          </div>
+          <div style={{ color: 'var(--text-muted)' }}>
+            SSO {authCfg?.enabled ? '已启用' : '未强制'} · issuer={authCfg?.issuer || '—'}
+          </div>
+          <div style={{ color: 'var(--text-muted)' }}>
+            OIDC login_ready={String(!!authCfg?.oidc?.login_ready)} · client={authCfg?.oidc?.client_id || '—'}
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              className="notion-btn primary"
+              style={{ fontSize: 12 }}
+              type="button"
+              onClick={() => void onOidcLogin()}
+              disabled={loading || !authCfg?.oidc?.login_ready}
+            >
+              企业 OIDC 登录
+            </button>
+            <button className="notion-btn" style={{ fontSize: 12 }} type="button" onClick={onLogout} disabled={loading}>
+              退出本地 Bearer
+            </button>
+            <button
+              className="notion-btn"
+              style={{ fontSize: 12 }}
+              type="button"
+              onClick={() => void reloadAuth()}
+              disabled={loading}
+            >
+              刷新身份
+            </button>
+          </div>
+          <div style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            配置 DATA_DIR/sso.json 的 oidc.*（含 jwks_uri）；IdP 回调需回 Studio 同源并带 ?code=&state=。
+          </div>
+        </div>
+      )}
     </div>
   )
 
@@ -503,7 +608,7 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-light)', fontWeight: 600, fontSize: 13 }}>
-        运维 · 托管 / ACL / 人审
+        运维 · 托管 / ACL / 人审 / SSO
       </div>
       {body}
     </div>

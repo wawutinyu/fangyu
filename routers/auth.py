@@ -5,11 +5,13 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from fangyu.core.sso import (
+    complete_oidc_login,
     load_sso_config,
     mint_access_token,
     principal_from_payload,
     public_auth_config,
     save_sso_config,
+    start_oidc_login,
     verify_access_token,
 )
 
@@ -29,6 +31,15 @@ class SsoConfigBody(BaseModel):
     audience: str | None = None
     shared_secret: str | None = None
     oidc: dict | None = None
+
+
+class OidcStartBody(BaseModel):
+    redirect_uri: str = ""
+
+
+class OidcCallbackBody(BaseModel):
+    code: str = Field(..., min_length=1)
+    state: str = Field(..., min_length=1)
 
 
 @router.get("/config")
@@ -56,6 +67,32 @@ def issue_token(body: TokenBody):
         config=cfg,
     )
     return out
+
+
+@router.get("/oidc/start")
+def oidc_start_get(redirect_uri: str = ""):
+    """开始企业 OIDC 授权码登录，返回 authorization_url。"""
+    try:
+        return start_oidc_login(redirect_uri=redirect_uri)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.post("/oidc/start")
+def oidc_start_post(body: OidcStartBody):
+    try:
+        return start_oidc_login(redirect_uri=body.redirect_uri)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.post("/oidc/callback")
+def oidc_callback(body: OidcCallbackBody):
+    """授权码回调：换票并签发方隅 Bearer JWT。"""
+    try:
+        return complete_oidc_login(code=body.code, state=body.state)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @router.get("/me")
