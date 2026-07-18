@@ -48,3 +48,22 @@ Studio 外部 Agent「发现」可填工厂根 URL（不必手写 `/rpc`）。
 python -m fangyu bundle peer-probe http://127.0.0.1:9101 --save --label demo
 python -m fangyu bundle peer-probe --instance <managed_id> --save
 ```
+
+## 跨厂任务投递样例
+
+| 入口 | 说明 |
+|------|------|
+| 观 · **跨厂投递** | 加载 `fixtures/presence/cross_factory_task.json` 回放（两厂心跳 → a2a.send/complete） |
+| `python scripts/cross_factory_task_demo.py` | 本机起西厂 Bundle，RPC 投递并写 Presence 事件 |
+| 运维 · 工厂 → **拉入画布** | 通讯录条目探测后写入 `a2a-external` 节点，再在序里点名投递 |
+
+```bash
+# 可执行演示（临时端口）
+python scripts/cross_factory_task_demo.py --message "跨厂任务样例"
+
+# 或手工：西厂 run → 探测入库 → rpc
+python -m fangyu bundle run ./west --port 9102 --daemon
+python -m fangyu bundle peer-probe http://127.0.0.1:9102 --save --label 西厂
+python -m fangyu bundle rpc ./east --url http://127.0.0.1:9102/rpc \
+  --target 西厂执行 -m "跨厂任务" --skill default
+```

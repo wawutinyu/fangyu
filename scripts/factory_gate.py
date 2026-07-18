@@ -72,6 +72,7 @@ UNIT_SUITE = [
     "tests/unit/test_managed_eval_trend.py",
     "tests/unit/test_im_wizard.py",
     "tests/unit/test_presence_samples.py",
+    "tests/unit/test_eval_alert_presence.py",
     "tests/integration/test_opencode_factory.py",
     "tests/unit/test_factory_gate.py",
 ]
@@ -244,6 +245,17 @@ def stage_card() -> dict[str, Any]:
                 f"kinds={len(kinds)}",
             )
             checks.append({"id": "cross_host_sample", "ok": ok_xh})
+            try:
+                cft = load_sample_pack("cross-factory-task")
+                ck = {e.get("kind") for e in (cft.get("events") or [])}
+                ok_cft = _ok(
+                    "cross-factory-task sample",
+                    "a2a.send" in ck and "a2a.complete" in ck,
+                    f"kinds={len(ck)}",
+                )
+            except FileNotFoundError:
+                ok_cft = _ok("cross-factory-task sample", False, "missing")
+            checks.append({"id": "cross_factory_task_sample", "ok": ok_cft})
 
         ok = all(c.get("ok") for c in checks)
         return {"ok": ok, "checks": checks}

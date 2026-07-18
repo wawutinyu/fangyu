@@ -6,16 +6,17 @@ import time
 from pathlib import Path
 from typing import Any
 
-from fangyu.core.config import DATA_DIR, PROJECT_ROOT
+from fangyu.core import config as config_mod
+from fangyu.core.config import PROJECT_ROOT
 
 
 def eval_report_path(*, data_dir: Path | None = None) -> Path:
-    d = Path(data_dir) if data_dir is not None else Path(DATA_DIR)
+    d = Path(data_dir) if data_dir is not None else Path(config_mod.DATA_DIR)
     return d / "factory_eval_report.json"
 
 
 def eval_history_path(*, data_dir: Path | None = None) -> Path:
-    d = Path(data_dir) if data_dir is not None else Path(DATA_DIR)
+    d = Path(data_dir) if data_dir is not None else Path(config_mod.DATA_DIR)
     return d / "factory_eval_history.jsonl"
 
 
@@ -82,6 +83,7 @@ def write_eval_report(
     data_dir: Path | None = None,
     also_workspace: bool = True,
     history: bool = True,
+    emit_presence: bool = True,
 ) -> Path:
     """写入 DATA_DIR 报告；可选同步到仓库 `.fangyu/` 并追加历史。"""
     doc = {
@@ -104,7 +106,57 @@ def write_eval_report(
             append_eval_history(doc, data_dir=data_dir)
         except OSError:
             pass
+    if emit_presence:
+        try:
+            emit_eval_presence_event(doc, data_dir=data_dir)
+        except Exception:
+            pass
     return path
+
+
+def emit_eval_presence_event(
+    report: dict[str, Any],
+    *,
+    data_dir: Path | None = None,
+) -> dict[str, Any] | None:
+    """Eval 失败 / 回归时写入协作事件，供值班墙与 monitor/alerts。"""
+    from fangyu.core.collaboration import emit_event
+
+    ok = bool(report.get("ok"))
+    exit_code = int(report.get("exit_code") or 0)
+    hist = load_eval_history(data_dir=data_dir, limit=3)
+    # hist[0] 刚追加的当前行；对照 hist[1]
+    prev = hist[1] if len(hist) > 1 else None
+    cmp = compare_eval_reports(report, prev) if prev else {"changed": False, "stage_diffs": []}
+    regression = bool(prev and prev.get("ok") and not ok)
+    stage_fail = [
+        name
+        for name, st in (report.get("stages") or {}).items()
+        if isinstance(st, dict) and not st.get("skipped") and st.get("ok") is False
+    ]
+
+    if ok:
+        return None
+
+    kind = "eval.regression" if regression else "eval.fail"
+    failed = ", ".join(stage_fail[:6]) or "见 stages"
+    message = (
+        f"出厂质检{'回归' if regression else '未过'} · exit={exit_code} · {failed}"
+    )
+    return emit_event(
+        kind,
+        actor="eval:factory_gate",
+        message=message,
+        detail={
+            "exit_code": exit_code,
+            "ok": ok,
+            "live_tier": report.get("live_tier"),
+            "failed_stages": stage_fail,
+            "stage_diffs": (cmp.get("stage_diffs") or [])[:12],
+            "ts": report.get("ts"),
+        },
+        severity="error",
+    )
 
 
 def load_eval_report(*, data_dir: Path | None = None) -> dict[str, Any] | None:

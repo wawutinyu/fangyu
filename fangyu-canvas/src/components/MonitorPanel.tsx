@@ -62,6 +62,7 @@ interface MonitorAlert {
   factory_id?: string
   base_url?: string
   source?: string
+  detail?: Record<string, unknown>
 }
 
 export default function MonitorPanel({ headerless }: MonitorPanelProps) {
@@ -72,7 +73,11 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
   const [filterFlowId, setFilterFlowId] = useState('')
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null)
   const [alerts, setAlerts] = useState<MonitorAlert[]>([])
-  const [alertMeta, setAlertMeta] = useState<{ count?: number; offline_factories?: number } | null>(null)
+  const [alertMeta, setAlertMeta] = useState<{
+    count?: number
+    offline_factories?: number
+    eval_fail?: number
+  } | null>(null)
 
   const [bundleDir, setBundleDir] = useState('')
   const [workspace, setWorkspace] = useState('')
@@ -180,7 +185,11 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
       const resp = await apiFetch('/api/v1/monitor/alerts?limit=40')
       const json = await resp.json()
       setAlerts(json.alerts || [])
-      setAlertMeta({ count: json.count, offline_factories: json.offline_factories })
+      setAlertMeta({
+        count: json.count,
+        offline_factories: json.offline_factories,
+        eval_fail: json.eval_fail,
+      })
     } catch { /* ignore */ }
     setLoading(false)
   }, [])
@@ -608,18 +617,25 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
           {alertMeta && (
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
               共 {alertMeta.count ?? 0} · 离线工厂 {alertMeta.offline_factories ?? 0}
+              {alertMeta.eval_fail ? ` · Eval 红 ${alertMeta.eval_fail}` : ''}
             </div>
           )}
           {loading && <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: 8 }}>加载中...</div>}
           {!loading && alerts.length === 0 && (
             <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: 20 }}>
-              暂无告警。工厂心跳离线或协作 warn 事件会出现在此。
+              暂无告警。工厂离线、Eval 失败或协作 warn 会出现在此。
             </div>
           )}
           {alerts.map(a => {
             const sev = a.severity || 'info'
             const color = sev === 'error' || sev === 'deny' ? '#c0392b'
               : sev === 'warn' ? '#d48806' : '#1890ff'
+            const goPresence = () => {
+              window.dispatchEvent(new CustomEvent('fangyu:switch-view', { detail: { view: 'presence' } }))
+              window.dispatchEvent(new CustomEvent('fangyu:presence-focus', {
+                detail: { kind: a.kind, factory_id: a.factory_id },
+              }))
+            }
             return (
               <div
                 key={a.id}
@@ -629,11 +645,23 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
                   fontSize: 12,
                 }}
               >
-                <div style={{ fontWeight: 600, marginBottom: 2 }}>
-                  {a.title || a.kind}
-                  <span style={{ marginLeft: 8, fontWeight: 400, color: 'var(--text-muted)', fontSize: 11 }}>
-                    {a.kind} · {sev}
+                <div style={{ fontWeight: 600, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ flex: 1 }}>
+                    {a.title || a.kind}
+                    <span style={{ marginLeft: 8, fontWeight: 400, color: 'var(--text-muted)', fontSize: 11 }}>
+                      {a.kind} · {sev}
+                    </span>
                   </span>
+                  <button
+                    type="button"
+                    className="notion-btn"
+                    style={{ fontSize: 11 }}
+                    onClick={goPresence}
+                    data-testid="alert-go-presence"
+                    title="跳转到观 · 值班墙对照事件"
+                  >
+                    去观
+                  </button>
                 </div>
                 {a.message && (
                   <div style={{ color: 'var(--text-muted)', wordBreak: 'break-word' }}>{a.message}</div>

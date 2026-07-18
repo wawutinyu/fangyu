@@ -112,9 +112,10 @@
 ㉖ 工厂批量心跳 + Eval smoke CI    ✅ factories/heartbeat · factory-gate.yml
 ㉗ 定时心跳 + Presence↔通讯录对齐  ✅ heartbeat-loop · factories/align
 ㉘ 离线告警 + 通讯录拉入画布       ✅ monitor/alerts · 运维「拉入画布」
+㉙ Eval↔值班墙 + 跨厂投递样例     ✅ eval.fail 去观 · cross-factory-task
 ```
 
-下一刀：真 IM（仍暂缓）· Eval 告警联动值班墙 · Bundle 跨厂任务投递样例。
+下一刀：真 IM（仍暂缓）· 跨厂投递 live smoke · ACL 对外部 Agent 默认策略。
 
 ---
 

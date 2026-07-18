@@ -1,0 +1,163 @@
+{
+  "format": "fangyu.guan.replay",
+  "version": 1,
+  "id": "cross-factory-task",
+  "title": "跨厂任务投递样例",
+  "exported_at": "2026-07-19T04:00:00Z",
+  "summary": {
+    "agents": 2,
+    "agents_busy": 0,
+    "workers": 0,
+    "workers_online": 0,
+    "managed": 0,
+    "hosts": 2,
+    "events": 6
+  },
+  "departments": [
+    {
+      "id": "dept-sense",
+      "label": "感知",
+      "houses": [{ "id": "house-sense-0", "label": "感知·正厅" }]
+    },
+    {
+      "id": "dept-hosts",
+      "label": "跨机",
+      "houses": [{ "id": "house-hosts-0", "label": "跨机·正厅" }]
+    }
+  ],
+  "presence": [
+    {
+      "id": "agent:东厂调度",
+      "kind": "agent",
+      "name": "东厂调度",
+      "label": "东厂调度",
+      "status": "idle",
+      "online": true,
+      "department": "感知",
+      "department_id": "dept-sense"
+    },
+    {
+      "id": "agent:西厂执行",
+      "kind": "agent",
+      "name": "西厂执行",
+      "label": "西厂执行",
+      "status": "idle",
+      "online": true,
+      "department": "感知",
+      "department_id": "dept-sense"
+    },
+    {
+      "id": "host:factory-east",
+      "kind": "host",
+      "name": "factory-east",
+      "label": "东厂",
+      "status": "idle",
+      "online": true,
+      "department": "跨机",
+      "department_id": "dept-hosts",
+      "base_url": "http://127.0.0.1:9101",
+      "role": "factory"
+    },
+    {
+      "id": "host:factory-west",
+      "kind": "host",
+      "name": "factory-west",
+      "label": "西厂",
+      "status": "idle",
+      "online": true,
+      "department": "跨机",
+      "department_id": "dept-hosts",
+      "base_url": "http://127.0.0.1:9102",
+      "role": "factory"
+    }
+  ],
+  "events": [
+    {
+      "id": "cf-1",
+      "ts": 1720000001.0,
+      "kind": "host.heartbeat",
+      "actor": "host:factory-east",
+      "target": null,
+      "message": "东厂在线",
+      "detail": {
+        "host_id": "factory-east",
+        "base_url": "http://127.0.0.1:9101",
+        "role": "factory",
+        "label": "东厂"
+      },
+      "severity": "info"
+    },
+    {
+      "id": "cf-2",
+      "ts": 1720000002.0,
+      "kind": "host.heartbeat",
+      "actor": "host:factory-west",
+      "target": null,
+      "message": "西厂在线",
+      "detail": {
+        "host_id": "factory-west",
+        "base_url": "http://127.0.0.1:9102",
+        "role": "factory",
+        "label": "西厂"
+      },
+      "severity": "info"
+    },
+    {
+      "id": "cf-3",
+      "ts": 1720000003.0,
+      "kind": "factory.online",
+      "actor": "host:factory-west",
+      "target": null,
+      "message": "工厂在线 西厂",
+      "detail": {
+        "host_id": "factory-west",
+        "base_url": "http://127.0.0.1:9102",
+        "factory_id": "west",
+        "role": "factory"
+      },
+      "severity": "info"
+    },
+    {
+      "id": "cf-4",
+      "ts": 1720000004.0,
+      "kind": "a2a.send",
+      "actor": "东厂调度",
+      "target": "西厂执行",
+      "message": "跨厂任务：汇总东厂材料",
+      "detail": {
+        "via_host": "factory-east",
+        "rpc_url": "http://127.0.0.1:9102/rpc",
+        "factory_id": "west",
+        "skill_id": "default"
+      },
+      "severity": "info"
+    },
+    {
+      "id": "cf-5",
+      "ts": 1720000005.0,
+      "kind": "a2a.started",
+      "actor": "西厂执行",
+      "target": "东厂调度",
+      "message": "西厂已接单",
+      "detail": {
+        "via_host": "factory-west",
+        "factory_id": "west"
+      },
+      "severity": "info"
+    },
+    {
+      "id": "cf-6",
+      "ts": 1720000006.0,
+      "kind": "a2a.complete",
+      "actor": "西厂执行",
+      "target": "东厂调度",
+      "message": "跨厂任务完成",
+      "detail": {
+        "via_host": "factory-west",
+        "factory_id": "west",
+        "rpc_url": "http://127.0.0.1:9102/rpc"
+      },
+      "severity": "info"
+    }
+  ]
+}

@@ -171,6 +171,39 @@ export function explainCollabEvent(ev: CollaborationEvent): PlainExplanation {
     }
   }
 
+  if (kind === 'factory.offline') {
+    return {
+      title: '工厂离线',
+      plain: msg || `工厂「${ev.actor}」探测失败或不可达。`,
+      nextStep: '去运维·工厂再探测 / 批量心跳；确认对端端口与网络。',
+      severity: severity === 'info' ? 'warn' : severity,
+    }
+  }
+
+  if (kind === 'factory.online') {
+    return {
+      title: '工厂上线',
+      plain: msg || `工厂「${ev.actor}」已恢复在线。`,
+      nextStep: '观里筛主机可见；可继续跨厂投递或拉入画布。',
+      severity,
+    }
+  }
+
+  if (kind === 'eval.fail' || kind === 'eval.regression') {
+    const stages = ((ev.detail as { failed_stages?: string[] } | undefined)?.failed_stages || [])
+      .slice(0, 4)
+      .join('、')
+    return {
+      title: kind === 'eval.regression' ? '出厂质检回归' : '出厂质检未过',
+      plain: msg
+        || (stages
+          ? `factory_gate 红灯：阶段 ${stages} 失败。`
+          : 'factory_gate 质检未通过，详见观测 · Eval 报告。'),
+      nextStep: '打开观测 · Eval / 告警对照阶段；修完再跑 factory_gate。',
+      severity: 'error',
+    }
+  }
+
   if (kind.includes('fail') || kind.includes('error') || severity === 'error') {
     return {
       title: '协作出错',

@@ -59,6 +59,7 @@ export default function PresencePanel() {
   const [archiveMode, setArchiveMode] = useState(false)
   const [archiveTitle, setArchiveTitle] = useState<string | null>(null)
   const [library, setLibrary] = useState<PresenceReplayMeta[]>([])
+  const [focusKind, setFocusKind] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const timelineRef = useRef<HTMLDivElement | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
@@ -198,6 +199,31 @@ export default function PresencePanel() {
     }
   }, [applyArchiveSnapshot])
 
+  const loadCrossFactorySample = useCallback(async () => {
+    setDemoBusy(true)
+    setDemoHint(null)
+    try {
+      const out = await loadPresenceSample('cross-factory-task', true)
+      applyArchiveSnapshot(out.snapshot, out.title || out.replay?.title || '跨厂任务投递样例')
+      setFilter('host')
+      setDeptId('dept-hosts')
+      try {
+        setLibrary(await listPresenceReplays(40))
+      } catch {
+        /* ignore */
+      }
+      setDemoHint(`已加载跨厂投递样例 · ${out.snapshot.events?.length || 0} 事件 — 可拖回放`)
+      setReplayIndex(0)
+      setReplayPlaying(true)
+      setFocusKind('a2a.send')
+      window.setTimeout(() => setDemoHint(null), 5000)
+    } catch (e) {
+      setDemoHint(e instanceof Error ? e.message : String(e))
+    } finally {
+      setDemoBusy(false)
+    }
+  }, [applyArchiveSnapshot])
+
   const reload = useCallback(async () => {
     if (archiveModeRef.current) return
     try {
@@ -210,6 +236,21 @@ export default function PresencePanel() {
       setError(e instanceof Error ? e.message : String(e))
     }
   }, [])
+
+  useEffect(() => {
+    const onFocus = (e: Event) => {
+      const kind = String((e as CustomEvent).detail?.kind || '')
+      if (!kind) return
+      setFocusKind(kind)
+      if (kind.startsWith('factory.') || kind.startsWith('host.') || kind.startsWith('eval.')) {
+        setFilter('host')
+        setDeptId('dept-hosts')
+      }
+      void reload()
+    }
+    window.addEventListener('fangyu:presence-focus', onFocus)
+    return () => window.removeEventListener('fangyu:presence-focus', onFocus)
+  }, [reload])
 
   const stopPoll = useCallback(() => {
     if (pollRef.current) {
@@ -375,6 +416,21 @@ export default function PresencePanel() {
     )
     el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [activeReplayEventId])
+
+  useEffect(() => {
+    if (!focusKind || !timelineRef.current) return
+    const el = timelineRef.current.querySelector(
+      `[data-event-kind="${CSS.escape(focusKind)}"]`,
+    ) as HTMLElement | null
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      const i = eventsAsc.findIndex(e => e.kind === focusKind)
+      if (i >= 0) {
+        setReplayPlaying(false)
+        setReplayIndex(i)
+      }
+    }
+  }, [focusKind, eventsAsc, events])
 
   return (
     <div
@@ -559,6 +615,17 @@ export default function PresencePanel() {
               title="加载内置跨机 Presence 回放样例（host + managed）"
             >
               跨机样例
+            </button>
+            <button
+              type="button"
+              className="notion-btn"
+              data-testid="presence-cross-factory-sample"
+              style={{ fontSize: 11 }}
+              disabled={demoBusy}
+              onClick={() => { void loadCrossFactorySample() }}
+              title="加载跨厂任务投递回放样例（两厂 + a2a.send/complete）"
+            >
+              跨厂投递
             </button>
           </>
         )}
@@ -906,10 +973,12 @@ export default function PresencePanel() {
                   })
                   .map(ev => {
                     const active = activeReplayEventId === ev.id
+                    const focused = focusKind != null && ev.kind === focusKind
                     return (
                   <div
                     key={ev.id}
                     data-event-id={ev.id}
+                    data-event-kind={ev.kind}
                     data-edge-key={ev.target ? `${ev.actor}->${ev.target}` : undefined}
                     role="button"
                     tabIndex={0}
@@ -919,6 +988,7 @@ export default function PresencePanel() {
                         setReplayPlaying(false)
                         setReplayIndex(i)
                       }
+                      setFocusKind(null)
                       setSelectedActorId(ev.actor)
                       if (ev.target) {
                         setSelectedEdge({ source: ev.actor, target: ev.target })
@@ -932,6 +1002,7 @@ export default function PresencePanel() {
                         setReplayPlaying(false)
                         setReplayIndex(i)
                       }
+                      setFocusKind(null)
                       setSelectedActorId(ev.actor)
                       if (ev.target) {
                         setSelectedEdge({ source: ev.actor, target: ev.target })
@@ -940,9 +1011,17 @@ export default function PresencePanel() {
                     }}
                     style={{
                       padding: '8px 10px', marginBottom: 6, borderRadius: 8,
-                      background: 'var(--bg-primary)',
-                      border: `1px solid ${active ? '#c47e3b' : 'var(--border-color)'}`,
-                      boxShadow: active ? '0 0 0 1px #c47e3b' : undefined,
+                      background: focused
+                        ? 'rgba(212, 136, 6, 0.12)'
+                        : 'var(--bg-primary)',
+                      border: focused
+                        ? '1px solid #d48806'
+                        : `1px solid ${active ? '#c47e3b' : 'var(--border-color)'}`,
+                      boxShadow: focused
+                        ? '0 0 0 1px #d48806'
+                        : active
+                          ? '0 0 0 1px #c47e3b'
+                          : undefined,
                       fontSize: 11, lineHeight: 1.45,
                       cursor: 'pointer',
                     }}
