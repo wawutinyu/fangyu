@@ -120,7 +120,7 @@ G2-E 多编排   ██████░░░░  ~55%
 | 优先级 | 目标 | 验收标准 |
 |--------|------|----------|
 | **P0** | 稳住 G1 live | `opencode_harness_live` 三用例绿；`opencode_graduation_c` 自动项绿；live 用 `FANGYU_SHELL_POLICY=allow` 避免人审卡死；`factory_gate --live-tier smoke` 可重复过 |
-| **P1** | 真双厂值班验收 | 两实例：discover→入库→心跳→人为离线→告警→再探测→观可回放；形成签字清单（不靠再加筛选 UI） |
+| **P1** | 真双厂值班验收 | ✅ `scripts/dual_factory_duty_acceptance.py`（D1–D9）；见 [双厂值班](DUAL_FACTORY_DUTY.md) |
 | **P2** | 编排边 ACL | topology 边声明「谁可调谁」；越权可拦可审计；补齐 G2-E #5 |
 | **P3** | 飞书真机（单开） | 运维向导配凭证 → 私聊触发 Bundle/harness → 回复回会话；不挡 P0–P2 |
 | **P4** | 办公×编排交叉 | 一句办公任务拆多专家；IM `mode=orchestrate` 触发整网可演示验收 |
@@ -142,7 +142,7 @@ G2-E 多编排   ██████░░░░  ~55%
 | G2-B 飞书真机 | ☐ **P3**（暂缓可开） |
 | G2-D 托管 manage | ✅ |
 | G2-C 组织 ACL + SSO | ✅ 骨架 |
-| 真双厂值班验收仪式 | ☐ **P1** |
+| 真双厂值班验收仪式 | ✅ **P1** `dual_factory_duty_acceptance` |
 | Studio 运维面板 | ✅ |
 
 *版本：2026-07-19 · 口径：WorkBuddy 全档 = 办公 + IM + 企业权限 + 托管 + 多 Agent 编排；进度与 [项目评估](PROJECT_ASSESSMENT.md) v3.0 对齐*

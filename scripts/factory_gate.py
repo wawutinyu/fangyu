@@ -42,19 +42,22 @@ LIVE_TIER_SCRIPTS: dict[str, list[str]] = {
     "none": [],
     "smoke": [
         "scripts/cross_factory_harness_live.py",
+        "scripts/dual_factory_duty_acceptance.py",
         "scripts/opencode_harness_live.py",
     ],
     "full": [
         "scripts/cross_factory_harness_live.py",
+        "scripts/dual_factory_duty_acceptance.py",
         "scripts/opencode_harness_live.py",
         "scripts/task_harness_live.py",
         "scripts/workbuddy_harness_live.py",
     ],
 }
 
-# 无 API Key 也可跑的 live（跨厂 RPC 等）
+# 无 API Key 也可跑的 live（跨厂 RPC / 双厂值班等）
 KEY_FREE_LIVE: set[str] = {
     "scripts/cross_factory_harness_live.py",
+    "scripts/dual_factory_duty_acceptance.py",
 }
 
 # 固定回归集（与 docs/FACTORY_EVAL.md 对齐）

@@ -33,6 +33,8 @@ Studio 外部 Agent「发现」可填工厂根 URL（不必手写 `/rpc`）。
 
 运维面板 **工厂** 页：探测 → 入库 → 列表 / 再探测 / 删除（读写 `DATA_DIR/a2a_factories.json`）。
 
+**双厂值班验收（P1）：** [DUAL_FACTORY_DUTY.md](DUAL_FACTORY_DUTY.md) · `python scripts/dual_factory_duty_acceptance.py`
+
 ### 一键对端探测入库
 
 | 入口 | 说明 |

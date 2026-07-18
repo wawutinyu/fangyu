@@ -21,13 +21,14 @@ python scripts/factory_gate.py --unit-only
 | `--live-tier` | 脚本 | 说明 |
 |---------------|------|------|
 | `none` | （无） | 等价 `--skip-live`，CI 默认 |
-| `smoke` | `cross_factory_harness_live`（**无 Key**）+ `opencode_harness_live` | 跨厂 RPC + 最短 LLM |
+| `smoke` | `cross_factory_harness_live` + **`dual_factory_duty_acceptance`**（**无 Key**）+ `opencode_harness_live` | 跨厂 RPC + **双厂值班签字** + 最短 LLM |
 | `full` | + `task_harness_live` + `workbuddy_harness_live` | 毕业全档 |
 
-单独跑跨厂：
+单独跑：
 
 ```bash
 python scripts/cross_factory_harness_live.py
+python scripts/dual_factory_duty_acceptance.py   # P1 双厂值班验收 D1–D9
 ```
 
 ## 固定套件（出厂必绿）
