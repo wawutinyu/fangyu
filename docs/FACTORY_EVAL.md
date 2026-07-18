@@ -34,4 +34,13 @@ python scripts/factory_gate.py --unit-only
 - auth `modes` 含 `oidc_auth_code`
 - harness_trace 可落盘抽样
 
-每加一条产线：先加单测，再挂进 `factory_gate.stage_unit` / `stage_card`。
+## 产物
+
+每次跑 gate（除非 `--no-report`）会写：
+
+- `DATA_DIR/factory_eval_report.json`
+- 同步：仓库 `.fangyu/factory_eval_report.json`
+
+Studio「观测 → Eval 报告」或 `GET /api/v1/monitor/eval-report` 可读。
+
+Harness Trace：`GET /api/v1/monitor/harness-traces`（观测面板默认页）。

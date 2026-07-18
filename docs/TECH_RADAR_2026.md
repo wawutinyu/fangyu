@@ -30,7 +30,7 @@
 | Skills | 起步 | 已有 implement-and-verify；缺渐进加载与标准 frontmatter |
 | A2A | 中 | 有 RPC/编排；Agent Card / 任务态 / 跨厂发现未满 |
 | Eval | 中 | `FACTORY_EVAL` + `factory_gate` 固定套件；live 仍需 Key |
-| 沙箱/观测 | 部分 | 宪法/ACL/审计有；结构化 trace/eval 平台薄 |
+| 沙箱/观测 | 中 | 宪法/ACL/审计；Studio 观测读 harness_trace + Eval 报告 |
 
 ---
 
@@ -101,9 +101,10 @@
 ⑮ playwright 深度 + OIDC JWKS    ✅ wait/scroll/press/screenshot + RS256
 ⑯ Eval 回归 + OIDC 登录页        ✅ FACTORY_EVAL + oidc/start·callback + 运维 SSO
 ⑰ workbuddy live + ACL↔SSO       ✅ gate live 挂 WB · sync-sso / 运维一键入库
+⑱ 观测 Trace + Eval 报告         ✅ monitor harness/eval · factory_eval_report.json
 ```
 
-下一刀：真 IM（仍暂缓）· 观测面板读 harness_trace · Eval 平台化（报告产物）。
+下一刀：真 IM（仍暂缓）· Presence 面板与托管联动 · Skills 渐进目录 UX。
 
 ---
 

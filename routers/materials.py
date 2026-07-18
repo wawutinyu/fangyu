@@ -224,9 +224,22 @@ def apply_selection(body: PatchSelectionBody):
 @router.get("/traces")
 def list_traces(bundle_dir: str = "", workspace: str = "", limit: int = 50):
     """读取 harness_trace.jsonl。"""
-    from fangyu.engine.harness_trace import read_traces, resolve_trace_path
+    from fangyu.engine.harness_trace import (
+        read_traces,
+        resolve_trace_path,
+        summarize_trace_rows,
+    )
 
     path = resolve_trace_path(bundle_dir=bundle_dir or None, workspace=workspace or None)
     if not path or not path.is_file():
-        return {"path": str(path) if path else None, "traces": []}
-    return {"path": str(path), "traces": read_traces(path, limit=limit)}
+        return {
+            "path": str(path) if path else None,
+            "traces": [],
+            "summary": summarize_trace_rows([]),
+        }
+    rows = read_traces(path, limit=limit)
+    return {
+        "path": str(path),
+        "traces": rows,
+        "summary": summarize_trace_rows(rows),
+    }

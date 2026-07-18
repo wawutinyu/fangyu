@@ -47,6 +47,8 @@ Thumbs.db
 
 # Browser screenshots (local computer-use)
 .fangyu/screenshots/
+.fangyu/factory_eval_report.json
+data/factory_eval_report.json
 
 # Build
 build/

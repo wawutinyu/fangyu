@@ -48,6 +48,46 @@ async def list_logs(
     }
 
 
+@router.get("/harness-traces")
+def list_harness_traces(
+    bundle_dir: str = "",
+    workspace: str = "",
+    limit: int = Query(50, le=200),
+):
+    """观测：读取 harness_trace.jsonl + 聚合摘要。"""
+    from fangyu.engine.harness_trace import (
+        read_traces,
+        resolve_trace_path,
+        summarize_trace_rows,
+    )
+
+    path = resolve_trace_path(bundle_dir=bundle_dir or None, workspace=workspace or None)
+    if not path or not path.is_file():
+        return {
+            "path": str(path) if path else None,
+            "traces": [],
+            "summary": summarize_trace_rows([]),
+        }
+    rows = read_traces(path, limit=limit)
+    return {
+        "path": str(path),
+        "traces": rows,
+        "summary": summarize_trace_rows(rows),
+    }
+
+
+@router.get("/eval-report")
+def get_eval_report():
+    """最近一次 factory_gate 写出的 Eval 报告。"""
+    from fangyu.core.factory_eval import eval_report_path, load_eval_report
+
+    doc = load_eval_report()
+    return {
+        "path": str(eval_report_path()),
+        "report": doc,
+    }
+
+
 @router.delete("/logs")
 async def clear_logs(
     flow_id: str = "",

@@ -153,3 +153,33 @@ def read_traces(path: Path, *, limit: int = 50) -> list[dict[str, Any]]:
             continue
     rows.reverse()  # 新的在前
     return rows
+
+
+def summarize_trace_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """观测面板用：按 kind / success 聚合。"""
+    by_kind: dict[str, int] = {}
+    ok_n = 0
+    fail_n = 0
+    tools: list[str] = []
+    for r in rows or []:
+        kind = str(r.get("kind") or r.get("type") or "event")
+        by_kind[kind] = by_kind.get(kind, 0) + 1
+        if r.get("success") is True or r.get("ok") is True:
+            ok_n += 1
+        elif r.get("success") is False or r.get("ok") is False:
+            fail_n += 1
+        for t in r.get("tools_used") or []:
+            tools.append(str(t))
+    seen: set[str] = set()
+    uniq_tools: list[str] = []
+    for t in tools:
+        if t not in seen:
+            seen.add(t)
+            uniq_tools.append(t)
+    return {
+        "total": len(rows or []),
+        "by_kind": by_kind,
+        "success": ok_n,
+        "failure": fail_n,
+        "tools_used": uniq_tools[:40],
+    }
