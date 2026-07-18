@@ -11,12 +11,14 @@ import {
 } from '../utils/authApi'
 import {
   alignFactoriesPresence,
+  buildExternalAgentFromFactory,
   deleteRemoteFactory,
   fetchFactoryHeartbeatLoop,
   heartbeatFactories,
   listRemoteFactories,
   probeAndSaveFactory,
   probeRemoteFactory,
+  pullFactoryToCanvas,
   setFactoryHeartbeatLoop,
   type FactoryHeartbeatLoopStatus,
 } from '../utils/externalAgent'
@@ -319,6 +321,27 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
       setError(e instanceof Error ? e.message : String(e))
     }
     setLoading(false)
+  }
+
+  const onPullFactoryToCanvas = async (f: {
+    id: string
+    base_url: string
+    rpc_url?: string
+    label?: string
+    card_name?: string
+  }) => {
+    setLoading(true)
+    setError(null)
+    setFacNote(null)
+    try {
+      const node = await buildExternalAgentFromFactory(f)
+      pullFactoryToCanvas(node)
+      setFacNote(`已拉入画布 · ${node.label}`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setLoading(false)
+    }
   }
 
   const onDeleteFactory = async (id: string) => {
@@ -1167,7 +1190,7 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
                 {f.base_url}
                 {f.rpc_url ? ` · rpc ${f.rpc_url}` : ''}
               </div>
-              <div style={{ marginTop: 6, display: 'flex', gap: 6 }}>
+              <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 <button
                   className="notion-btn"
                   style={{ fontSize: 11 }}
@@ -1179,6 +1202,17 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
                   disabled={loading}
                 >
                   再探测
+                </button>
+                <button
+                  className="notion-btn primary"
+                  style={{ fontSize: 11 }}
+                  type="button"
+                  onClick={() => void onPullFactoryToCanvas(f)}
+                  disabled={loading}
+                  data-testid="factory-to-canvas"
+                  title="探测 Card 并作为 a2a-external 节点写入序·Agent 画布"
+                >
+                  拉入画布
                 </button>
                 <button
                   className="notion-btn"

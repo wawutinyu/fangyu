@@ -130,6 +130,14 @@ def get_eval_compare(
     }
 
 
+@router.get("/alerts")
+def get_monitor_alerts(limit: int = Query(40, ge=1, le=100)):
+    """观测告警：工厂离线当前态 + 近期协作 warn 事件。"""
+    from fangyu.core.monitor_alerts import collect_monitor_alerts
+
+    return collect_monitor_alerts(limit=limit)
+
+
 @router.delete("/logs")
 async def clear_logs(
     flow_id: str = "",

@@ -52,13 +52,27 @@ interface MonitorPanelProps {
   headerless?: boolean
 }
 
+interface MonitorAlert {
+  id: string
+  kind: string
+  severity?: string
+  title?: string
+  message?: string
+  ts?: number
+  factory_id?: string
+  base_url?: string
+  source?: string
+}
+
 export default function MonitorPanel({ headerless }: MonitorPanelProps) {
-  const [tab, setTab] = useState<'logs' | 'harness' | 'eval'>('harness')
+  const [tab, setTab] = useState<'logs' | 'harness' | 'eval' | 'alerts'>('harness')
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [expanded, setExpanded] = useState(false)
   const [loading, setLoading] = useState(false)
   const [filterFlowId, setFilterFlowId] = useState('')
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null)
+  const [alerts, setAlerts] = useState<MonitorAlert[]>([])
+  const [alertMeta, setAlertMeta] = useState<{ count?: number; offline_factories?: number } | null>(null)
 
   const [bundleDir, setBundleDir] = useState('')
   const [workspace, setWorkspace] = useState('')
@@ -160,11 +174,23 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
     }
   }, [])
 
+  const fetchAlerts = useCallback(async () => {
+    setLoading(true)
+    try {
+      const resp = await apiFetch('/api/v1/monitor/alerts?limit=40')
+      const json = await resp.json()
+      setAlerts(json.alerts || [])
+      setAlertMeta({ count: json.count, offline_factories: json.offline_factories })
+    } catch { /* ignore */ }
+    setLoading(false)
+  }, [])
+
   useEffect(() => {
     if (tab === 'logs') void fetchLogs()
     if (tab === 'harness') void fetchTraces()
     if (tab === 'eval') void fetchEval()
-  }, [tab, fetchLogs, fetchTraces, fetchEval])
+    if (tab === 'alerts') void fetchAlerts()
+  }, [tab, fetchLogs, fetchTraces, fetchEval, fetchAlerts])
 
   useEffect(() => {
     if (tab !== 'eval' || evalView !== 'compare') return
@@ -201,6 +227,14 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
         <button className="notion-btn" style={{ fontSize: 12, fontWeight: tab === 'eval' ? 600 : 400 }} onClick={() => setTab('eval')}>
           Eval 报告
         </button>
+        <button
+          className="notion-btn"
+          style={{ fontSize: 12, fontWeight: tab === 'alerts' ? 600 : 400 }}
+          onClick={() => setTab('alerts')}
+          data-testid="monitor-alerts-tab"
+        >
+          告警{alertMeta?.offline_factories ? ` (${alertMeta.offline_factories})` : ''}
+        </button>
         <div style={{ flex: 1 }} />
         {tab === 'eval' && (
           <>
@@ -229,6 +263,7 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
             if (tab === 'logs') void fetchLogs(filterFlowId)
             if (tab === 'harness') void fetchTraces()
             if (tab === 'eval') void fetchEval()
+            if (tab === 'alerts') void fetchAlerts()
           }}
           disabled={loading}
         >
@@ -567,6 +602,52 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
           )}
         </div>
       )}
+
+      {tab === 'alerts' && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 14px' }} data-testid="monitor-alerts">
+          {alertMeta && (
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
+              共 {alertMeta.count ?? 0} · 离线工厂 {alertMeta.offline_factories ?? 0}
+            </div>
+          )}
+          {loading && <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: 8 }}>加载中...</div>}
+          {!loading && alerts.length === 0 && (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: 20 }}>
+              暂无告警。工厂心跳离线或协作 warn 事件会出现在此。
+            </div>
+          )}
+          {alerts.map(a => {
+            const sev = a.severity || 'info'
+            const color = sev === 'error' || sev === 'deny' ? '#c0392b'
+              : sev === 'warn' ? '#d48806' : '#1890ff'
+            return (
+              <div
+                key={a.id}
+                style={{
+                  marginBottom: 6, padding: '8px 10px', borderRadius: 6,
+                  border: '1px solid var(--border-light)', borderLeft: `3px solid ${color}`,
+                  fontSize: 12,
+                }}
+              >
+                <div style={{ fontWeight: 600, marginBottom: 2 }}>
+                  {a.title || a.kind}
+                  <span style={{ marginLeft: 8, fontWeight: 400, color: 'var(--text-muted)', fontSize: 11 }}>
+                    {a.kind} · {sev}
+                  </span>
+                </div>
+                {a.message && (
+                  <div style={{ color: 'var(--text-muted)', wordBreak: 'break-word' }}>{a.message}</div>
+                )}
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                  {formatTs(a.ts)}
+                  {a.base_url ? ` · ${a.base_url}` : ''}
+                  {a.source ? ` · ${a.source}` : ''}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 
@@ -581,7 +662,7 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-          <span>观测 · Trace / 日志 / Eval</span>
+          <span>观测 · Trace / 日志 / Eval / 告警</span>
         </div>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: expanded ? 'rotate(180deg)' : undefined }}>
           <polyline points="6 9 12 15 18 9"/>

@@ -111,10 +111,11 @@
 ㉕ 对端一键入库 + 值班墙跨机默认  ✅ probe-save/peer-probe · 墙默认 host
 ㉖ 工厂批量心跳 + Eval smoke CI    ✅ factories/heartbeat · factory-gate.yml
 ㉗ 定时心跳 + Presence↔通讯录对齐  ✅ heartbeat-loop · factories/align
+㉘ 离线告警 + 通讯录拉入画布       ✅ monitor/alerts · 运维「拉入画布」
 ```
 
-下一刀：真 IM（仍暂缓）· 工厂离线告警进观测 · A2A 外部 Agent 从通讯录一键拉入画布。
+下一刀：真 IM（仍暂缓）· Eval 告警联动值班墙 · Bundle 跨厂任务投递样例。
 
 ---
 
-*版本：2026-07-18 · 随行业与仓库演进更新「现状」表*
+*版本：2026-07-19 · 随行业与仓库演进更新「现状」表*

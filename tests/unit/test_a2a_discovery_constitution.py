@@ -259,3 +259,53 @@ def test_constitution_bundle_roundtrip(tmp_path):
         tpl = client.get("/api/v1/constitution/policy-templates")
         assert tpl.status_code == 200
         assert len(tpl.json()["templates"]) >= 2
+
+
+def test_factory_offline_transition_and_monitor_alerts(monkeypatch, tmp_path):
+    from fangyu.core import a2a_discovery as disc
+    from fangyu.core import a2a_factories as fac
+    from fangyu.core import config as config_mod
+    from fangyu.core.collaboration import list_events, reset_collaboration
+    from fangyu.core.remote_hosts import clear_remote_hosts
+
+    config_mod.set_data_dir(tmp_path / "data")
+    (tmp_path / "data").mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("FANGYU_COLLAB_DB", str(tmp_path / "collab.db"))
+    clear_remote_hosts()
+    reset_collaboration()
+    fac.save_factories([])
+
+    upsert_factory(base_url="http://alert.example:8001", label="告警厂")
+    rows = fac.load_factories()
+    rows[0]["online"] = True
+    fac.save_factories(rows)
+
+    monkeypatch.setattr(
+        disc,
+        "probe_factory",
+        lambda url: {
+            "ok": False,
+            "base_url": "http://alert.example:8001",
+            "error": "connection refused",
+            "hits": [],
+        },
+    )
+
+    with TestClient(app) as client:
+        r = client.post("/api/v1/a2a/factories/heartbeat", json={"sync_presence": True})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["offline"] == 1
+        rows = fac.load_factories()
+        assert rows[0].get("online") is False
+        assert rows[0].get("meta", {}).get("alert") == "offline"
+
+        kinds = [e["kind"] for e in list_events(limit=20)]
+        assert "factory.offline" in kinds
+
+        al = client.get("/api/v1/monitor/alerts?limit=20")
+        assert al.status_code == 200
+        alert_body = al.json()
+        assert alert_body["ok"] is True
+        assert alert_body["offline_factories"] >= 1
+        assert any(a["kind"] == "factory.offline" for a in alert_body["alerts"])

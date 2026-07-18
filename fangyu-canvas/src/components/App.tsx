@@ -559,6 +559,18 @@ export default function App() {
     }
   }, [handleFullExperience])
 
+  useEffect(() => {
+    const onAddExternal = (e: Event) => {
+      const node = (e as CustomEvent).detail?.node
+      if (!node) return
+      store.dispatch(addAgentNode(node))
+      goXuAgent()
+      flashHangHint(`已拉入外部 Agent「${node.label || node.id}」`, 4500)
+    }
+    window.addEventListener('fangyu:add-external-agent', onAddExternal)
+    return () => window.removeEventListener('fangyu:add-external-agent', onAddExternal)
+  }, [goXuAgent, flashHangHint])
+
   const flowDirty = useAppSelector(s => s.flow.dirty)
 
   return (

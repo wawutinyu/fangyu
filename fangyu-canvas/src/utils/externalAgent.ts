@@ -211,6 +211,55 @@ export async function deleteRemoteFactory(factoryId: string): Promise<void> {
   if (!resp.ok) throw new Error(`删除工厂失败 (${resp.status})`)
 }
 
+/** 从工厂通讯录条目构造外部 Agent 画布节点（探测 Card + 身份） */
+export async function buildExternalAgentFromFactory(factory: {
+  id?: string
+  base_url: string
+  rpc_url?: string
+  label?: string
+  card_name?: string
+}): Promise<AgentCanvasNode> {
+  const target = (factory.rpc_url || factory.base_url || '').trim()
+  if (!target) throw new Error('工厂缺少 base_url / rpc_url')
+  const discovered = await discoverExternalAgent(target)
+  const card = discovered.card as AgentCard
+  const name = String(
+    factory.label || factory.card_name || card.name || factory.id || '外部工厂',
+  )
+  const id = `ext_fac_${(factory.id || name).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 24) || Date.now()}`
+  return {
+    id,
+    label: name,
+    type: 'a2a-external',
+    position: {
+      x: 220 + Math.random() * 280,
+      y: 80 + Math.random() * 220,
+    },
+    agentCard: {
+      name,
+      version: card.version || '1.0.0',
+      description: card.description,
+      capabilities: card.capabilities || { streaming: false, pushNotifications: false },
+      skills: card.skills?.length ? card.skills : [{ id: 'default', name: 'default' }],
+      defaultInterface: card.defaultInterface || { type: 'a2a', url: discovered.rpc_url },
+      metadata: { ...(card.metadata || {}), external: true, factory_id: factory.id, factory_base: factory.base_url },
+    },
+    externalConfig: {
+      rpcUrl: discovered.rpc_url,
+      agentId: discovered.identity?.agent_id || '',
+      publicKey: discovered.identity?.public_key || '',
+      remoteName: name,
+      authorized: false,
+      allowedSkills: ['*'],
+    },
+  }
+}
+
+/** 派发到 App：写入画布并切到序·Agent */
+export function pullFactoryToCanvas(node: AgentCanvasNode): void {
+  window.dispatchEvent(new CustomEvent('fangyu:add-external-agent', { detail: { node } }))
+}
+
 export async function registerExternalAgent(node: AgentCanvasNode): Promise<void> {
   const ext = node.externalConfig
   const card = node.agentCard

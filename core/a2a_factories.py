@@ -111,6 +111,8 @@ def heartbeat_factories(
         if not base:
             results.append({"id": fid, "ok": False, "error": "no base_url"})
             continue
+        was_online = row.get("online")
+        # 尚未探测过时 was_online 可能为 None
         probe: dict[str, Any] | None = None
         err = ""
         try:
@@ -131,6 +133,12 @@ def heartbeat_factories(
             row["rpc_url"] = probe["rpc_url"]
         meta = dict(row.get("meta") or {})
         meta["last_heartbeat_error"] = err or None
+        if was_online is True and not ok:
+            meta["offline_since"] = now
+            meta["alert"] = "offline"
+        elif ok:
+            meta.pop("offline_since", None)
+            meta.pop("alert", None)
         row["meta"] = meta
         if ok:
             online_n += 1
@@ -150,8 +158,9 @@ def heartbeat_factories(
                         meta={"factory_id": fid, "source": "a2a_factories"},
                         ttl_sec=ttl_sec,
                     )
+                    kind = "factory.online" if was_online is False else "host.heartbeat"
                     emit_event(
-                        "host.heartbeat",
+                        kind,
                         actor=f"host:{host['id']}",
                         message=f"工厂在线 {host.get('label')}",
                         detail={
@@ -163,10 +172,16 @@ def heartbeat_factories(
                     )
                 else:
                     emit_event(
-                        "host.offline",
+                        "factory.offline" if was_online is not False else "host.offline",
                         actor=f"host:{host_id}",
                         message=f"工厂离线 {row.get('label') or base}",
-                        detail={"host_id": host_id, "base_url": base, "factory_id": fid},
+                        detail={
+                            "host_id": host_id,
+                            "base_url": base,
+                            "factory_id": fid,
+                            "transition": was_online is True,
+                            "error": err or None,
+                        },
                         severity="warn",
                     )
             except Exception:
