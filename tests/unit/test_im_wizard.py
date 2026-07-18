@@ -26,6 +26,8 @@ def test_feishu_channel_status_checklist(tmp_path, restore_data_dir):
     step_ids = {s["id"] for s in empty["steps"]}
     assert "bundle" in step_ids
     assert "app_credentials" in step_ids
+    assert "topology" in step_ids
+    assert empty["has_topology"] is False
 
     bind_feishu_channel(
         root,
@@ -43,6 +45,29 @@ def test_feishu_channel_status_checklist(tmp_path, restore_data_dir):
     assert "***" in st["verification_token"]
     assert all(s["ok"] for s in st["steps"])
     assert st["steps"][0]["ok"] is True
+
+
+def test_feishu_status_orchestrate_needs_topology(tmp_path, restore_data_dir):
+    root = build_from_profile("workbuddy", tmp_path / "orch-warn", name="OrchWarn")
+    bind_feishu_channel(root, mode="orchestrate", verification_token="t", app_id="a", app_secret="b")
+    st = feishu_channel_status(root)
+    assert st["mode"] == "orchestrate"
+    assert st["has_topology"] is False
+    topo_step = next(s for s in st["steps"] if s["id"] == "topology")
+    assert topo_step["ok"] is False
+    assert "orchestrate" in (st.get("note") or "")
+
+    multi = build_from_profile(
+        "multi",
+        tmp_path / "orch-ok",
+        intent="协作写周报并落盘纪要",
+        name="OrchOk",
+    )
+    bind_feishu_channel(multi, mode="orchestrate", verification_token="t", app_id="a", app_secret="b")
+    st2 = feishu_channel_status(multi)
+    assert st2["has_topology"] is True
+    assert st2["topology_ready_for_orchestrate"] is True
+    assert next(s for s in st2["steps"] if s["id"] == "topology")["ok"] is True
 
 
 def test_im_status_and_bind_routes(tmp_path, restore_data_dir):

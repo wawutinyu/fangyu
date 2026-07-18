@@ -233,6 +233,8 @@ export interface ImStatus {
   channel?: string
   mode?: string
   enabled?: boolean
+  has_topology?: boolean
+  topology_ready_for_orchestrate?: boolean
   im_config_path?: string | null
   app_id?: string
   app_id_set?: boolean

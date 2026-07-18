@@ -1002,6 +1002,24 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
           <div style={{ color: 'var(--text-muted)', lineHeight: 1.45 }}>
             {imStatus?.note || '真机事件订阅仍暂缓；此处只写 Bundle 凭证与回调 URL。'}
           </div>
+          {imMode === 'orchestrate' && (
+            <div
+              data-testid="im-orchestrate-hint"
+              style={{
+                fontSize: 12,
+                lineHeight: 1.45,
+                padding: '8px 10px',
+                borderRadius: 6,
+                border: '1px solid var(--border-light)',
+                color: imStatus?.has_topology === false ? '#b42318' : 'var(--text-muted)',
+                background: imStatus?.has_topology === false ? 'rgba(180,35,24,0.06)' : 'transparent',
+              }}
+            >
+              {imStatus?.has_topology
+                ? '已检测到 topology.json，mode=orchestrate 可走整网编排。'
+                : 'mode=orchestrate 需要 multi Bundle（含 config/topology.json）。workbuddy 单 Agent 包会失败；请用办公意图导出 multi 编队。'}
+            </div>
+          )}
           <input
             className="notion-input"
             style={{ fontSize: 12 }}

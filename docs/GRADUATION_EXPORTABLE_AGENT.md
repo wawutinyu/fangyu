@@ -123,7 +123,7 @@ G2-E 多编排   ███████░░░  ~70%（边 ACL + 办公模板/I
 | **P1** | 真双厂值班验收 | ✅ `scripts/dual_factory_duty_acceptance.py`（D1–D9）；见 [双厂值班](DUAL_FACTORY_DUTY.md) |
 | **P2** | 编排边 ACL | ✅ topology 边声明 + 越权可拦可审计；G2-E #5 |
 | **P3** | 飞书真机（单开） | 运维向导配凭证 → 私聊触发 Bundle/harness → 回复回会话；不挡 P0–P2 |
-| **P4** | 办公×编排交叉 | ✅ `office_report` 模板 + IM orchestrate 单测；见 [办公×编排](OFFICE_ORCHESTRATE.md) |
+| **P4** | 办公×编排交叉 | ✅ `office_report` + IM orchestrate + `demo_vertical_slice` + 运维拓扑提示；见 [办公×编排](OFFICE_ORCHESTRATE.md) |
 
 关联：[项目评估](PROJECT_ASSESSMENT.md) · [技术雷达](TECH_RADAR_2026.md)
 

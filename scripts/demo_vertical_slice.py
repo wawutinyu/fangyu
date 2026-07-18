@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""可演示竖切 — 5 分钟故事（默认 mock，可 --live）。
+"""可演示竖切 — 办公×编排故事（默认 mock，可 --live）。
 
 故事线：
-  1) 意图 → multi Bundle（topology 导出）
+  1) 意图 → office_report multi Bundle
   2) 组织 ACL 绑定 + operator 禁 shell / 允许写成品
   3) 多 Agent orchestrate → deliverables 纪要
-  4) manage 托管启停 + 健康探测
-  5) 打印可给人看的结果路径
+  4) IM mode=orchestrate（同 Bundle 入站编排）
+  5) manage 托管启停 + 健康探测
+  6) 打印可给人看的结果路径
 
 用法（仓库根）：
   python scripts/demo_vertical_slice.py
@@ -75,17 +76,17 @@ def main() -> int:
     config_mod.set_data_dir(data)
     mh.reset_registry_for_tests()
 
-    total = 5
+    total = 6
     instance_id = None
     try:
         print("=" * 56)
-        print("方隅 · 可演示竖切")
-        print("意图 → multi Bundle → ACL → 编排落盘 → 托管启停")
+        print("方隅 · 可演示竖切（P4 办公×编排）")
+        print("意图 → office_report multi → ACL → 编排落盘 → IM orchestrate → 托管")
         print("=" * 56)
         print(f"工作目录: {tmp}")
 
         # 1) multi export
-        _step(1, total, "意图 → 导出多 Agent Bundle")
+        _step(1, total, "意图 → 导出办公编队 Bundle（office_report）")
         root = build_from_profile(
             "multi",
             bundle_dir,
@@ -94,9 +95,15 @@ def main() -> int:
             workspace=office,
         )
         topo = load_topology(root)
+        from fangyu.core.intent_agents import classify_agent_intent
+        assert classify_agent_intent(INTENT) == "office_report"
+        pipe = topo.get("pipeline") or []
         _ok(f"Bundle: {root}")
-        _ok(f"topology pipeline: {' → '.join(topo.get('pipeline') or [])}")
+        _ok(f"template=office_report · pipeline: {' → '.join(pipe)}")
         _ok(f"agents: {len(topo.get('agents') or [])}")
+        if "agent_draft" not in pipe:
+            print("  ✗ 期望 office_report pipeline 含 agent_draft", file=sys.stderr)
+            return 1
 
         # 2) ACL
         _step(2, total, "组织 ACL：operator 可写成品、禁 shell")
@@ -185,8 +192,58 @@ def main() -> int:
             return 1
         _ok(f"纪要预览: {text.strip().splitlines()[0][:40]}")
 
-        # 4) manage
-        _step(4, total, "托管 manage：启动 → 健康 → 停止")
+        # 4) IM orchestrate（同 Bundle，不碰真飞书）
+        _step(4, total, "IM mode=orchestrate（入站触发整网）")
+        from fangyu.engine.im_inbound import handle_inbound_text, write_im_config
+        from fangyu.engine.im_feishu import feishu_channel_status
+
+        write_im_config(
+            root,
+            {"channel": "generic", "mode": "orchestrate", "enabled": True},
+        )
+        st = feishu_channel_status(root)
+        if not st.get("has_topology"):
+            print("  ✗ status 应报告 has_topology", file=sys.stderr)
+            return 1
+        _ok("status.has_topology=True（orchestrate 就绪）")
+        im_calls = {"n": 0}
+
+        async def im_fake_llm(_messages):
+            im_calls["n"] += 1
+            if im_calls["n"] % 2 == 1:
+                return json.dumps({
+                    "action": "tool",
+                    "name": "write_deliverable",
+                    "args": {
+                        "path": "im_weekly.md",
+                        "content": "# IM 入站周报\n\n- 来自 mode=orchestrate\n",
+                    },
+                }, ensure_ascii=False)
+            return json.dumps(
+                {"action": "done", "result": f"im-ok-{im_calls['n']}"},
+                ensure_ascii=False,
+            )
+
+        from fangyu.core.org_acl import reset_principal, set_principal
+        token = set_principal("operator")
+        try:
+            im_out = handle_inbound_text(
+                root,
+                "写一份短周报",
+                mode="orchestrate",
+                llm=im_fake_llm,
+                max_turns=6,
+                workspace=office,
+            )
+        finally:
+            reset_principal(token)
+        if not im_out.get("success"):
+            print(f"  ✗ IM orchestrate 失败: {im_out.get('error')}", file=sys.stderr)
+            return 1
+        _ok(f"IM 编排成功 mode={im_out.get('mode')} steps={len(im_out.get('steps') or [])}")
+
+        # 5) manage
+        _step(5, total, "托管 manage：启动 → 健康 → 停止")
         # action 包更轻，用同一 workspace 旁另建托管用 worker
         host_bundle = tmp / "host-bundle"
         build_from_profile("action", host_bundle, name="Demo-Hosted")
@@ -204,12 +261,12 @@ def main() -> int:
             return 1
         _ok("已停止")
 
-        # 5) summary
-        _step(5, total, "演示结论")
+        # 6) summary
+        _step(6, total, "演示结论")
         print("  这条竖切证明：")
-        print("    · 意图可导出为多 Agent 拓扑 Bundle")
+        print("    · 办公意图 → office_report 多 Agent 拓扑")
         print("    · ACL 能拦危险工具、放行办公成品")
-        print("    · 编排可落盘 deliverables/")
+        print("    · 编排 / IM orchestrate 可落盘 deliverables/")
         print("    · 托管可启停并探活")
         print()
         print("[OK] 可演示竖切通过")

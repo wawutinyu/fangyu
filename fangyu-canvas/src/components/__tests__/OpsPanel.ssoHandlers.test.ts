@@ -19,3 +19,12 @@ describe('OpsPanel SSO handlers', () => {
     expect(src).toMatch(/const reloadAuth\s*=/)
   })
 })
+
+describe('OpsPanel IM orchestrate hint', () => {
+  it('warns when mode=orchestrate without topology', () => {
+    expect(src).toMatch(/data-testid="im-orchestrate-hint"/)
+    expect(src).toMatch(/imMode === 'orchestrate'/)
+    expect(src).toMatch(/has_topology/)
+    expect(src).toMatch(/topology\.json/)
+  })
+})

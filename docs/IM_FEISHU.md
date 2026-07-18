@@ -9,7 +9,9 @@
 1. 填 Bundle 目录（导出包或托管实例的根路径）
 2. 填 App ID / App Secret / Verification Token（可选 mode=chat|orchestrate）
 3. **写入并设为默认** → 生成 `config/im.json`，并设平台默认 Bundle
-4. 对照检查清单：challenge 就绪 / 主动回消息就绪
+4. 对照检查清单：challenge 就绪 / 主动回消息就绪；`mode=orchestrate` 时须有 `config/topology.json`（multi 编队），运维页会红字提示
+
+`GET /api/v1/im/status` 另返回 `has_topology` / `topology_ready_for_orchestrate`。
 
 ## API
 

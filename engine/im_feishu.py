@@ -242,6 +242,8 @@ def feishu_channel_status(
     channel = str(cfg.get("channel") or "generic")
     mode = str(cfg.get("mode") or "chat")
     enabled = cfg.get("enabled") is not False
+    topology_path = (root / "config" / "topology.json") if root else None
+    has_topology = bool(topology_path and topology_path.is_file())
 
     events_url = (
         f"/api/v1/im/feishu?bundle_dir={root.resolve()}" if exists and root else "/api/v1/im/feishu"
@@ -264,6 +266,16 @@ def feishu_channel_status(
             "label": "通道 = feishu",
             "ok": channel == "feishu",
             "hint": "绑定后 channel 应为 feishu",
+        },
+        {
+            "id": "topology",
+            "label": "mode=orchestrate 需 topology.json（multi 编队）",
+            "ok": has_topology if mode == "orchestrate" else True,
+            "hint": (
+                "已有拓扑，可整网编排"
+                if has_topology
+                else "用 profile=multi + 办公意图导出；否则 orchestrate 会报错"
+            ),
         },
         {
             "id": "verification_token",
@@ -299,6 +311,8 @@ def feishu_channel_status(
         "channel": channel,
         "mode": mode,
         "enabled": enabled,
+        "has_topology": has_topology,
+        "topology_ready_for_orchestrate": has_topology,
         "im_config_path": str(im_path) if has_im_file else None,
         "app_id": _mask_secret(app_id) if app_id else "",
         "app_id_set": bool(app_id),
@@ -315,5 +329,12 @@ def feishu_channel_status(
         "steps": steps,
         "ready_for_challenge": ready_challenge,
         "ready_for_reply": ready_reply,
-        "note": "真机事件订阅仍暂缓；本向导只落 Bundle 凭证与回调 URL 提示。",
+        "note": (
+            "真机事件订阅仍暂缓；本向导只落 Bundle 凭证与回调 URL 提示。"
+            + (
+                " mode=orchestrate 需要 multi Bundle 的 topology.json。"
+                if mode == "orchestrate" and not has_topology
+                else ""
+            )
+        ),
     }
