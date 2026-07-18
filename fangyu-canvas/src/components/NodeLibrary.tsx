@@ -10,18 +10,19 @@ export default function NodeLibrary({ onCollapse }: Props) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
   const filteredCategories = React.useMemo(() => {
-    if (!searchQuery.trim()) return NODE_CATEGORIES
     const q = searchQuery.toLowerCase().trim()
     return NODE_CATEGORIES
       .map(cat => ({
         ...cat,
-        nodes: cat.nodes.filter(n =>
-          !LEGACY_TYPES.has(n.type) && (
-            n.name.toLowerCase().includes(q) ||
-            n.type.toLowerCase().includes(q) ||
-            n.desc.toLowerCase().includes(q)
+        nodes: cat.nodes.filter(n => {
+          if (LEGACY_TYPES.has(n.type)) return false
+          if (!q) return true
+          return (
+            n.name.toLowerCase().includes(q)
+            || n.type.toLowerCase().includes(q)
+            || n.desc.toLowerCase().includes(q)
           )
-        ),
+        }),
       }))
       .filter(cat => cat.nodes.length > 0)
   }, [searchQuery])

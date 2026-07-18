@@ -78,6 +78,14 @@ async def execute_tool(name: str, args: dict, global_vars: dict) -> Any:
     if not tool.get("enabled", True):
         raise ValueError(f"工具 '{name}' 已禁用（设置 ALLOW_DANGEROUS_TOOLS=true 可启用 shell/文件类工具）")
 
+    # 用户代码必须走沙箱，禁止 subprocess / 任意 open
+    if name == "code_execution":
+        from .sandbox import run_code
+        out = await run_code(str(args.get("code", "")), input_data=args, timeout=30)
+        if out.get("error"):
+            return {"error": out["error"], "logs": out.get("logs", [])}
+        return out.get("result")
+
     impl = tool.get("implementation", {})
     impl_type = impl.get("type", "prompt")
 
@@ -90,28 +98,30 @@ async def execute_tool(name: str, args: dict, global_vars: dict) -> Any:
         suffix = impl.get("suffix", "")
         if suffix:
             full_code += "\n" + suffix
-        safe_globals = {
-            "__builtins__": {
-                "__import__": __import__,
-                "True": True, "False": False, "None": None,
-                "abs": abs, "all": all, "any": any, "bool": bool, "bytes": bytes,
-                "dict": dict, "enumerate": enumerate, "filter": filter,
-                "float": float, "hash": hash, "hex": hex, "int": int,
-                "isinstance": isinstance, "len": len, "list": list,
-                "map": map, "max": max, "min": min, "object": object,
-                "oct": oct, "ord": ord, "range": range, "repr": repr,
-                "reversed": reversed, "round": round, "set": set,
-                "slice": slice, "sorted": sorted, "str": str, "sum": sum,
-                "tuple": tuple, "type": type, "zip": zip, "open": open,
-                "hasattr": hasattr, "getattr": getattr, "setattr": setattr,
-                "ImportError": ImportError, "Exception": Exception,
-                "ValueError": ValueError, "KeyError": KeyError,
-                "AttributeError": AttributeError, "TypeError": TypeError,
-                "ModuleNotFoundError": ModuleNotFoundError,
-                "OSError": OSError, "FileNotFoundError": FileNotFoundError,
-                "StopIteration": StopIteration,
-            }
+        builtins = {
+            "__import__": __import__,
+            "True": True, "False": False, "None": None,
+            "abs": abs, "all": all, "any": any, "bool": bool, "bytes": bytes,
+            "dict": dict, "enumerate": enumerate, "filter": filter,
+            "float": float, "hash": hash, "hex": hex, "int": int,
+            "isinstance": isinstance, "len": len, "list": list,
+            "map": map, "max": max, "min": min, "object": object,
+            "oct": oct, "ord": ord, "range": range, "repr": repr,
+            "reversed": reversed, "round": round, "set": set,
+            "slice": slice, "sorted": sorted, "str": str, "sum": sum,
+            "tuple": tuple, "type": type, "zip": zip,
+            "hasattr": hasattr, "getattr": getattr, "setattr": setattr,
+            "ImportError": ImportError, "Exception": Exception,
+            "ValueError": ValueError, "KeyError": KeyError,
+            "AttributeError": AttributeError, "TypeError": TypeError,
+            "ModuleNotFoundError": ModuleNotFoundError,
+            "OSError": OSError, "FileNotFoundError": FileNotFoundError,
+            "StopIteration": StopIteration,
         }
+        # 仅危险工具（默认禁用）需要 open；普通内置工具不再暴露 open
+        if name in DANGEROUS_TOOL_NAMES:
+            builtins["open"] = open
+        safe_globals = {"__builtins__": builtins}
         safe_locals = {"args": args, "result": None}
         try:
             exec(full_code, safe_globals, safe_locals)
@@ -206,7 +216,8 @@ BUILTIN_TOOLS: list[dict] = [
         "name": "code_execution",
         "description": "在沙箱中执行 Python 代码",
         "parameters": {"type": "object", "properties": {"code": {"type": "string", "description": "Python 代码"}}, "required": ["code"]},
-        "implementation": {"type": "code", "code": "import subprocess; result = subprocess.run(['python', '-c', args.get('code', '')], capture_output=True, text=True, timeout=30).stdout"},
+        # 实际执行由 execute_tool 走 engine.sandbox.run_code，此处仅作注册占位
+        "implementation": {"type": "sandbox", "timeout": 30},
     },
     {
         "name": "read_url",

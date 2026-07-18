@@ -13,14 +13,19 @@ fangyu **共享画布** — Flow / Agent 组件、Redux、工具函数、`platfo
 
 ## 开发
 
-本包不单独启动浏览器，请用：
+本包不单独启动浏览器，请用仓库根目录：
 
 ```bash
-# 仓库根目录
-install-native.bat      # 推荐：Windows 原生
+# macOS
+./dev.sh
+./scripts/mac-smoke.sh
+
+# Windows
+install-native.bat      # 推荐：原生
 dev.bat                 # 仅网页序
-dev-worker-tray.bat     # 仅行托盘
 ```
+
+连线规则见 [`docs/FLOW_CONNECTION_RULES.md`](../docs/FLOW_CONNECTION_RULES.md)。
 
 ## 脚本
 

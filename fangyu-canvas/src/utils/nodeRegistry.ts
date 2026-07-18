@@ -680,29 +680,33 @@ export function filterUniqueTypes(types: string[], existingNodeTypes: string[]):
 }
 const NO_OUTPUT_TYPES = new Set(['output'])
 
+function portsTypeCompatible(sourceType: string, targetType: string): boolean {
+  if (sourceType === 'any' || targetType === 'any') return true
+  return sourceType === targetType
+}
+
+/** 类型级连线规则（与 connectionRules / 拖拽校验保持一致） */
+export function canConnectTypes(sourceType: string, targetType: string): boolean {
+  if (!sourceType || !targetType) return false
+  if (sourceType === targetType) return false
+  if (NO_OUTPUT_TYPES.has(sourceType) || NO_INPUT_TYPES.has(targetType)) return false
+
+  const sourceMeta = getNodeMeta(sourceType)
+  const targetMeta = getNodeMeta(targetType)
+  if (sourceMeta.outputSchema.length === 0 || targetMeta.inputSchema.length === 0) return false
+
+  const sourcePortTypes = sourceMeta.outputSchema.map(p => p.type)
+  const targetPortTypes = targetMeta.inputSchema.map(p => p.type)
+  return sourcePortTypes.some(st =>
+    targetPortTypes.some(tt => portsTypeCompatible(st, tt)),
+  )
+}
+
 /**
  * 给定源节点类型，返回所有可兼容的目标节点类型列表（用于 + 按钮菜单过滤）
+ * 仅推荐现行（非 legacy）节点，避免拖出已废弃类型。
  */
 export function getCompatibleTargets(sourceType: string): string[] {
   if (NO_OUTPUT_TYPES.has(sourceType)) return []
-
-  const sourceMeta = getNodeMeta(sourceType)
-  if (sourceMeta.outputSchema.length === 0) return []
-
-  const allTypes = getAllNodeTypes()
-
-  return allTypes.filter(targetType => {
-    if (targetType === sourceType) return false
-    if (NO_INPUT_TYPES.has(targetType)) return false
-
-    const targetMeta = getNodeMeta(targetType)
-    if (targetMeta.inputSchema.length === 0) return false
-
-    const sourcePortTypes = sourceMeta.outputSchema.map(p => p.type)
-    const targetPortTypes = targetMeta.inputSchema.map(p => p.type)
-
-    return sourcePortTypes.some(st =>
-      st === 'any' || targetPortTypes.some(tt => tt === 'any' || tt === st),
-    )
-  })
+  return getActiveNodeTypes().filter(t => canConnectTypes(sourceType, t))
 }

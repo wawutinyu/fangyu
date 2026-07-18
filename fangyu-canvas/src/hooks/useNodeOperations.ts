@@ -1,6 +1,7 @@
 import { useCallback, useRef, useEffect } from 'react'
 import type { Node, Edge } from 'reactflow'
 import { getNodeMeta, getDefaultConfig, getCompatibleTargets } from '../utils/nodeRegistry'
+import { isValidFlowConnection, normalizeConnectionHandles } from '../utils/connectionRules'
 import { generateId } from '../utils/flowHelper'
 
 function createAtomNode(nodeType: string, position: { x: number; y: number }): Node {
@@ -175,6 +176,8 @@ export function useNodeOperations(
   const handleAddNode = useCallback((afterNodeId: string, sourcePort: string, nodeType: string) => {
     const sourceNode = nodes.find(n => n.id === afterNodeId)
     if (!sourceNode) return
+    const sourceType = String(sourceNode.data?.originType || '')
+    if (!getCompatibleTargets(sourceType).includes(nodeType)) return
 
     const existingFromNode = edges.filter(e => e.source === afterNodeId).length
     const newNode = createAtomNode(nodeType, {
@@ -188,11 +191,13 @@ export function useNodeOperations(
       const targetFirstInput = meta.inputSchema[0]?.name || '__default'
       setLocalEdges(eds => eds.concat(createFlowEdge(afterNodeId, newNode.id, sourcePort, targetFirstInput)))
     }
-  }, [nodes, setLocalNodes, setLocalEdges])
+  }, [nodes, edges, setLocalNodes, setLocalEdges])
 
   const handleAddParent = useCallback((targetNodeId: string, targetPort: string, nodeType: string) => {
     const targetNode = nodes.find(n => n.id === targetNodeId)
     if (!targetNode) return
+    const targetType = String(targetNode.data?.originType || '')
+    if (!getCompatibleTargets(nodeType).includes(targetType)) return
 
     const existingToNode = edges.filter(e => e.target === targetNodeId).length
     const newNode = createAtomNode(nodeType, {
@@ -206,12 +211,18 @@ export function useNodeOperations(
       const sourceFirstOutput = meta.outputSchema[0]?.name || '__default'
       setLocalEdges(eds => eds.concat(createFlowEdge(newNode.id, targetNodeId, sourceFirstOutput, targetPort)))
     }
-  }, [nodes, setLocalNodes, setLocalEdges])
+  }, [nodes, edges, setLocalNodes, setLocalEdges])
 
   const handleEdgeInsert = useCallback((edge: Edge, nodeType: string) => {
     const sourceNode = nodes.find(n => n.id === edge.source)
     const targetNode = nodes.find(n => n.id === edge.target)
     if (!sourceNode || !targetNode) return
+
+    const sourceType = String(sourceNode.data?.originType || '')
+    const targetType = String(targetNode.data?.originType || '')
+    // 插入节点必须能接上游、且能通向下游
+    if (!getCompatibleTargets(sourceType).includes(nodeType)) return
+    if (!getCompatibleTargets(nodeType).includes(targetType)) return
 
     const meta = getNodeMeta(nodeType)
     const newNode = createAtomNode(nodeType, {
@@ -293,19 +304,26 @@ export function useNodeOperations(
   const handleConnectExisting = useCallback((sourceNodeId: string, targetNodeId: string, targetPort: string) => {
     const sourceNode = nodes.find(n => n.id === sourceNodeId)
     if (!sourceNode) return
-    const sourceMeta = getNodeMeta(sourceNode.data.originType || '')
+    const sourceMeta = getNodeMeta(String(sourceNode.data?.originType || ''))
     const sourceFirstOutput = sourceMeta.outputSchema[0]?.name || '__default'
-    const newEdge: Edge = {
-      id: generateId('edge'),
+    const connection = normalizeConnectionHandles({
       source: sourceNodeId,
       sourceHandle: sourceFirstOutput,
       target: targetNodeId,
       targetHandle: targetPort,
+    }, { nodes, edges })
+    if (!isValidFlowConnection(connection, { nodes, edges })) return
+    const newEdge: Edge = {
+      id: generateId('edge'),
+      source: connection.source!,
+      sourceHandle: connection.sourceHandle,
+      target: connection.target!,
+      targetHandle: connection.targetHandle,
       type: 'flow-edge',
       data: { linkType: 'serial', mappings: {} },
     }
     setLocalEdges(eds => eds.concat(newEdge))
-  }, [nodes, setLocalEdges])
+  }, [nodes, edges, setLocalEdges])
 
   return {
     groupSelected,

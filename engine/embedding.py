@@ -102,3 +102,8 @@ def cosine_similarity(a: list[float], b: list[float]) -> float:
     if not na or not nb:
         return 0.0
     return dot / (na * nb)
+
+
+def reset_embedding_for_tests() -> None:
+    global _encoder
+    _encoder = None

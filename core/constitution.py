@@ -7,6 +7,7 @@ import time
 from typing import Any
 
 from .config import DATA_DIR
+from .exceptions import ConstitutionError
 
 CONSTITUTION_FILE = DATA_DIR / "constitution.json"
 AUDIT_FILE = DATA_DIR / "audit.log"
@@ -30,22 +31,8 @@ DEFAULT_CONSTITUTION: dict[str, Any] = {
 }
 
 
-class ConstitutionViolation(ValueError):
-    """违反宪法约束。"""
-
-    def __init__(self, rule: str, message: str, *, context: dict | None = None):
-        self.rule = rule
-        self.context = context or {}
-        super().__init__(message)
-
-    def to_dict(self) -> dict:
-        return {
-            "type": "constitution",
-            "rule": self.rule,
-            "message": str(self),
-            "violations": self.context.get("violations", []),
-            "context": self.context.get("context"),
-        }
+class ConstitutionViolation(ConstitutionError):
+    """违反宪法约束（保留原名以兼容现有 import / isinstance）。"""
 
 
 def violation_to_dict(exc: Exception) -> dict:

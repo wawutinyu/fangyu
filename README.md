@@ -41,7 +41,39 @@ API：`POST /api/v1/intent/to-flow`
 
 ## 安装与启动
 
+### macOS / Linux
+
 ```bash
+chmod +x dev.sh dev-worker.sh dev-clean.sh scripts/mac-smoke.sh
+./dev.sh
+# → Studio http://127.0.0.1:5173
+# → API    http://127.0.0.1:8000/docs
+
+# 另开终端（可选 Worker）
+./dev-worker.sh
+
+# 端口被占用
+./dev-clean.sh
+
+# 一键冒烟（单元 + 画布测试；API 已启动时顺带 Happy Path）
+./scripts/mac-smoke.sh
+```
+
+精简依赖（默认不含向量大模型）：
+
+```bash
+# 推荐：若已有项目旁 .tools（node/uv），先：
+#   source scripts/mac-env.sh
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"          # 语义检索再加：pip install -e ".[vector]"
+npm install
+```
+
+> 日常开发用 `./dev.sh` 即可（请在本机 Terminal 保持前台运行，勿仅依赖 IDE 后台进程）。Tauri 原生见 `./dev-native.sh`（需 Rust）。
+
+### Windows
+
+```bat
 # 根目录一次安装
 npm install
 py -m pip install -e .
@@ -90,6 +122,13 @@ fangyu/
 ## 测试
 
 ```bash
+# macOS / Linux
+source .venv/bin/activate   # 或 source scripts/mac-env.sh
+pytest tests/unit/ -q
+npm run test:fast -w fangyu-canvas
+./scripts/mac-smoke.sh      # 一键冒烟
+
+# Windows
 py -m pytest tests/unit/ -q
 npm run test
 npm run build:studio
@@ -97,6 +136,8 @@ npm run build:studio
 # 序 → 行 Happy Path（shell + run_flow，需 API + Worker）
 py scripts/worker_happy_path.py --spawn-worker
 ```
+
+画布连线契约：[docs/FLOW_CONNECTION_RULES.md](docs/FLOW_CONNECTION_RULES.md) · 过夜清单：[docs/OVERNIGHT_BACKLOG.md](docs/OVERNIGHT_BACKLOG.md)
 
 ## 文档
 

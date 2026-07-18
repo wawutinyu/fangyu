@@ -6,6 +6,7 @@ __pycache__/
 venv/
 *.sqlite3
 data/*.db
+data/vector/
 
 # Worker 持久化
 data/workers.db

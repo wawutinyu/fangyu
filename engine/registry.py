@@ -65,6 +65,13 @@ def _init_registry():
 _init_registry()
 
 
+def reset_registry_for_tests():
+    """测试用：清空执行器并重建节点元数据（不自动 register_executors）。"""
+    NODE_REGISTRY.clear()
+    _EXECUTORS.clear()
+    _init_registry()
+
+
 def _get_meta(node_type):
     if node_type in NODE_REGISTRY:
         return NODE_REGISTRY[node_type]

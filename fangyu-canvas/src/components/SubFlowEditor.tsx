@@ -7,6 +7,7 @@ import ReactFlow, {
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 import { getNodeMeta } from '../utils/nodeRegistry'
+import { isValidFlowConnection, normalizeConnectionHandles } from '../utils/connectionRules'
 
 const NODE_WIDTH = 140
 const NODE_HEIGHT = 60
@@ -55,14 +56,20 @@ export default function SubFlowEditor({ visible, innerNodes, innerLinks, onSave,
     setRfEdges(edges)
   }, [visible, innerNodes, innerLinks, setRfNodes, setRfEdges])
 
+  const isValidConnection = useCallback((conn: Connection) => {
+    return isValidFlowConnection(conn, { nodes: rfNodes, edges: rfEdges })
+  }, [rfNodes, rfEdges])
+
   const onConnect = useCallback((conn: Connection) => {
+    const normalized = normalizeConnectionHandles(conn, { nodes: rfNodes, edges: rfEdges })
+    if (!isValidFlowConnection(normalized, { nodes: rfNodes, edges: rfEdges })) return
     setRfEdges(eds => addEdge({
-      ...conn,
+      ...normalized,
       type: 'default',
       style: { stroke: '#999' },
       markerEnd: { type: MarkerType.ArrowClosed, color: '#999' },
     }, eds))
-  }, [setRfEdges])
+  }, [rfNodes, rfEdges, setRfEdges])
 
   const handleAddNode = useCallback(() => {
     const id = genId()
@@ -142,6 +149,7 @@ export default function SubFlowEditor({ visible, innerNodes, innerLinks, onSave,
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            isValidConnection={isValidConnection}
             fitView
             deleteKeyCode="Delete"
             multiSelectionKeyCode="Shift"

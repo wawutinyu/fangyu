@@ -22,4 +22,14 @@ describe('collaborationGraph', () => {
     const layout = layoutCollaborationGraph([], [])
     expect(layout.nodes).toEqual([])
   })
+
+  it('drops self-loop edges', () => {
+    const edges: CollaborationEdge[] = [
+      { source: 'a', target: 'a', count: 1, last_kind: 'a2a.send', last_ts: 1 },
+      { source: 'a', target: 'b', count: 2, last_kind: 'a2a.send', last_ts: 2 },
+    ]
+    const layout = layoutCollaborationGraph([], edges)
+    expect(layout.edges).toHaveLength(1)
+    expect(layout.edges[0].target).toBe('b')
+  })
 })

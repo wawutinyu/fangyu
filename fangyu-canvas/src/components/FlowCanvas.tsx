@@ -22,6 +22,7 @@ import { store } from '../store'
 import { setNodes, setEdges, setEdgeData, selectEdge, openEdgeConfigPanel } from '../store/flowSlice'
 import { selectNode, openConfigPanel } from '../store/flowSlice'
 import { getNodeMeta, getCompatibleTargets, getAllNodeTypes, filterUniqueTypes, LEGACY_TYPES } from '../utils/nodeRegistry'
+import { isValidFlowConnection, normalizeConnectionHandles } from '../utils/connectionRules'
 import { generateId, convertFromExportFormat, convertToExportFormat } from '../utils/flowHelper'
 import { Executor } from '../utils/executor'
 import { type PendingInteraction } from '../utils/localExecutor'
@@ -79,17 +80,28 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
   const [simConstitutionWarnings, setSimConstitutionWarnings] = React.useState<ViolationPayload | null>(null)
   const rfInstanceRef = React.useRef<ReactFlowInstance | null>(null)
   const existingNodeTypes = useAppSelector(s => s.flow.nodes.map(n => n.data?.originType || ''))
-  const edgeInsertableTypes = React.useMemo(() => {
-    return filterUniqueTypes(getAllNodeTypes().filter(type => {
-      if (LEGACY_TYPES.has(type)) return false
-      const meta = getNodeMeta(type)
-      return meta.inputSchema.length > 0 && meta.outputSchema.length > 0
-    }), existingNodeTypes)
-  }, [existingNodeTypes])
 
   const [edgeInsert, setEdgeInsert] = React.useState<{
     visible: boolean; edge: Edge | null; clientX: number; clientY: number
   }>({ visible: false, edge: null, clientX: 0, clientY: 0 })
+
+  const edgeInsertableTypes = React.useMemo(() => {
+    const edge = edgeInsert.edge
+    const sourceType = edge
+      ? String(nodes.find(n => n.id === edge.source)?.data?.originType || '')
+      : ''
+    const targetType = edge
+      ? String(nodes.find(n => n.id === edge.target)?.data?.originType || '')
+      : ''
+    return filterUniqueTypes(getAllNodeTypes().filter(type => {
+      if (LEGACY_TYPES.has(type)) return false
+      const meta = getNodeMeta(type)
+      if (meta.inputSchema.length === 0 || meta.outputSchema.length === 0) return false
+      if (!sourceType || !targetType) return true
+      return getCompatibleTargets(sourceType).includes(type)
+        && getCompatibleTargets(type).includes(targetType)
+    }), existingNodeTypes)
+  }, [existingNodeTypes, edgeInsert.edge, nodes])
 
   const [pendingInteraction, setPendingInteraction] = React.useState<PendingInteraction | null>(null)
   const [interactionMinimized, setInteractionMinimized] = React.useState(false)
@@ -231,42 +243,22 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
   }, [])
 
   const isValidConnection = React.useCallback((connection: Connection) => {
-    if (connection.source === connection.target) return false
-    const sourceNode = nodes.find(n => n.id === connection.source)
-    const targetNode = nodes.find(n => n.id === connection.target)
-    if (!sourceNode || !targetNode) return false
-
-    const sourceMeta = getNodeMeta(sourceNode.data?.originType || '')
-    const targetMeta = getNodeMeta(targetNode.data?.originType || '')
-
-    const sourcePorts = sourceMeta.outputSchema
-    const targetPorts = targetMeta.inputSchema
-
-    if (sourcePorts.length === 0 || targetPorts.length === 0) return false
-
-    const existingCount = edges.filter(e => e.target === connection.target).length
-    const requiredCount = targetMeta.inputSchema.filter(p => p.required).length
-    if (requiredCount > 0 && existingCount >= requiredCount) return false
-
-    const sourceType = sourcePorts[0]?.type || 'any'
-    const targetType = targetPorts[existingCount]?.type || 'any'
-
-    if (sourceType === 'any' || targetType === 'any') return true
-
-    return sourceType === targetType
+    return isValidFlowConnection(connection, { nodes, edges })
   }, [nodes, edges])
 
   const onConnect = React.useCallback((connection: Connection) => {
+    const normalized = normalizeConnectionHandles(connection, { nodes, edges })
+    if (!isValidFlowConnection(normalized, { nodes, edges })) return
     pushHistory()
     const edgeId = generateId('edge')
     setLocalEdges(eds => addEdge({
-      ...connection,
+      ...normalized,
       id: edgeId,
       type: 'flow-edge',
       data: { linkType: 'serial', mappings: {} },
     }, eds))
     dispatch(setEdgeData({ edgeId, data: { linkType: 'serial', mappings: {} } }))
-  }, [setLocalEdges, dispatch, pushHistory])
+  }, [nodes, edges, setLocalEdges, dispatch, pushHistory])
 
   const onNodeClick = React.useCallback((_: React.MouseEvent, node: Node) => {
     dispatch(selectNode(node.id))
@@ -367,21 +359,13 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
     if (!connectTarget) return []
     const targetNode = nodes.find(n => n.id === connectTarget.nodeId)
     if (!targetNode) return []
-    const targetOriginType = targetNode.data?.originType || ''
+    const targetOriginType = String(targetNode.data?.originType || '')
     return nodes.filter(n => {
       if (n.id === connectTarget.nodeId) return false
-      const sourceOriginType = n.data?.originType || ''
+      const sourceOriginType = String(n.data?.originType || '')
       if (!sourceOriginType) return false
-
-      if (getCompatibleTargets(sourceOriginType).includes(targetOriginType)) return true
-
-      const sourceMeta = getNodeMeta(sourceOriginType)
-      const targetMeta = getNodeMeta(targetOriginType)
-      if (!sourceMeta || !targetMeta) return false
-      if (sourceMeta.outputSchema.length === 0 || targetMeta.inputSchema.length === 0) return false
-      const srcTypes = sourceMeta.outputSchema.map(p => p.type)
-      const tgtTypes = targetMeta.inputSchema.map(p => p.type)
-      return srcTypes.some(st => st === 'any' || tgtTypes.some(tt => tt === 'any' || tt === st))
+      // 与拖拽连线同一套规则，禁止端口类型兜底绕过 canConnectTypes
+      return getCompatibleTargets(sourceOriginType).includes(targetOriginType)
     })
   }, [connectTarget, nodes])
 

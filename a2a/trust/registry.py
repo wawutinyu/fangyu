@@ -18,17 +18,33 @@ class TrustRegistry:
         return None if agent_id in cls._revoked else cls._identities.get(agent_id)
 
     @classmethod
-    def revoke(cls, agent_id: str): cls._revoked.add(agent_id)
+    def revoke(cls, agent_id: str):
+        cls._revoked.add(agent_id)
 
     @classmethod
     def check_nonce(cls, nonce: str) -> bool:
-        if nonce in cls._nonces: return False
+        if nonce in cls._nonces:
+            return False
         cls._nonces.add(nonce)
-        if len(cls._nonces) > 10000: cls._nonces.clear()
+        if len(cls._nonces) > 10000:
+            cls._nonces.clear()
         return True
 
     @classmethod
     def authorize(cls, agent_id: str, skill_id: str) -> bool:
-        if agent_id in cls._revoked: return False
+        if agent_id in cls._revoked:
+            return False
         allowed = cls._policies.get(agent_id, [])
         return "*" in allowed or skill_id in allowed
+
+    @classmethod
+    def reset(cls) -> None:
+        """测试 / 热重载：清空全部注册状态。"""
+        cls._identities.clear()
+        cls._policies.clear()
+        cls._revoked.clear()
+        cls._nonces.clear()
+
+
+def reset_trust_for_tests() -> None:
+    TrustRegistry.reset()

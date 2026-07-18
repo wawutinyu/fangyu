@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 import sys
 import traceback
 
@@ -16,6 +17,9 @@ SAFE_BUILTINS = {
 }
 
 FORBIDDEN = ['__import__', 'open', 'eval', 'compile', 'globals', 'locals', 'vars', 'dir', 'getattr', 'setattr', 'delattr', 'hasattr']
+
+# 语句级 import/from-import（避免误伤变量名 important 等）
+_IMPORT_STMT = re.compile(r'(?m)^\s*(?:import\s+\w+|from\s+\S+\s+import\s+)')
 
 
 def _run_code(code: str, input_data: dict, params: dict, extra_globals: dict | None = None) -> dict:
@@ -39,6 +43,9 @@ def _run_code(code: str, input_data: dict, params: dict, extra_globals: dict | N
     for word in FORBIDDEN:
         if word in code:
             return {'result': None, 'error': f'禁止使用 {word}', 'logs': logs}
+
+    if _IMPORT_STMT.search(code):
+        return {'result': None, 'error': '禁止使用 import', 'logs': logs}
 
     try:
         compiled = compile(code, '<sandbox>', 'exec')

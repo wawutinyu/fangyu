@@ -21,17 +21,15 @@ class JsonRpcRequest(BaseModel):
 
 
 def _setup_trust_registry(bundle: dict[str, Any]) -> dict[str, Any]:
-    """注册 bundle 自身及 trusted_peers 到 TrustRegistry（ATP + A2A 双注册）。"""
-    from fangyu.a2a.trust.registry import TrustRegistry as A2ATrustRegistry
-    from fangyu.engine.trust_runtime import TrustRegistry as EngineTrustRegistry
+    """注册 bundle 自身及 trusted_peers 到统一 TrustRegistry。"""
+    from fangyu.a2a.trust.registry import TrustRegistry
 
     ident = bundle["identity"]
     agent_id = ident["agent_id"]
     pubkey = ident["public_key"]
     skills = list(bundle["skills"].keys()) or ["*"]
 
-    for reg in (A2ATrustRegistry, EngineTrustRegistry):
-        reg.register(agent_id, pubkey, skills)
+    TrustRegistry.register(agent_id, pubkey, skills)
 
     trust_policy = (bundle.get("interfaces") or {}).get("trust_policy") or {}
     for peer in trust_policy.get("trusted_peers") or []:
@@ -39,8 +37,7 @@ def _setup_trust_registry(bundle: dict[str, Any]) -> dict[str, Any]:
         pk = peer.get("public_key") or peer.get("publicKey")
         allowed = peer.get("allowed_skills") or ["*"]
         if pid and pk:
-            for reg in (A2ATrustRegistry, EngineTrustRegistry):
-                reg.register(pid, pk, allowed)
+            TrustRegistry.register(pid, pk, allowed)
 
     return trust_policy
 

@@ -8,7 +8,9 @@
 - [ ] Windows / macOS / Linux 任一
 - [ ] Node.js ≥ 18、Python ≥ 3.10、Git
 
-> **常见坑：** pull 新代码后若 `/api/v1/presence` 等返回 404，多半是旧 API 进程仍在跑。先 `dev-clean.bat`，再 `dev.bat` / `py -m fangyu --server`。
+> **常见坑：** pull 新代码后若 `/api/v1/presence` 等返回 404，多半是旧 API 进程仍在跑。  
+> - Windows：先 `dev-clean.bat`，再 `dev.bat` / `py -m fangyu --server`  
+> - macOS：先 `./dev-clean.sh`，再 `./dev.sh`（请在本机 Terminal 前台跑）；冒烟用 `./scripts/mac-smoke.sh`
 
 ## 步骤（建议计时）
 

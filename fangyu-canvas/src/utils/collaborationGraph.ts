@@ -25,6 +25,7 @@ export function layoutCollaborationGraph(
   const height = opts?.height ?? 280
   const names = new Set<string>()
   for (const e of edges) {
+    if (e.source === e.target) continue
     names.add(e.source)
     names.add(e.target)
   }
@@ -49,6 +50,8 @@ export function layoutCollaborationGraph(
     }
   })
   const known = new Set(ids)
-  const filtered = edges.filter(e => known.has(e.source) && known.has(e.target))
+  const filtered = edges.filter(
+    e => e.source !== e.target && known.has(e.source) && known.has(e.target),
+  )
   return { nodes, edges: filtered, width, height }
 }

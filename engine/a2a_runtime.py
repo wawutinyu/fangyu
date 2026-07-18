@@ -44,11 +44,9 @@ class AgentRegistry:
             "agent_id": agent_id,
             "public_key": public_key,
         }
-        from .trust_runtime import TrustRegistry
-        from fangyu.a2a.trust.registry import TrustRegistry as A2ATrustRegistry
+        from fangyu.a2a.trust.registry import TrustRegistry
         skills = allowed_skills or ["*"]
         TrustRegistry.register(agent_id, public_key, skills)
-        A2ATrustRegistry.register(agent_id, public_key, skills)
 
     @classmethod
     def authorize_external(cls, name: str, authorized: bool = True, allowed_skills: list[str] | None = None) -> bool:
@@ -64,10 +62,8 @@ class AgentRegistry:
             meta["authorized"] = authorized
         agent_id = ext.get("agent_id")
         if agent_id and allowed_skills is not None:
-            from .trust_runtime import TrustRegistry
-            from fangyu.a2a.trust.registry import TrustRegistry as A2ATrustRegistry
+            from fangyu.a2a.trust.registry import TrustRegistry
             TrustRegistry.register(agent_id, ext["public_key"], allowed_skills)
-            A2ATrustRegistry.register(agent_id, ext["public_key"], allowed_skills)
         return True
 
     @classmethod

@@ -92,6 +92,9 @@ jobs:
       - name: Python unit tests
         run: python -m pytest tests/unit/ -q
 
+      - name: Core integration (happy path + bundle)
+        run: python -m pytest tests/integration/test_happy_path.py tests/integration/test_bundle_runtime.py -q --tb=line
+
   api:
     runs-on: ubuntu-latest
 

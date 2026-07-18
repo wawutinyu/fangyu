@@ -1,9 +1,12 @@
 """Fangyu FastAPI server"""
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from .core.config import settings
+from .core.exceptions import ConstitutionError, FangyuError, TrustError
 from .models.database import init_db
 
 from .routers import flow as flow_router
@@ -64,6 +67,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(FangyuError)
+async def fangyu_error_handler(_request: Request, exc: FangyuError):
+    status = 403 if isinstance(exc, (ConstitutionError, TrustError)) else 400
+    return JSONResponse(status_code=status, content=exc.to_dict())
+
 
 app.include_router(flow_router.router)
 app.include_router(llm_router.router)

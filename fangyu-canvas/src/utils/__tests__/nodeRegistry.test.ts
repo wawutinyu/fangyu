@@ -9,19 +9,21 @@ describe('getCompatibleTargets', () => {
 
   it('llm can connect to most nodes with input', () => {
     const result = getCompatibleTargets('llm')
-    expect(result).toContain('condition')
+    expect(result).toContain('branch')
     expect(result).toContain('code')
     expect(result).toContain('http')
     expect(result).toContain('knowledge')
-    expect(result).toContain('memory-write')
+    expect(result).toContain('memory')
     expect(result).not.toContain('input')
     expect(result).not.toContain('variable-get')
     expect(result).not.toContain('llm')
+    expect(result).not.toContain('condition')
+    expect(result).not.toContain('memory-write')
   })
 
   it('excludes self from results', () => {
-    const result = getCompatibleTargets('condition')
-    expect(result).not.toContain('condition')
+    const result = getCompatibleTargets('branch')
+    expect(result).not.toContain('branch')
   })
 
   it('excludes no-input types', () => {

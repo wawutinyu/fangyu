@@ -46,3 +46,38 @@ def test_safe_tools_remain_enabled():
     tool = tool_registry.get_tool("web_search")
     if tool:
         assert tool.get("enabled", True) is True
+
+
+def test_code_execution_uses_sandbox_not_subprocess():
+    """用户代码应走 sandbox，禁止任意 import/subprocess。"""
+    tool = tool_registry.get_tool("code_execution")
+    assert tool is not None
+    impl = tool.get("implementation") or {}
+    assert impl.get("type") == "sandbox"
+    assert "subprocess" not in str(impl)
+
+    async def _run():
+        ok = await tool_registry.execute_tool("code_execution", {"code": "result = 1 + 2"}, {})
+        assert ok == 3
+        blocked = await tool_registry.execute_tool(
+            "code_execution",
+            {"code": "import os; result = os.getcwd()"},
+            {},
+        )
+        assert isinstance(blocked, dict)
+        assert "error" in blocked
+        assert "禁止" in blocked["error"] or "import" in blocked["error"].lower()
+
+    asyncio.run(_run())
+
+
+def test_trust_registry_is_unified():
+    from fangyu.a2a.trust.registry import TrustRegistry as A2A
+    from fangyu.engine.trust_runtime import TrustRegistry as Engine
+
+    assert A2A is Engine
+    A2A._identities.clear()
+    A2A._policies.clear()
+    A2A._revoked.clear()
+    Engine.register("unify_test", "pubkey", ["*"])
+    assert A2A.get_public_key("unify_test") == "pubkey"
