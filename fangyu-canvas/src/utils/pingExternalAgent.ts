@@ -56,12 +56,19 @@ async function emitPingPresence(
 
 export async function pingExternalAgent(
   node: AgentCanvasNode,
-  *,
-  text = 'ping from 方隅授权向导',
-  skillId?: string,
-  emitPresence = true,
-  source = 'ExternalAgentAuthWizard',
+  opts: {
+    text?: string
+    skillId?: string
+    emitPresence?: boolean
+    source?: string
+  } = {},
 ): Promise<PingResult> {
+  const {
+    text = 'ping from 方隅授权向导',
+    skillId,
+    emitPresence = true,
+    source = 'ExternalAgentAuthWizard',
+  } = opts
   const skill = skillId
     || node.externalConfig?.allowedSkills?.[0]
     || node.agentCard?.skills?.[0]?.id

@@ -78,7 +78,7 @@ describe('explainCollabEvent', () => {
       detail: { ok: true, excerpt: 'pong' },
     }))
     expect(ok.title).toContain('试跑通过')
-    expect(ok.plain).toContain('ext_peer')
+    expect(ok.plain).toContain('西厂')
 
     const bad = explainCollabEvent(ev({
       kind: 'external.ping',
