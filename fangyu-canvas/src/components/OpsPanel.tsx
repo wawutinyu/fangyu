@@ -393,7 +393,12 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
         + (ph
           ? ` · 再探测在线 ${ph.online ?? 0}/${ph.total ?? 0}`
           : ''),
-      )    } catch (e) {
+      )
+      window.dispatchEvent(new CustomEvent('fangyu:switch-view', { detail: { view: 'presence' } }))
+      window.dispatchEvent(new CustomEvent('fangyu:presence-focus', {
+        detail: { kind: 'factory.align' },
+      }))
+    } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
     setLoading(false)

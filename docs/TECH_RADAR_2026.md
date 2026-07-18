@@ -123,9 +123,10 @@
 ㊲ 离线再探测 + Eval 健康摘要      ✅ FactoryOfflineRetest · factories_health
 ㊳ Eval 健康差 + 墙主机再探测     ✅ factories_health_diff · PresenceCard 再探测
 ㊴ 健康回归告警 + 对齐后自动再探测 ✅ eval.health_regression · retest_after
+㊵ 健康回归去观 + 对齐写观事件     ✅ focusPresenceFromAlert · factory.align
 ```
 
-下一刀：真 IM（仍暂缓）· 健康回归铃铛去观定位 · 对齐结果写入观事件。
+下一刀：真 IM（仍暂缓）· 对齐事件时间轴筛选 · Eval 健康差一键再探测批量。
 
 ---
 

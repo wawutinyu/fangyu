@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useMonitorAlerts } from '../hooks/useMonitorAlerts'
 import type { MonitorAlert } from '../utils/monitorApi'
+import { focusPresenceFromAlert } from '../utils/presenceNavigation'
 import ExternalPingRetestButton from './ExternalPingRetestButton'
 import FactoryOfflineRetestButton from './FactoryOfflineRetestButton'
 
@@ -46,9 +47,7 @@ export default function PresenceAlertBell({ wallMode, pollMs = 45000 }: Props) {
   }, [open])
 
   const focusAlert = (a: MonitorAlert) => {
-    window.dispatchEvent(new CustomEvent('fangyu:presence-focus', {
-      detail: { kind: a.kind, factory_id: a.factory_id },
-    }))
+    focusPresenceFromAlert(a)
     setOpen(false)
   }
 

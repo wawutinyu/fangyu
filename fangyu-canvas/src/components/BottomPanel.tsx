@@ -83,8 +83,17 @@ export default function BottomPanel({
       setCollapsed(false)
       setHeight(h => Math.max(h, 360))
     }
+    const onFocusMonitor = () => {
+      setActiveTab('monitor')
+      setCollapsed(false)
+      setHeight(h => Math.max(h, 360))
+    }
     window.addEventListener('fangyu:focus-bottom-chat', onFocusChat)
-    return () => window.removeEventListener('fangyu:focus-bottom-chat', onFocusChat)
+    window.addEventListener('fangyu:focus-bottom-monitor', onFocusMonitor)
+    return () => {
+      window.removeEventListener('fangyu:focus-bottom-chat', onFocusChat)
+      window.removeEventListener('fangyu:focus-bottom-monitor', onFocusMonitor)
+    }
   }, [])
 
   useEffect(() => {

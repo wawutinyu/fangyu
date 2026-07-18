@@ -356,6 +356,46 @@ def align_factories_and_presence(
                 sync_presence=True,
             )
 
+    try:
+        from fangyu.core.collaboration import emit_event
+
+        if imported or exported or post_hb:
+            ph = post_hb or {}
+            msg = (
+                f"对齐完成 · 导入 {len(imported)} · 导出 {len(exported)}"
+            )
+            if post_hb:
+                msg += f" · 再探测 {ph.get('online', 0)}/{ph.get('total', 0)} 在线"
+            emit_event(
+                "factory.align",
+                actor="ops:a2a_align",
+                message=msg,
+                detail={
+                    "imported": len(imported),
+                    "exported": len(exported),
+                    "import_details": imported[:12],
+                    "export_details": exported[:12],
+                    "post_heartbeat": {
+                        "total": ph.get("total"),
+                        "online": ph.get("online"),
+                        "offline": ph.get("offline"),
+                    } if post_hb else None,
+                    "probe_heartbeat": (
+                        {
+                            "total": (hb or {}).get("total"),
+                            "online": (hb or {}).get("online"),
+                            "offline": (hb or {}).get("offline"),
+                        }
+                        if hb
+                        else None
+                    ),
+                    "ts": now,
+                },
+                severity="info",
+            )
+    except Exception:
+        pass
+
     return {
         "ok": True,
         "ts": now,

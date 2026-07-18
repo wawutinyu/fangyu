@@ -189,6 +189,18 @@ export function explainCollabEvent(ev: CollaborationEvent): PlainExplanation {
     }
   }
 
+  if (kind === 'factory.align') {
+    const imported = (ev.detail as { imported?: number } | undefined)?.imported
+    const exported = (ev.detail as { exported?: number } | undefined)?.exported
+    return {
+      title: '通讯录对齐',
+      plain: msg
+        || `Presence ↔ 工厂通讯录已对齐${imported != null ? ` · 导入 ${imported}` : ''}${exported != null ? ` · 导出 ${exported}` : ''}。`,
+      nextStep: '观时间轴可见；运维·工厂可再对齐或对离线厂再探测。',
+      severity: 'info',
+    }
+  }
+
   if (kind === 'eval.fail' || kind === 'eval.regression' || kind === 'eval.health_regression') {
     const stages = ((ev.detail as { failed_stages?: string[] } | undefined)?.failed_stages || [])
       .slice(0, 4)

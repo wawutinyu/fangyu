@@ -1,6 +1,7 @@
 /** 值班大屏投屏条 — 告警数 + 最新标题 */
 import { useMonitorAlerts } from '../hooks/useMonitorAlerts'
 import type { MonitorAlert } from '../utils/monitorApi'
+import { focusPresenceFromAlert } from '../utils/presenceNavigation'
 
 interface Props {
   pollMs?: number
@@ -13,9 +14,7 @@ export default function PresenceAlertStrip({ pollMs = 30000 }: Props) {
 
   const focus = (a: MonitorAlert | null) => {
     if (!a) return
-    window.dispatchEvent(new CustomEvent('fangyu:presence-focus', {
-      detail: { kind: a.kind, factory_id: a.factory_id },
-    }))
+    focusPresenceFromAlert(a)
   }
 
   const sev = latest?.severity || 'warn'

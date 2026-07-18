@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../platform'
 import ExternalPingRetestButton from './ExternalPingRetestButton'
 import FactoryOfflineRetestButton from './FactoryOfflineRetestButton'
+import { focusPresenceFromAlert } from '../utils/presenceNavigation'
 
 interface LogEntry {
   id: number
@@ -97,6 +98,7 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
     offline_factories?: number
     eval_fail?: number
     ping_fail?: number
+    health_regress?: number
   } | null>(null)
 
   const [bundleDir, setBundleDir] = useState('')
@@ -246,6 +248,7 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
         offline_factories: json.offline_factories,
         eval_fail: json.eval_fail,
         ping_fail: json.ping_fail,
+        health_regress: json.health_regress,
       })
     } catch { /* ignore */ }
     setLoading(false)
@@ -257,6 +260,22 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
     if (tab === 'eval') void fetchEval()
     if (tab === 'alerts') void fetchAlerts()
   }, [tab, fetchLogs, fetchTraces, fetchEval, fetchAlerts])
+
+  useEffect(() => {
+    const onFocusMonitor = (e: Event) => {
+      const detail = (e as CustomEvent).detail || {}
+      const nextTab = String(detail.tab || 'alerts') as 'logs' | 'harness' | 'eval' | 'alerts'
+      if (nextTab === 'logs' || nextTab === 'harness' || nextTab === 'eval' || nextTab === 'alerts') {
+        setTab(nextTab)
+      }
+      if (nextTab === 'eval' && detail.evalView === 'compare') {
+        setEvalView('compare')
+      }
+      setExpanded(true)
+    }
+    window.addEventListener('fangyu:focus-bottom-monitor', onFocusMonitor)
+    return () => window.removeEventListener('fangyu:focus-bottom-monitor', onFocusMonitor)
+  }, [])
 
   useEffect(() => {
     if (tab !== 'eval' || evalView !== 'compare') return
@@ -777,12 +796,13 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
               共 {alertMeta.count ?? 0} · 离线工厂 {alertMeta.offline_factories ?? 0}
               {alertMeta.eval_fail ? ` · Eval 红 ${alertMeta.eval_fail}` : ''}
               {alertMeta.ping_fail ? ` · 试跑红 ${alertMeta.ping_fail}` : ''}
+              {alertMeta.health_regress ? ` · 健康回归 ${alertMeta.health_regress}` : ''}
             </div>
           )}
           {loading && <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: 8 }}>加载中...</div>}
           {!loading && alerts.length === 0 && (
             <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: 20 }}>
-              暂无告警。工厂离线、Eval 失败、试跑失败或协作 warn 会出现在此。
+              暂无告警。工厂离线、Eval 失败、健康回归、试跑失败或协作 warn 会出现在此。
             </div>
           )}
           {alerts.map(a => {
@@ -790,10 +810,7 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
             const color = sev === 'error' || sev === 'deny' ? '#c0392b'
               : sev === 'warn' ? '#d48806' : '#1890ff'
             const goPresence = () => {
-              window.dispatchEvent(new CustomEvent('fangyu:switch-view', { detail: { view: 'presence' } }))
-              window.dispatchEvent(new CustomEvent('fangyu:presence-focus', {
-                detail: { kind: a.kind, factory_id: a.factory_id },
-              }))
+              focusPresenceFromAlert(a)
             }
             return (
               <div
