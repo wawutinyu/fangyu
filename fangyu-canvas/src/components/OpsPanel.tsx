@@ -336,7 +336,8 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
     try {
       const node = await buildExternalAgentFromFactory(f)
       pullFactoryToCanvas(node)
-      setFacNote(`已拉入画布 · ${node.label}`)
+      window.dispatchEvent(new CustomEvent('fangyu:open-external-auth', { detail: { node } }))
+      setFacNote(`已拉入画布 · ${node.label} — 请完成授权向导`)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {

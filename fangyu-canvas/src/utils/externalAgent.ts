@@ -298,6 +298,32 @@ export async function authorizeExternalAgent(
   if (!resp.ok) throw new Error(`授权失败 (${resp.status})`)
 }
 
+/** 注册 + 授权（技能白名单，拒绝默认 *） */
+export async function completeExternalAuth(
+  node: AgentCanvasNode,
+  allowedSkills: string[],
+): Promise<AgentCanvasNode> {
+  const skills = allowedSkills.length ? allowedSkills : ['default']
+  const next: AgentCanvasNode = {
+    ...node,
+    externalConfig: {
+      ...(node.externalConfig || {
+        rpcUrl: '', agentId: '', publicKey: '', remoteName: '', authorized: false, allowedSkills: [],
+      }),
+      authorized: true,
+      allowedSkills: skills,
+    },
+  }
+  await registerExternalAgent(next)
+  await authorizeExternalAgent(next.id, true, skills)
+  return next
+}
+
+/** 打开授权向导（App 监听） */
+export function openExternalAuthWizard(node: AgentCanvasNode): void {
+  window.dispatchEvent(new CustomEvent('fangyu:open-external-auth', { detail: { node } }))
+}
+
 export async function deployAllAgents(agents: AgentCanvasNode[]): Promise<{ success: boolean; count: number }> {
   const locals = agents.filter(a => a.type === 'a2a-agent' && a.agentCard)
   const externals = agents.filter(a => a.type === 'a2a-external' && a.agentCard && a.externalConfig)

@@ -28,6 +28,7 @@ import {
   downloadReplayMarkdown,
   readReplayPackFromFile,
 } from '../utils/presenceExport'
+import PresenceAlertBell from './PresenceAlertBell'
 import ActorDetailPanel from './ActorDetailPanel'
 import EventExplainCard from './EventExplainCard'
 import HouseCommonsScene from './HouseCommonsScene'
@@ -482,6 +483,7 @@ export default function PresencePanel() {
           )}
         </div>
         <div style={{ flex: 1 }} />
+        <PresenceAlertBell wallMode={wallMode} />
         {snap && (
           <div style={{
             fontSize: wallMode ? 14 : 11,

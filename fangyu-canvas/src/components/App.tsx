@@ -20,13 +20,14 @@ import PresencePanel from './PresencePanel'
 import LawPanel from './LawPanel'
 import HangBoard from './HangBoard'
 import SetupCopilotPanel from './SetupCopilotPanel'
+import ExternalAgentAuthWizard from './ExternalAgentAuthWizard'
 import { AssetContext, type AgentBindTarget } from '../context/AssetContext'
 import { store } from '../store'
 import { useAppSelector } from '../store/hooks'
 import { toggleSettings, fetchSettings } from '../store/settingsSlice'
 import { openFlowConfig } from '../store/flowSlice'
 import { toggleHistory, saveFlowApi, fetchAllProjects, createProjectApi } from '../store/saveSlice'
-import { updateSkillFlow, loadAgents, addAgentNode } from '../store/agentSlice'
+import { updateSkillFlow, loadAgents, addAgentNode, updateAgentNode } from '../store/agentSlice'
 import { convertToExportFormat } from '../utils/flowHelper'
 import { demoFlows } from '../utils/demoFlows'
 import { snapshotFlowFromCanvas, getExportFormatFromCanvas } from '../utils/flowSnapshot'
@@ -90,6 +91,7 @@ export default function App() {
   const [intentPanelOpen, setIntentPanelOpen] = useState(false)
   const [scenarioPanelOpen, setScenarioPanelOpen] = useState(false)
   const [setupCopilotOpen, setSetupCopilotOpen] = useState(false)
+  const [authWizardNode, setAuthWizardNode] = useState<import('../store/agentSlice').AgentCanvasNode | null>(null)
   const [agentBindTarget, setAgentBindTarget] = useState<AgentBindTarget | null>(null)
   const [agentAssetPickerOpen, setAgentAssetPickerOpen] = useState(false)
   const [fullExperienceBusy, setFullExperienceBusy] = useState(false)
@@ -571,6 +573,17 @@ export default function App() {
     return () => window.removeEventListener('fangyu:add-external-agent', onAddExternal)
   }, [goXuAgent, flashHangHint])
 
+  useEffect(() => {
+    const onOpenAuth = (e: Event) => {
+      const node = (e as CustomEvent).detail?.node
+      if (!node) return
+      setAuthWizardNode(node)
+      goXuAgent()
+    }
+    window.addEventListener('fangyu:open-external-auth', onOpenAuth)
+    return () => window.removeEventListener('fangyu:open-external-auth', onOpenAuth)
+  }, [goXuAgent])
+
   const flowDirty = useAppSelector(s => s.flow.dirty)
 
   return (
@@ -739,6 +752,27 @@ export default function App() {
         onRegistered={(node) => {
           store.dispatch(addAgentNode(node))
           goXuAgent()
+          setAuthWizardNode(node)
+        }}
+      />
+      <ExternalAgentAuthWizard
+        open={!!authWizardNode}
+        node={authWizardNode}
+        onClose={() => setAuthWizardNode(null)}
+        onAuthorized={(node) => {
+          store.dispatch(updateAgentNode({
+            id: node.id,
+            data: {
+              externalConfig: node.externalConfig,
+              agentCard: node.agentCard,
+              label: node.label,
+            },
+          }))
+          // 若不在画布则补上
+          const exists = store.getState().agent.nodes.some(n => n.id === node.id)
+          if (!exists) store.dispatch(addAgentNode(node))
+          flashHangHint(`已授权外部 Agent「${node.label}」`, 4500)
+          setAuthWizardNode(null)
         }}
       />
       <SaveHistory

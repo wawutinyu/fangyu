@@ -1,7 +1,6 @@
 import React, { useCallback, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { AgentCanvasNode } from '../store/agentSlice'
-import { authorizeExternalAgent, registerExternalAgent } from '../utils/externalAgent'
 
 interface PreviewPayload {
   discover: {
@@ -23,6 +22,7 @@ interface PreviewPayload {
 interface Props {
   open: boolean
   onClose: () => void
+  /** 发现后交给授权向导（不再直接 * 授权） */
   onRegistered?: (node: AgentCanvasNode) => void
 }
 
@@ -32,7 +32,6 @@ export default function SetupCopilotPanel({ open, onClose, onRegistered }: Props
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<PreviewPayload | null>(null)
   const [confirmed, setConfirmed] = useState(false)
-  const [busy, setBusy] = useState(false)
 
   const preview = useCallback(async () => {
     setLoading(true)
@@ -54,53 +53,44 @@ export default function SetupCopilotPanel({ open, onClose, onRegistered }: Props
     }
   }, [url])
 
-  const authorize = useCallback(async () => {
+  const continueToWizard = useCallback(() => {
     if (!data || !confirmed) return
-    setBusy(true)
-    setError(null)
-    try {
-      const card = data.discover.card as {
-        name?: string
-        description?: string
-        skills?: Array<{ id: string; name: string; description?: string }>
-      }
-      const identity = data.discover.identity || {}
-      const nodeId = `ext_${(identity.agent_id || card.name || 'agent').toString().replace(/\W+/g, '_').slice(0, 24)}`
-      const node: AgentCanvasNode = {
-        id: nodeId,
-        label: data.preview.name,
-        type: 'a2a-external',
-        position: { x: 120, y: 180 },
-        agentCard: {
-          name: data.preview.name,
-          description: String(card.description || ''),
-          version: '1.0.0',
-          capabilities: { streaming: false, pushNotifications: false },
-          skills: (card.skills || []).map(s => ({
-            id: s.id,
-            name: s.name,
-            description: s.description || '',
-          })),
-          defaultInterface: { type: 'http', url: data.discover.rpc_url },
-        },
-        externalConfig: {
-          rpcUrl: data.discover.rpc_url,
-          agentId: String(identity.agent_id || nodeId),
-          publicKey: String(identity.public_key || ''),
-          remoteName: data.preview.name,
-          authorized: true,
-          allowedSkills: ['*'],
-        },
-      }
-      await registerExternalAgent(node)
-      await authorizeExternalAgent(node.id, true, ['*'])
-      onRegistered?.(node)
-      onClose()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setBusy(false)
+    const card = data.discover.card as {
+      name?: string
+      description?: string
+      skills?: Array<{ id: string; name: string; description?: string }>
     }
+    const identity = data.discover.identity || {}
+    const skillIds = (card.skills || []).map(s => s.id).filter(Boolean)
+    const nodeId = `ext_${(identity.agent_id || card.name || 'agent').toString().replace(/\W+/g, '_').slice(0, 24)}`
+    const node: AgentCanvasNode = {
+      id: nodeId,
+      label: data.preview.name,
+      type: 'a2a-external',
+      position: { x: 120, y: 180 },
+      agentCard: {
+        name: data.preview.name,
+        description: String(card.description || ''),
+        version: '1.0.0',
+        capabilities: { streaming: false, pushNotifications: false },
+        skills: (card.skills || []).map(s => ({
+          id: s.id,
+          name: s.name,
+          description: s.description || '',
+        })),
+        defaultInterface: { type: 'http', url: data.discover.rpc_url },
+      },
+      externalConfig: {
+        rpcUrl: data.discover.rpc_url,
+        agentId: String(identity.agent_id || nodeId),
+        publicKey: String(identity.public_key || ''),
+        remoteName: data.preview.name,
+        authorized: false,
+        allowedSkills: skillIds.length ? skillIds : ['default'],
+      },
+    }
+    onRegistered?.(node)
+    onClose()
   }, [data, confirmed, onRegistered, onClose])
 
   if (!open) return null
@@ -122,7 +112,9 @@ export default function SetupCopilotPanel({ open, onClose, onRegistered }: Props
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
           <div>
             <div style={{ fontSize: 16, fontWeight: 700 }}>Setup Copilot</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>粘贴外部 Agent URL → 人话确认 → 授权接入</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              粘贴外部 Agent URL → 人话确认 → 授权向导勾选技能
+            </div>
           </div>
           <button type="button" onClick={onClose} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 18 }}>×</button>
         </div>
@@ -166,11 +158,12 @@ export default function SetupCopilotPanel({ open, onClose, onRegistered }: Props
             <button
               type="button"
               className="notion-btn primary"
-              style={{ marginTop: 12, opacity: confirmed && !busy ? 1 : 0.5 }}
-              disabled={!confirmed || busy}
-              onClick={authorize}
+              style={{ marginTop: 12, opacity: confirmed ? 1 : 0.5 }}
+              disabled={!confirmed}
+              onClick={continueToWizard}
+              data-testid="setup-copilot-continue"
             >
-              {busy ? '接入中…' : '确认授权并加入画布'}
+              继续授权向导
             </button>
           </div>
         )}

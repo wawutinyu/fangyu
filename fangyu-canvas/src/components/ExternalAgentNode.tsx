@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { Handle, Position, type NodeProps } from 'reactflow'
 import type { AgentCanvasNode } from '../store/agentSlice'
+import { openExternalAuthWizard } from '../utils/externalAgent'
 
 function ExternalAgentNode({ data }: NodeProps<AgentCanvasNode>) {
   const card = data.agentCard
@@ -17,15 +18,36 @@ function ExternalAgentNode({ data }: NodeProps<AgentCanvasNode>) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
         <span style={{ fontSize: 16 }}>🌐</span>
         <strong style={{ fontSize: 14, color: '#222' }}>{data.label}</strong>
-        <span style={{
-          fontSize: 10, padding: '1px 6px', borderRadius: 4,
-          background: authorized ? '#52c41a' : '#ff4d4f', color: '#fff',
-        }}>{authorized ? '已授权' : '待授权'}</span>
+        {authorized ? (
+          <span style={{
+            fontSize: 10, padding: '1px 6px', borderRadius: 4,
+            background: '#52c41a', color: '#fff',
+          }}>已授权</span>
+        ) : (
+          <button
+            type="button"
+            data-testid="external-node-authorize"
+            title="打开授权向导"
+            onClick={(e) => {
+              e.stopPropagation()
+              openExternalAuthWizard(data)
+            }}
+            style={{
+              fontSize: 10, padding: '1px 6px', borderRadius: 4, border: 'none',
+              background: '#ff4d4f', color: '#fff', cursor: 'pointer',
+            }}
+          >
+            待授权
+          </button>
+        )}
       </div>
       <div style={{ fontSize: 11, color: '#888', lineHeight: 1.5 }}>
         {card?.description && <div style={{ marginBottom: 2 }}>{card.description}</div>}
         <div>外部 Agent | {ext?.rpcUrl || '未配置 RPC'}</div>
         <div>远程: {ext?.remoteName || card?.name || '-'}</div>
+        {!authorized && (
+          <div style={{ marginTop: 4, color: '#fa8c16' }}>点击「待授权」勾选技能并接入</div>
+        )}
       </div>
       <Handle type="source" position={Position.Right} style={{ background: '#fa8c16', width: 8, height: 8 }} />
     </div>

@@ -55,7 +55,9 @@ python -m fangyu bundle peer-probe --instance <managed_id> --save
 |------|------|
 | 观 · **跨厂投递** | 加载 `fixtures/presence/cross_factory_task.json` 回放（两厂心跳 → a2a.send/complete） |
 | `python scripts/cross_factory_task_demo.py` | 本机起西厂 Bundle，RPC 投递并写 Presence 事件 |
-| 运维 · 工厂 → **拉入画布** | 通讯录条目探测后写入 `a2a-external` 节点，再在序里点名投递 |
+| 运维 · 工厂 → **拉入画布** | 写入 `a2a-external` 并打开 **授权向导**（勾选技能） |
+| 画布「待授权」 | 同授权向导 |
+| Setup Copilot | URL 发现 → 继续授权向导 |
 
 ```bash
 # 可执行演示（临时端口）
