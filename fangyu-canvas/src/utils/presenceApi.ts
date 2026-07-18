@@ -195,6 +195,19 @@ export function statusColor(status: string): string {
   }
 }
 
+/** 工厂健康分着色（与运维通讯录阈值一致） */
+export function factoryHealthColor(score: number | null | undefined): string {
+  if (score == null || Number.isNaN(score)) return 'var(--text-muted)'
+  if (score >= 80) return '#1a7f37'
+  if (score >= 50) return '#d48806'
+  return '#c0392b'
+}
+
+export function factoryHealthLabel(score: number, grade?: string): string {
+  const g = grade ? ` ${grade}` : ''
+  return `健康 ${score}${g}`
+}
+
 export function statusLabel(status: string): string {
   const map: Record<string, string> = {
     busy: '忙碌',

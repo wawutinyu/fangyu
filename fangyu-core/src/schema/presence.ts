@@ -30,6 +30,8 @@ export interface PresenceEntity {
   /** 跨机主机 */
   base_url?: string | null
   role?: string | null
+  /** 工厂健康分（通讯录/心跳同步） */
+  health?: { score: number; grade?: string } | null
 }
 
 export type CollaborationSeverity = 'info' | 'warn' | 'deny' | 'error'

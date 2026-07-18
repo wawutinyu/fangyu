@@ -3,6 +3,8 @@ import type { CollaborationEvent, PresenceEntity, PresenceSnapshot } from '@fang
 import {
   fetchPresenceSnapshot,
   formatEventTime,
+  factoryHealthColor,
+  factoryHealthLabel,
   mergePresenceEvent,
   runPresenceDemo,
   statusColor,
@@ -1129,6 +1131,23 @@ function PresenceCard({
       <div style={{ fontSize: 11, color: color, fontWeight: 600 }}>
         {statusLabel(String(entity.status))}
       </div>
+      {entity.role === 'factory' && entity.health?.score != null && (
+        <div style={{ marginTop: 6 }}>
+          <span
+            data-testid="presence-health-badge"
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              padding: '1px 6px',
+              borderRadius: 4,
+              color: '#fff',
+              background: factoryHealthColor(entity.health.score),
+            }}
+          >
+            {factoryHealthLabel(entity.health.score, entity.health.grade)}
+          </span>
+        </div>
+      )}
       {entity.current_skill && (
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
           当前: {entity.current_skill}

@@ -93,6 +93,8 @@ export interface HouseSettlement {
     x: number
     y: number
     place: HouseRolePlace
+    /** 工厂健康分覆盖光环色 */
+    haloOverride?: string
   }[]
 }
 
@@ -184,6 +186,13 @@ function haloColor(status: string): string {
   if (s === 'unauthorized') return HOUSE_PALETTE.status.unauthorized
   if (s === 'offline') return HOUSE_PALETTE.status.offline
   return HOUSE_PALETTE.status.waiting
+}
+
+/** 工厂健康分 → 场景光环色（与运维通讯录阈值一致） */
+export function healthHaloColor(score: number): string {
+  if (score >= 80) return '#1a7f37'
+  if (score >= 50) return '#d48806'
+  return '#c0392b'
 }
 
 /** 导出供场景着色 */
@@ -481,6 +490,11 @@ export function layoutHouseSettlement(
   const actors = houses.flatMap(h =>
     h.members.map(m => {
       const pt = actorPoint(h, m)
+      const score = m.presence.health?.score
+      const haloOverride =
+        m.presence.role === 'factory' && score != null && !Number.isNaN(score)
+          ? healthHaloColor(score)
+          : undefined
       return {
         id: m.id,
         houseId: h.id,
@@ -490,6 +504,7 @@ export function layoutHouseSettlement(
         x: pt.x,
         y: pt.y,
         place: m.place,
+        haloOverride,
       }
     }),
   )

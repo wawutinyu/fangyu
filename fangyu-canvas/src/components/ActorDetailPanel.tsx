@@ -5,6 +5,8 @@ import type {
   PresenceEntity,
 } from '@fangyu/core/schema'
 import {
+  factoryHealthColor,
+  factoryHealthLabel,
   formatEventTime,
   statusColor,
   statusLabel,
@@ -231,6 +233,23 @@ export default function ActorDetailPanel({
           <>
             {entity.base_url && <Row label="URL">{entity.base_url}</Row>}
             {entity.role && <Row label="角色">{entity.role}</Row>}
+            {entity.role === 'factory' && entity.health?.score != null && (
+              <Row label="健康">
+                <span
+                  data-testid="actor-health-badge"
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    padding: '1px 6px',
+                    borderRadius: 4,
+                    color: '#fff',
+                    background: factoryHealthColor(entity.health.score),
+                  }}
+                >
+                  {factoryHealthLabel(entity.health.score, entity.health.grade)}
+                </span>
+              </Row>
+            )}
           </>
         )}
         {entity.external && (

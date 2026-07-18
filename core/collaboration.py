@@ -204,6 +204,53 @@ def _agent_busy_map() -> dict[str, dict[str, Any]]:
     return busy
 
 
+def _factory_index_by_base() -> dict[str, dict[str, Any]]:
+    from fangyu.core.a2a_factories import _norm_base, load_factories
+
+    out: dict[str, dict[str, Any]] = {}
+    for row in load_factories():
+        base = _norm_base(str(row.get("base_url") or ""))
+        if base:
+            out[base] = row
+    return out
+
+
+def _resolve_host_health(
+    h: dict[str, Any],
+    factory_by_base: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any] | None:
+    """从 remote_host.meta.health 或通讯录匹配解析工厂健康分。"""
+    meta = h.get("meta") or {}
+    raw = meta.get("health")
+    if isinstance(raw, dict) and raw.get("score") is not None:
+        try:
+            return {
+                "score": int(raw["score"]),
+                "grade": raw.get("grade"),
+            }
+        except (TypeError, ValueError):
+            pass
+    if h.get("role") != "factory" and not meta.get("factory_id"):
+        return None
+    if factory_by_base is None:
+        return None
+    from fangyu.core.a2a_factories import _norm_base, compute_factory_health
+
+    base = _norm_base(str(h.get("base_url") or ""))
+    row = factory_by_base.get(base) if base else None
+    if not row:
+        fid = str(meta.get("factory_id") or "")
+        if fid:
+            for r in factory_by_base.values():
+                if str(r.get("id") or "") == fid:
+                    row = r
+                    break
+    if not row:
+        return None
+    hth = compute_factory_health(row)
+    return {"score": hth["score"], "grade": hth.get("grade")}
+
+
 def build_presence() -> list[dict[str, Any]]:
     """聚合 Agent + Worker Presence 快照。"""
     now = time.time()
@@ -313,12 +360,13 @@ def build_presence() -> list[dict[str, Any]]:
     except Exception:
         pass
 
-    # 跨机心跳主机
+    # 跨机心跳主机（工厂角色附带健康分，供值班墙着色）
     try:
         from fangyu.core.remote_hosts import list_remote_hosts
 
+        factory_by_base: dict[str, dict[str, Any]] | None = None
         for h in list_remote_hosts():
-            entities.append({
+            ent: dict[str, Any] = {
                 "id": f"host:{h.get('id')}",
                 "kind": "host",
                 "name": h.get("name") or h.get("id"),
@@ -332,7 +380,17 @@ def build_presence() -> list[dict[str, Any]]:
                 "updated_at": h.get("last_seen") or now,
                 "department": "跨机",
                 "department_id": "dept-hosts",
-            })
+            }
+            health = _resolve_host_health(h, None)
+            if health is None and (
+                h.get("role") == "factory" or (h.get("meta") or {}).get("factory_id")
+            ):
+                if factory_by_base is None:
+                    factory_by_base = _factory_index_by_base()
+                health = _resolve_host_health(h, factory_by_base)
+            if health:
+                ent["health"] = health
+            entities.append(ent)
     except Exception:
         pass
 

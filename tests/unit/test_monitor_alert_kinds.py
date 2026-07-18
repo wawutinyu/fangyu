@@ -8,7 +8,7 @@ def is_monitor_alert_kind(kind: str) -> bool:
         return False
     return (
         k.startswith("eval.")
-        or k in ("factory.offline", "host.offline", "factory.online")
+        or k in ("factory.offline", "host.offline", "factory.online", "external.ping")
     )
 
 
@@ -18,6 +18,7 @@ def test_is_monitor_alert_kind():
     assert is_monitor_alert_kind("factory.offline")
     assert is_monitor_alert_kind("host.offline")
     assert is_monitor_alert_kind("factory.online")
+    assert is_monitor_alert_kind("external.ping")
     assert not is_monitor_alert_kind("a2a.send")
     assert not is_monitor_alert_kind("host.heartbeat")
     assert not is_monitor_alert_kind("")

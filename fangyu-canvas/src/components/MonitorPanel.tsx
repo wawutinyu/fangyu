@@ -77,6 +77,7 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
     count?: number
     offline_factories?: number
     eval_fail?: number
+    ping_fail?: number
   } | null>(null)
 
   const [bundleDir, setBundleDir] = useState('')
@@ -189,6 +190,7 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
         count: json.count,
         offline_factories: json.offline_factories,
         eval_fail: json.eval_fail,
+        ping_fail: json.ping_fail,
       })
     } catch { /* ignore */ }
     setLoading(false)
@@ -618,12 +620,13 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
               共 {alertMeta.count ?? 0} · 离线工厂 {alertMeta.offline_factories ?? 0}
               {alertMeta.eval_fail ? ` · Eval 红 ${alertMeta.eval_fail}` : ''}
+              {alertMeta.ping_fail ? ` · 试跑红 ${alertMeta.ping_fail}` : ''}
             </div>
           )}
           {loading && <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: 8 }}>加载中...</div>}
           {!loading && alerts.length === 0 && (
             <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: 20 }}>
-              暂无告警。工厂离线、Eval 失败或协作 warn 会出现在此。
+              暂无告警。工厂离线、Eval 失败、试跑失败或协作 warn 会出现在此。
             </div>
           )}
           {alerts.map(a => {

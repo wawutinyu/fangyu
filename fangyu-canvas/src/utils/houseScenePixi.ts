@@ -327,6 +327,7 @@ type ActorView = {
   walkT: number
   walkDur: number
   placeLabel: string
+  haloOverride?: string
   /** 演示走位：到达后走回 */
   returnTo?: { x: number; y: number }
 }
@@ -362,7 +363,7 @@ function drawActor(
   wrap.cursor = 'pointer'
   wrap.on('pointertap', () => handlers.onSelectActor?.(actor.id))
 
-  const haloCol = hex(haloColor(actor.status))
+  const haloCol = hex(actor.haloOverride || haloColor(actor.status))
   const halo = new Graphics().circle(0, 6, selected ? 32 : 24).fill({ color: haloCol, alpha: 0.42 })
   wrap.addChild(halo)
   wrap.addChild(new Graphics().circle(0, 0, 36).fill({ color: 0xffffff, alpha: 0.001 }))
@@ -447,6 +448,7 @@ function drawActor(
     walkT: 0,
     walkDur,
     placeLabel,
+    haloOverride: actor.haloOverride,
   }
   tickList.push(view)
   return view
@@ -773,7 +775,7 @@ export async function mountHouseScene(
           } else {
             a.walking = false
             walkPersist.delete(a.id)
-            setStatusLine(a.statusText, `${statusLabel(a.status)} · ${a.placeLabel}`, hex(haloColor(a.status)))
+            setStatusLine(a.statusText, `${statusLabel(a.status)} · ${a.placeLabel}`, hex(a.haloOverride || haloColor(a.status)))
             lastPos.set(a.id, { x: a.toX, y: a.toY })
           }
         }

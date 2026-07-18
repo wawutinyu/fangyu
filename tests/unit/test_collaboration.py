@@ -177,6 +177,26 @@ def test_build_presence_reads_agent_department(monkeypatch):
     assert any(d.get("id") == "dept-judge" for d in deps)
 
 
+def test_build_presence_attaches_factory_health():
+    """remote_host.meta.health → Presence 实体 health。"""
+    from fangyu.core.remote_hosts import clear_remote_hosts, upsert_remote_host
+
+    clear_remote_hosts()
+    upsert_remote_host(
+        host_id="factory:east",
+        label="东厂",
+        base_url="http://127.0.0.1:18789",
+        role="factory",
+        meta={"factory_id": "east", "health": {"score": 88, "grade": "A"}},
+    )
+    entities = build_presence()
+    hit = next(e for e in entities if e.get("id") == "host:factory:east")
+    assert hit["role"] == "factory"
+    assert hit["health"]["score"] == 88
+    assert hit["health"]["grade"] == "A"
+    clear_remote_hosts()
+
+
 def _sample_replay_pack(**overrides):
     pack = {
         "format": "fangyu.guan.replay",

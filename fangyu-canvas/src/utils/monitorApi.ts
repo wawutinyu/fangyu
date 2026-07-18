@@ -18,6 +18,7 @@ export interface MonitorAlertsResponse {
   count?: number
   offline_factories?: number
   eval_fail?: number
+  ping_fail?: number
   alerts: MonitorAlert[]
 }
 
@@ -30,6 +31,7 @@ export async function fetchMonitorAlerts(limit = 20): Promise<MonitorAlertsRespo
     count: body.count ?? 0,
     offline_factories: body.offline_factories ?? 0,
     eval_fail: body.eval_fail ?? 0,
+    ping_fail: body.ping_fail ?? 0,
     alerts: body.alerts || [],
   }
 }
@@ -43,5 +45,6 @@ export function isMonitorAlertKind(kind: string): boolean {
     || k === 'factory.offline'
     || k === 'host.offline'
     || k === 'factory.online'
+    || k === 'external.ping'
   )
 }

@@ -1,4 +1,4 @@
-"""观测告警 — 工厂离线 · Eval 失败等。"""
+"""观测告警 — 工厂离线 · Eval 失败 · 外部试跑失败等。"""
 from __future__ import annotations
 
 import time
@@ -6,7 +6,7 @@ from typing import Any
 
 
 def collect_monitor_alerts(*, limit: int = 40) -> dict[str, Any]:
-    """汇总当前离线工厂 + Eval 失败 + 近期 factory/host/eval 事件。"""
+    """汇总当前离线工厂 + Eval 失败 + 近期 factory/host/eval/external.ping 事件。"""
     from fangyu.core.a2a_factories import load_factories
     from fangyu.core.collaboration import list_events
     from fangyu.core.factory_eval import load_eval_report
@@ -60,6 +60,27 @@ def collect_monitor_alerts(*, limit: int = 40) -> dict[str, Any]:
     for ev in events:
         kind = str(ev.get("kind") or "")
         sev = str(ev.get("severity") or "info")
+        detail = ev.get("detail") or {}
+        if kind == "external.ping":
+            if detail.get("ok") is False and sev in ("warn", "deny", "error"):
+                event_alerts.append({
+                    "id": f"ev-{ev.get('id')}",
+                    "kind": "external.ping",
+                    "severity": sev,
+                    "title": "外部试跑未过",
+                    "message": str(
+                        ev.get("message")
+                        or detail.get("error")
+                        or detail.get("reason")
+                        or "ping 失败"
+                    ),
+                    "ts": float(ev.get("ts") or 0),
+                    "actor": ev.get("actor"),
+                    "target": ev.get("target"),
+                    "detail": detail,
+                    "source": "collaboration",
+                })
+            continue
         if kind.startswith("eval.") or kind in ("factory.offline", "host.offline") or (
             sev in ("warn", "error", "deny") and kind.startswith(("factory.", "host.", "eval."))
         ):
@@ -71,7 +92,7 @@ def collect_monitor_alerts(*, limit: int = 40) -> dict[str, Any]:
                 "message": str(ev.get("message") or ""),
                 "ts": float(ev.get("ts") or 0),
                 "actor": ev.get("actor"),
-                "detail": ev.get("detail") or {},
+                "detail": detail,
                 "source": "collaboration",
             })
 
@@ -95,11 +116,13 @@ def collect_monitor_alerts(*, limit: int = 40) -> dict[str, Any]:
 
     merged.sort(key=lambda x: float(x.get("ts") or 0), reverse=True)
     merged = merged[: max(1, min(limit, 100))]
+    ping_fail = sum(1 for a in merged if a.get("kind") == "external.ping")
     return {
         "ok": True,
         "ts": now,
         "count": len(merged),
         "offline_factories": len(offline_factories),
         "eval_fail": len(eval_alerts),
+        "ping_fail": ping_fail,
         "alerts": merged,
     }

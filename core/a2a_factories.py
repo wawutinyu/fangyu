@@ -153,13 +153,18 @@ def heartbeat_factories(
                 from fangyu.core.remote_hosts import upsert_remote_host
 
                 host_id = f"factory:{fid or base}"
+                health = compute_factory_health(row, now=now, ttl_sec=ttl_sec)
                 if ok:
                     host = upsert_remote_host(
                         host_id=host_id,
                         label=str(row.get("label") or row.get("card_name") or base),
                         base_url=base,
                         role="factory",
-                        meta={"factory_id": fid, "source": "a2a_factories"},
+                        meta={
+                            "factory_id": fid,
+                            "source": "a2a_factories",
+                            "health": health,
+                        },
                         ttl_sec=ttl_sec,
                     )
                     kind = "factory.online" if was_online is False else "host.heartbeat"
@@ -273,13 +278,18 @@ def align_factories_and_presence(
                 continue
             online = bool(row.get("online"))
             host_id = f"factory:{fid or base}"
+            health = compute_factory_health(row, now=now, ttl_sec=120.0)
             if online or row.get("last_probe_ok"):
                 host = upsert_remote_host(
                     host_id=host_id,
                     label=str(row.get("label") or row.get("card_name") or base),
                     base_url=base,
                     role="factory",
-                    meta={"factory_id": fid, "source": "a2a_factories_align"},
+                    meta={
+                        "factory_id": fid,
+                        "source": "a2a_factories_align",
+                        "health": health,
+                    },
                     ttl_sec=120.0,
                 )
                 exported.append({
@@ -299,6 +309,7 @@ def align_factories_and_presence(
                         "factory_id": fid,
                         "source": "a2a_factories_align",
                         "online": False,
+                        "health": health,
                     },
                     ttl_sec=30.0,
                 )
