@@ -125,9 +125,10 @@
 ㊴ 健康回归告警 + 对齐后自动再探测 ✅ eval.health_regression · retest_after
 ㊵ 健康回归去观 + 对齐写观事件     ✅ focusPresenceFromAlert · factory.align
 ㊶ 时间轴 kind 筛选 + 批量再探测   ✅ timelineKindFilter · offline batch retest
+㊷ 墙默认运维筛选 + 再探测写观     ✅ wall ops filter · factory.retest
 ```
 
-下一刀：真 IM（仍暂缓）· 值班墙时间轴运维筛选默认 · 批量再探测结果写观事件。
+下一刀：真 IM（仍暂缓）· 或进入真实跨厂值班验收；打磨类可暂停。
 
 ---
 

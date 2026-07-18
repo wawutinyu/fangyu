@@ -54,6 +54,7 @@ export default function PresencePanel() {
   const [filter, setFilter] = useState<'all' | 'agent' | 'worker' | 'managed' | 'host'>('all')
   const [preWallFilter, setPreWallFilter] = useState<'all' | 'agent' | 'worker' | 'managed' | 'host'>('all')
   const [preWallDept, setPreWallDept] = useState<string | null>(null)
+  const [preWallTimelineFilter, setPreWallTimelineFilter] = useState<TimelineKindFilter>('all')
   const [deptId, setDeptId] = useState<string | null>(null)
   const [selectedEdge, setSelectedEdge] = useState<{ source: string; target: string } | null>(null)
   /** 点宅间径：按两端宅成员筛跨宅往来 */
@@ -123,9 +124,11 @@ export default function PresencePanel() {
   const enterWallMode = useCallback(async () => {
     setPreWallFilter(filter)
     setPreWallDept(deptId)
-    // 值班墙默认聚焦跨机主机（可再改筛选项）
+    setPreWallTimelineFilter(timelineKindFilter)
+    // 值班墙默认聚焦跨机主机 + 运维时间线（factory/host）
     setFilter('host')
     setDeptId('dept-hosts')
+    setTimelineKindFilter('ops')
     setWallMode(true)
     const el = panelRef.current
     if (el && !document.fullscreenElement) {
@@ -135,12 +138,13 @@ export default function PresencePanel() {
         // 浏览器拒绝全屏时仍用 fixed 覆盖
       }
     }
-  }, [filter, deptId])
+  }, [filter, deptId, timelineKindFilter])
 
   const exitWallMode = useCallback(async () => {
     setWallMode(false)
     setFilter(preWallFilter)
     setDeptId(preWallDept)
+    setTimelineKindFilter(preWallTimelineFilter)
     if (document.fullscreenElement) {
       try {
         await document.exitFullscreen()
@@ -148,7 +152,7 @@ export default function PresencePanel() {
         /* ignore */
       }
     }
-  }, [preWallFilter, preWallDept])
+  }, [preWallFilter, preWallDept, preWallTimelineFilter])
 
   useEffect(() => {
     if (!wallMode) return
@@ -951,7 +955,7 @@ export default function PresencePanel() {
                 borderBottom: '1px solid var(--border-color)',
                 display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
               }}>
-                <span>协作时间线</span>
+                <span>协作时间线{wallMode && timelineKindFilter === 'ops' ? ' · 运维' : ''}</span>
                 {pathFilterLabel && (
                   <span style={{ fontSize: 10, fontWeight: 500, color: '#c47e3b' }}>
                     {pathFilterLabel}

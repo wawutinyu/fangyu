@@ -1,6 +1,7 @@
 /** 工厂离线 · 单厂 / 批量再探测 */
 import { useState, type MouseEvent } from 'react'
 import { heartbeatFactories } from '../utils/externalAgent'
+import { emitPresenceEvent } from '../utils/presenceApi'
 
 export function offlineFactoryIds(
   factories: Array<{ id?: string; online?: boolean | null }>,
@@ -17,6 +18,8 @@ interface Props {
   label?: string
   onDone?: () => void
   compact?: boolean
+  /** 写观事件；默认批量时写入 */
+  emitPresence?: boolean
 }
 
 export default function FactoryOfflineRetestButton({
@@ -26,6 +29,7 @@ export default function FactoryOfflineRetestButton({
   label,
   onDone,
   compact,
+  emitPresence,
 }: Props) {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
@@ -34,7 +38,8 @@ export default function FactoryOfflineRetestButton({
   const ids = (factoryIds && factoryIds.length > 0)
     ? factoryIds
     : (factoryId ? [factoryId] : [])
-  const batch = ids.length > 1
+  const batch = ids.length > 1 || (factoryIds != null && factoryIds.length >= 1)
+  const shouldEmit = emitPresence ?? batch
 
   const run = async (e: MouseEvent) => {
     e.stopPropagation()
@@ -48,27 +53,47 @@ export default function FactoryOfflineRetestButton({
         factory_ids: ids,
         sync_presence: true,
       })
-      if (batch || ids.length !== 1) {
-        const online = body.online ?? 0
-        const total = body.total ?? ids.length
+      const online = body.online ?? 0
+      const total = body.total ?? ids.length
+      const offline = body.offline ?? Math.max(0, total - online)
+      if (batch) {
         const allOk = online >= total && total > 0
         setOk(allOk || online > 0)
         setMsg(
           allOk
             ? `✓ 全部在线 ${online}/${total}`
-            : `再探测 ${online}/${total} 在线${body.offline ? ` · 仍离线 ${body.offline}` : ''}`,
+            : `再探测 ${online}/${total} 在线${offline ? ` · 仍离线 ${offline}` : ''}`,
         )
       } else {
         const one = ids[0]
         const hit = (body.results || []).find(r => r.id === one)
           || (body.results || [])[0]
-        const online = hit ? Boolean(hit.ok || hit.online) : body.online > 0
-        setOk(online)
+        const oneOk = hit ? Boolean(hit.ok || hit.online) : online > 0
+        setOk(oneOk)
         setMsg(
-          online
+          oneOk
             ? `✓ 已在线${hit?.base_url ? ` · ${hit.base_url}` : ''}`
             : `✗ 仍离线${hit?.error ? ` · ${hit.error}` : ''}`,
         )
+      }
+      if (shouldEmit) {
+        const allOk = online >= total && total > 0
+        void emitPresenceEvent({
+          kind: 'factory.retest',
+          actor: 'ops:factory_retest',
+          message: batch
+            ? `批量再探测 · ${online}/${total} 在线`
+            : `再探测 · ${ids[0]} ${online > 0 ? '在线' : '离线'}`,
+          detail: {
+            factory_ids: ids,
+            online,
+            offline,
+            total,
+            batch,
+            results: (body.results || []).slice(0, 20),
+          },
+          severity: allOk ? 'info' : 'warn',
+        })
       }
       onDone?.()
     } catch (ex) {

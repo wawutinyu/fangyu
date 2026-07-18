@@ -15,8 +15,14 @@ describe('presenceTimelineFilter', () => {
 
   it('timelineFilterForFocusKind', () => {
     expect(timelineFilterForFocusKind('factory.align')).toBe('factory')
+    expect(timelineFilterForFocusKind('factory.retest')).toBe('factory')
     expect(timelineFilterForFocusKind('eval.health_regression')).toBe('eval')
     expect(timelineFilterForFocusKind('host.offline')).toBe('host')
     expect(timelineFilterForFocusKind('a2a.send')).toBe(null)
+  })
+
+  it('factory.retest matches factory and ops', () => {
+    expect(eventMatchesTimelineFilter('factory.retest', 'ops')).toBe(true)
+    expect(eventMatchesTimelineFilter('factory.retest', 'factory')).toBe(true)
   })
 })

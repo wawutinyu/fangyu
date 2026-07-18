@@ -201,6 +201,21 @@ export function explainCollabEvent(ev: CollaborationEvent): PlainExplanation {
     }
   }
 
+  if (kind === 'factory.retest') {
+    const online = (ev.detail as { online?: number } | undefined)?.online
+    const total = (ev.detail as { total?: number } | undefined)?.total
+    const batch = (ev.detail as { batch?: boolean } | undefined)?.batch
+    return {
+      title: batch ? '批量再探测' : '工厂再探测',
+      plain: msg
+        || (online != null && total != null
+          ? `对离线厂再探测完成 · ${online}/${total} 在线。`
+          : '对离线厂再探测已完成。'),
+      nextStep: '时间轴运维筛选可查看；仍离线则检查对端网络或运维·工厂通讯录。',
+      severity: severity === 'warn' ? 'warn' : 'info',
+    }
+  }
+
   if (kind === 'eval.fail' || kind === 'eval.regression' || kind === 'eval.health_regression') {
     const stages = ((ev.detail as { failed_stages?: string[] } | undefined)?.failed_stages || [])
       .slice(0, 4)
