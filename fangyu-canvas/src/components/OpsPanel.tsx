@@ -159,8 +159,20 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
   }, [tab, reload])
 
   const reloadAuth = async () => {
-    setAuthCfg(await fetchAuthConfig())
-    setAuthMe(await fetchAuthMe())
+    setError(null)
+    try {
+      setAuthCfg(await fetchAuthConfig())
+      setAuthMe(await fetchAuthMe())
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  const onLogout = () => {
+    setStoredAccessToken(null)
+    setAuthMe(null)
+    setAuthNote('已清除本地 Bearer')
+    setError(null)
   }
 
   const onOidcLogin = async () => {
