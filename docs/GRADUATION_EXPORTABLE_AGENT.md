@@ -1,116 +1,108 @@
-# 本机毕业：可导出的 OpenCode / WorkBuddy 级 Agent
+# 毕业标准：可导出的 OpenCode / WorkBuddy 级 Agent
 
 > 方隅的目的是 **批量、快速产出高质量 Agent 的平台**。  
-> 本机毕业 ≠ Studio 好用，而是：**用平台搭出并能导出**达到 OpenCode harness / WorkBuddy 档的独立智能体。
+> 毕业 ≠ Studio 好用，而是：**用平台搭出并能导出**达到 OpenCode harness **与** WorkBuddy（含 IM / 企业权限 / 托管）档的独立智能体。
 
 关联：[愿景](VISION_AND_PRODUCT.md) · [评估](PROJECT_ASSESSMENT.md) · [L1 路线图](L1_ROADMAP.md)
 
----
-
-## 毕业标准（硬）
-
-你自己（或另一个人）做到：
-
-1. `python -m fangyu bundle create --profile opencode --dest <dir> --workspace <repo>`
-2. `python -m fangyu bundle chat <dir> --workspace <repo> -m "…真实任务…"`
-3. Agent **多轮**使用工具完成任务；改动出现在绑定仓库里
-4. 会话落在 `<repo>/.fangyu/chat.jsonl`
-5. 危险命令被拦；包内宪法生效
-6. 同一 create 命令可再吐变体包
-7. `python scripts/opencode_harness_live.py` 在配置 API Key 后三用例全绿
-
-**当前进度：** A ✅ · B ✅ · C 自动项 ✅（`scripts/opencode_graduation_c.py`）；剩 C4 live 需 API Key。
+**口径更正（2026-07-18）：** IM、企业权限、托管 **属于毕业范围**，不是「以后再说」的附加项。
 
 ---
 
-## 本机用法（毕业路径 A）
+## 双轨毕业
 
-```bash
-python -m fangyu bundle create --profile opencode --dest ~/tmp/oc --name OC \
-  --workspace ~/Projects/some-repo
-
-python -m fangyu bundle chat ~/tmp/oc --workspace ~/Projects/some-repo \
-  -m "在 README 末尾加一节 Fangyu Harness"
-
-# 或交互
-python -m fangyu bundle chat ~/tmp/oc --workspace ~/Projects/some-repo
-```
-
----
-
-## 毕业路径 B — Live 三用例
-
-需要至少一个：`DEEPSEEK_API_KEY` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`。
-
-```bash
-export DEEPSEEK_API_KEY=sk-...
-python scripts/opencode_harness_live.py
-# 或
-./scripts/opencode_harness_live.sh --keep   # 失败时保留临时目录
-```
-
-| 用例 | 期望 |
-|------|------|
-| write | 写出 `live_write.md` 含 `live-case-1` |
-| search+patch | `seed.txt` 中 `REPLACE_ME` → `PATCHED` |
-| shell | 写出 `live_shell.txt` 含 `live-case-3` |
-
-退出码：`0` 全绿 · `1` 失败 · `2` 无 Key 跳过（不当假绿）。
-
----
-
-## 毕业路径 C — 人手 + 自动验收
-
-一键自动项（无 Key 也能跑 C1–C3/C5/C6；有 Key 顺带跑 C4）：
-
-```bash
-python scripts/opencode_graduation_c.py
-```
-
-| # | 项 | 自动脚本 | 结果 |
-|---|----|----------|------|
-| 1 | create + `--workspace` 指向 git 仓库 | ✅ | 脚本打勾 |
-| 2 | `bundle chat` 完成小改动（可 git status） | ✅ mock | 脚本打勾 |
-| 3 | `<repo>/.fangyu/chat.jsonl` 有会话 | ✅ | 脚本打勾 |
-| 4 | live 脚本三用例绿（有 Key） | 有 Key 才跑 | ☐ 需你配 Key |
-| 5 | 危险 shell 被拒 | ✅ | 脚本打勾 |
-| 6 | 再 create 变体包仍可 chat | ✅ mock | 脚本打勾 |
-
-**OpenCode 本机毕业条件：** `opencode_graduation_c.py` 全绿（含 C4），并建议在真实业务仓再人手 chat 一次。
-
-WorkBuddy 竖切另开 profile。
-
----
-
-## 地基支柱（P0）
-
-| ID | 支柱 | 验收一句话 |
+| 轨 | 含义 | 当前粗进度 |
 |----|------|------------|
-| P0-1 | Bundle 运行时 `DATA_DIR` 闭环 | 清宿主 `data/` 后同包行为不变；宪法从包内加载 |
-| P0-2 | 导出闭包（tools/skills） | 无 Studio 也能执行声明技能 |
-| P0-3 | 真 Agentic Loop | 单测：≥2 轮 tool 回灌后结束 |
-| P0-4 | Coding 手脚进包 | 对指定 repo 完成读→改→跑最小任务 |
-| P0-5 | 工厂 CLI/API | `profile → bundle` 无点画布；OpenCode 集成测绿 |
+| **G1 · OpenCode harness** | 绑仓、多轮手脚、chat/RPC、工厂出包、live 绿 | **~75%**（差 API Key live） |
+| **G2 · WorkBuddy 全档** | 办公交付 + **IM 入口** + **企业权限** + **可托管常驻** | **~15–20%**（仅有通用 harness 地基） |
+
+**平台毕业 = G1 ∧ G2。** 只完成 G1 不算总毕业。
 
 ---
 
-## 已知空洞（仍诚实）
+## G1 · OpenCode（硬清单）
 
-- 模型须遵守 JSON tool 协议（尚未原生 tools API）  
-- 无 LSP；apply_patch 为简单字符串替换  
-- WorkBuddy 办公 profile 未做  
-- Seed「OpenCode」营销节点 ≠ 本工厂 profile  
+1. `bundle create --profile opencode --workspace <repo>`
+2. `bundle chat` 多轮改仓；`.fangyu/chat.jsonl` 有会话
+3. 包内宪法；危险 shell 拒
+4. 工厂可批量变体
+5. `opencode_harness_live.py` 有 Key 三用例绿
+6. `opencode_graduation_c.py` 自动项绿
+
+脚本：`scripts/opencode_graduation_c.py` · `scripts/opencode_harness_live.py`
 
 ---
 
-## 进度
+## G2 · WorkBuddy 全档（硬清单）
+
+### G2-A 办公数字员工（产品竖切）
+
+| # | 项 | 状态 |
+|---|----|------|
+| 1 | `bundle create --profile workbuddy` | ☐ |
+| 2 | 一句话任务 → 拆解 → 多轮执行 | 部分（通用 loop，无办公技能包） |
+| 3 | **成品落盘**（至少 md；目标 docx/xlsx/页） | ☐ |
+| 4 | 工作区 = 用户授权文件夹 | 部分（`--workspace`） |
+| 5 | 办公 live / 验收脚本 | ☐ |
+
+### G2-B IM 入口（在毕业范围内）
+
+| # | 项 | 状态 |
+|---|----|------|
+| 1 | 至少一条 IM 通道可对话触发 Agent（微信 / 企微 / 飞书 / 钉钉 **任选先做一条**） | ☐（仅有通用 webhook 雏形） |
+| 2 | 消息 → Bundle/harness → 回复回 IM | ☐ |
+| 3 | 凭证与回调配置可进 Bundle/部署文档 | ☐ |
+
+### G2-C 企业权限（在毕业范围内）
+
+| # | 项 | 状态 |
+|---|----|------|
+| 1 | 组织/成员/角色或等价 ACL（谁能调哪个 Agent、哪些工具） | ☐ |
+| 2 | 与律（宪法/审计）打通：越权可拦可查 | 部分（单机宪法，无组织模型） |
+| 3 | 授权/吊销产品路径（非只改 JSON） | ☐ Setup Copilot 级 UX 不足 |
+
+### G2-D 托管常驻（在毕业范围内）
+
+| # | 项 | 状态 |
+|---|----|------|
+| 1 | 导出物可 **7×24 常驻**（daemon / 服务安装 / 托管进程） | 部分（`--daemon` / run-bundle） |
+| 2 | 托管面：启停、日志、健康、升级或等价运维 | ☐ |
+| 3 | 可选云托管或本机「托管感」面板（用户能当服务用，不是一次性脚本） | ☐ |
+
+---
+
+## 距离判断（诚实）
+
+```text
+G1 OpenCode  ████████░░  ~75%
+G2-A 办公竖切 ░░░░░░░░░░  ~5%
+G2-B IM       ░░░░░░░░░░  ~5%（webhook 皮）
+G2-C 企业权限 ██░░░░░░░░  ~15%（宪法/ATP 可复用）
+G2-D 托管     ███░░░░░░░  ~25%（daemon 有，运维面无）
+────────────────────────
+总毕业(G1∧G2) ██░░░░░░░░  ~20%
+```
+
+先前把 IM/权限/托管剔出本机毕业，是 **口径错了**；按你确认的范围，总毕业线明显更远，但差异化也更成立。
+
+---
+
+## 建议推进顺序（仍服务总毕业）
+
+1. **收口 G1**（配 Key 跑绿 live）— 成本最低  
+2. **G2-A workbuddy profile + 成品落盘** — 证明「办公员工」  
+3. **G2-B 先打通一条 IM**（建议飞书或企微，文档/回调相对清晰）  
+4. **G2-D 托管面板/安装器** — 常驻可运营  
+5. **G2-C 企业权限模型** — 与律/ATP 合并，避免两套 ACL  
+
+---
+
+## 进度总表
 
 | 项 | 状态 |
 |----|------|
-| 文档对齐毕业线 | ✅ |
-| P0 地基 | ✅ |
-| A：bundle chat + --workspace | ✅ |
-| B：真 Key 三用例 live 脚本 | ✅ |
-| C：验收（自动 + 人手） | ✅ 自动项；☐ C4 待 Key |
+| G1 路径 A/B/C 自动 | ✅（C4 live 待 Key） |
+| G2 纳入毕业口径 | ✅ 本文已改 |
+| G2 实现 | ☐ 未开干 |
 
-*版本：2026-07-18*
+*版本：2026-07-18 · 口径：WorkBuddy 全档含 IM/企业权限/托管*

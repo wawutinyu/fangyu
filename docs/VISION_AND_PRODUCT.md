@@ -43,11 +43,11 @@
 - **用户：** 想造 Agent 的开发者 / 集成商 / 小团队
 - **价值：** 画出来 = 跑起来 = 导出去，比纯 SaaS 更「可带走」
 - **竞争点：** export parity、Bundle、A2A、ATP、Adapter SDK、自托管
-- **成功指标：** 能用平台 **批量导出** 达到 OpenCode harness / WorkBuddy 档的独立 Agent（见 [本机毕业](GRADUATION_EXPORTABLE_AGENT.md)）；脱离 Studio 仍能多轮干活并受包内宪法约束
+- **成功指标：** 能用平台 **批量导出** 达到 OpenCode harness **与** WorkBuddy 全档（含 **IM 入口、企业权限、托管常驻**）的独立 Agent（见 [毕业标准](GRADUATION_EXPORTABLE_AGENT.md)）；脱离 Studio 仍能多轮干活并受包内宪法约束
 
-> **现阶段共识（2026-07-18）：产线地基优先于上层建筑。**  
-> Bundle 闭环 / 真 agent loop / 导出闭包 / 工厂 — 未夯实前，Studio UX 与场景皮肤不计入毕业。  
-> CLI / API / 文档 / 测试优先于「零门槛大众 UI」。
+> **现阶段共识（2026-07-18）：产线地基优先，但毕业范围含 WorkBuddy 全档。**  
+> IM / 企业权限 / 托管 **不是可选彩蛋**，与办公竖切同属 G2 毕业要件。  
+> G1（OpenCode）收口后并行推 G2-A→B→D→C。
 
 ### 角色 B：宪法 + 社会协议（差异化、长期壁垒）
 
