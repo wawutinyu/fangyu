@@ -3,7 +3,7 @@
 > 行业已收敛：**MCP（工具）· Skills（方法）· A2A（协作）· Harness（机床）· Eval（质检）**。  
 > 方隅定位是 **Agent 工厂**：批量组装可导出的公民，而不是再做一个聊天壳。
 
-关联：[工厂原料](FACTORY_MATERIALS.md) · [拓扑与 task](TOPOLOGY_AND_TASK.md) · [MCP Tasks](MCP_TASKS.md) · [浏览器](BROWSER_TOOL.md) · [认证 SSO](AUTH_SSO.md) · [出厂 Eval](FACTORY_EVAL.md) · [A2A 发现](A2A_DISCOVERY.md) · [毕业标准](GRADUATION_EXPORTABLE_AGENT.md) · [愿景](VISION_AND_PRODUCT.md)
+关联：[工厂原料](FACTORY_MATERIALS.md) · [拓扑与 task](TOPOLOGY_AND_TASK.md) · [MCP Tasks](MCP_TASKS.md) · [浏览器](BROWSER_TOOL.md) · [认证 SSO](AUTH_SSO.md) · [出厂 Eval](FACTORY_EVAL.md) · [A2A 发现](A2A_DISCOVERY.md) · [毕业标准](GRADUATION_EXPORTABLE_AGENT.md) · [愿景](VISION_AND_PRODUCT.md) · [价值与意义](VALUE_AND_SIGNIFICANCE.md)
 
 ---
 
