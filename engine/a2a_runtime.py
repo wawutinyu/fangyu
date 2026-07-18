@@ -210,7 +210,21 @@ class AgentBus:
         ext = AgentRegistry.get_external(agent_name)
         if ext:
             from .trust_runtime import TrustViolation
+            meta = message.get("metadata") or {}
+            principal = meta.get("principal_id") or meta.get("principal")
+            from fangyu.core.org_acl import assert_external_org_allowed, reset_principal, set_principal
+            _acl_token = set_principal(str(principal) if principal else None)
+            try:
+                assert_external_org_allowed(
+                    str(principal) if principal else None,
+                    agent_name=agent_name,
+                    skill=skill_id or "default",
+                )
+            except Exception:
+                reset_principal(_acl_token)
+                raise
             if not ext.get("authorized"):
+                reset_principal(_acl_token)
                 raise TrustViolation(
                     "not_authorized",
                     f"外部 Agent '{agent_name}' 尚未授权，请在编排面板中批准接入",
@@ -218,13 +232,17 @@ class AgentBus:
                 )
             allowed = ext.get("allowed_skills") or ["*"]
             if "*" not in allowed and skill_id and skill_id not in allowed:
+                reset_principal(_acl_token)
                 raise TrustViolation(
                     "not_authorized",
                     f"外部 Agent '{agent_name}' 未授权技能 '{skill_id}'",
                     context={"agent": agent_name, "skill_id": skill_id},
                 )
             from .a2a_remote import remote_send_message
-            remote_task = remote_send_message(ext, message, task_id=task.get("id", ""))
+            try:
+                remote_task = remote_send_message(ext, message, task_id=task.get("id", ""))
+            finally:
+                reset_principal(_acl_token)
             if remote_task.get("history"):
                 task["history"] = remote_task["history"]
             output = extract_task_output(remote_task)

@@ -135,6 +135,13 @@ class DiscoverExternalRequest(BaseModel):
 
 @router.post("/agents/register_external")
 def register_external_agent(body: RegisterExternalRequest):
+    from fangyu.core.org_acl import apply_external_register_defaults
+
+    defaults = apply_external_register_defaults(
+        body.card,
+        allowed_skills=body.allowed_skills,
+        authorized=body.authorized,
+    )
     AgentRegistry.register_external(
         body.name,
         body.card,
@@ -142,14 +149,15 @@ def register_external_agent(body: RegisterExternalRequest):
         body.agent_id,
         body.public_key,
         remote_name=body.remote_name,
-        allowed_skills=body.allowed_skills,
-        authorized=body.authorized,
+        allowed_skills=defaults["allowed_skills"],
+        authorized=defaults["authorized"],
     )
     return {
         "success": True,
         "name": body.name,
         "external": True,
-        "authorized": body.authorized,
+        "authorized": defaults["authorized"],
+        "allowed_skills": defaults["allowed_skills"],
     }
 
 

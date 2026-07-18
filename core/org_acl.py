@@ -43,9 +43,10 @@ DEFAULT_ACL: dict[str, Any] = {
             "permissions": ["*"],
         },
         "operator": {
-            "description": "可调 Agent、办公工具；禁 shell",
+            "description": "可调 Agent、办公工具、外部 Agent；禁 shell",
             "permissions": [
                 "agent:call:*",
+                "agent:call:external:*",
                 "skill:use:*",
                 "tool:use:read",
                 "tool:use:write",
@@ -65,7 +66,7 @@ DEFAULT_ACL: dict[str, Any] = {
             ],
         },
         "viewer": {
-            "description": "只读工具",
+            "description": "只读工具；不可调外部 Agent",
             "permissions": [
                 "agent:call:*",
                 "skill:use:*",
@@ -85,6 +86,14 @@ DEFAULT_ACL: dict[str, Any] = {
                 "tool:deny:question",
             ],
         },
+    },
+    # 外部 Agent 默认策略（注册 / 组织 ACL）
+    "external_agents": {
+        "default_authorized": False,
+        "default_allowed_skills_mode": "card",
+        "require_org_permission": True,
+        "require_external_permission": True,
+        "allow_agent_wildcard": False,
     },
 }
 
@@ -127,11 +136,15 @@ def get_principal() -> str | None:
 
 def _normalize(doc: dict[str, Any]) -> dict[str, Any]:
     out = json.loads(json.dumps(DEFAULT_ACL))
-    out.update({k: v for k, v in doc.items() if k not in ("members", "roles")})
+    out.update({k: v for k, v in doc.items() if k not in ("members", "roles", "external_agents")})
     if isinstance(doc.get("members"), dict):
         out["members"] = doc["members"]
     if isinstance(doc.get("roles"), dict):
         out["roles"] = doc["roles"]
+    if isinstance(doc.get("external_agents"), dict):
+        merged = dict(out.get("external_agents") or {})
+        merged.update(doc["external_agents"])
+        out["external_agents"] = merged
     out["enabled"] = bool(out.get("enabled"))
     out["require_principal"] = bool(out.get("require_principal"))
     return out
@@ -236,6 +249,9 @@ def _match(pattern: str, kind: str, name: str) -> bool:
         return False
     if p_name == "*" or p_name == name:
         return True
+    # 前缀通配：external:* → external:foo
+    if p_name.endswith(":*") and name.startswith(p_name[:-1]):
+        return True
     return False
 
 
@@ -329,6 +345,150 @@ def assert_org_allowed(
                 f"成员 '{pid}' 无权使用工具 '{tool}'",
                 context={"agent": agent, "skill_id": skill, "tool": tool, "principal": pid, "rule": rule},
             )
+
+
+def external_agents_policy(acl: dict[str, Any] | None = None) -> dict[str, Any]:
+    """外部 Agent 默认策略块。"""
+    doc = acl if acl is not None else load_acl()
+    base = dict((DEFAULT_ACL.get("external_agents") or {}))
+    cur = doc.get("external_agents") if isinstance(doc.get("external_agents"), dict) else {}
+    base.update(cur or {})
+    return base
+
+
+def skill_ids_from_card(card: dict[str, Any] | None) -> list[str]:
+    """从 Agent Card 提取 skill id；无则 ['default']。"""
+    skills = (card or {}).get("skills") if isinstance(card, dict) else None
+    ids: list[str] = []
+    if isinstance(skills, list):
+        for s in skills:
+            if isinstance(s, dict) and s.get("id"):
+                ids.append(str(s["id"]))
+            elif isinstance(s, str) and s.strip():
+                ids.append(s.strip())
+    return ids or ["default"]
+
+
+def default_external_allowed_skills(
+    card: dict[str, Any] | None = None,
+    *,
+    requested: list[str] | None = None,
+    acl: dict[str, Any] | None = None,
+) -> list[str]:
+    """注册外部 Agent 时的默认技能白名单（默认取 Card，拒绝裸 *）。"""
+    policy = external_agents_policy(acl)
+    mode = str(policy.get("default_allowed_skills_mode") or "card")
+    card_ids = skill_ids_from_card(card)
+    req = [str(x) for x in (requested or []) if x]
+    if mode == "star":
+        return req or ["*"]
+    # card 模式：请求为 * 或空 → 用 card；否则与 card 求交（空请求则 card）
+    if not req or req == ["*"]:
+        return card_ids
+    if "*" in req:
+        return card_ids
+    inter = [x for x in req if x in card_ids or x == "default"]
+    return inter or card_ids
+
+
+def apply_external_register_defaults(
+    card: dict[str, Any] | None,
+    *,
+    allowed_skills: list[str] | None = None,
+    authorized: bool | None = None,
+    acl: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """应用外部注册默认：authorized 默认 false；技能默认 Card 白名单。"""
+    policy = external_agents_policy(acl)
+    auth = bool(policy.get("default_authorized", False)) if authorized is None else bool(authorized)
+    skills = default_external_allowed_skills(card, requested=allowed_skills, acl=acl)
+    return {"authorized": auth, "allowed_skills": skills}
+
+
+def assert_external_org_allowed(
+    principal_id: str | None,
+    *,
+    agent_name: str,
+    skill: str | None = None,
+    acl: dict[str, Any] | None = None,
+) -> None:
+    """外部 Agent 调用前的组织 ACL：默认要求 agent:call:external:*（admin * 除外）。"""
+    doc = acl if acl is not None else load_acl()
+    if not doc.get("enabled"):
+        return
+
+    policy = external_agents_policy(doc)
+    if not policy.get("require_org_permission", True):
+        return
+
+    from fangyu.core.constitution import audit_event
+
+    pid = (principal_id or "").strip() or None
+    if not pid:
+        if doc.get("require_principal"):
+            audit_event("acl_violation", {"rule": "require_principal", "agent": agent_name, "external": True})
+            raise ACLError(
+                "require_principal",
+                "组织 ACL 已启用且要求主体身份（调用外部 Agent）",
+                context={"agent": agent_name, "skill_id": skill},
+            )
+        return
+
+    if pid not in (doc.get("members") or {}):
+        audit_event("acl_violation", {"rule": "unknown_principal", "principal": pid, "external": True})
+        raise ACLError(
+            "unknown_principal",
+            f"未知成员 '{pid}'",
+            context={"agent": agent_name, "skill_id": skill, "principal": pid},
+        )
+
+    perms = _member_permissions(doc, pid)
+    if "*" in perms:
+        if skill is not None:
+            assert_org_allowed(pid, skill=skill or "default", acl=doc)
+        return
+
+    if policy.get("require_external_permission", True):
+        targets = {
+            f"external:{agent_name}",
+            "external:*",
+        }
+        if policy.get("allow_agent_wildcard"):
+            # 允许 agent:call:* 覆盖外部
+            ok, rule = _allowed(perms, "agent", f"external:{agent_name}")
+            if not ok:
+                ok, rule = _allowed(perms, "agent", agent_name)
+        else:
+            ok = False
+            rule = "agent:call:external:missing"
+            for p in perms:
+                if not p.startswith("agent:call:"):
+                    continue
+                pname = p[len("agent:call:"):]
+                if pname in targets or pname == f"external:{agent_name}":
+                    ok, rule = True, p
+                    break
+                if pname.endswith(":*") and f"external:{agent_name}".startswith(pname[:-1]):
+                    ok, rule = True, p
+                    break
+        if not ok:
+            audit_event("acl_violation", {
+                "rule": rule,
+                "principal": pid,
+                "agent": agent_name,
+                "external": True,
+            })
+            raise ACLError(
+                "agent_denied",
+                f"成员 '{pid}' 无权调用外部 Agent '{agent_name}'（需 agent:call:external:*）",
+                context={"agent": agent_name, "skill_id": skill, "principal": pid, "rule": rule},
+            )
+    else:
+        assert_org_allowed(pid, agent=agent_name, skill=skill, acl=doc)
+        return
+
+    if skill is not None:
+        assert_org_allowed(pid, skill=skill or "default", acl=doc)
 
 
 def add_member(member_id: str, *, name: str = "", roles: list[str] | None = None) -> dict[str, Any]:

@@ -41,13 +41,20 @@ if str(ROOT) not in sys.path:
 LIVE_TIER_SCRIPTS: dict[str, list[str]] = {
     "none": [],
     "smoke": [
+        "scripts/cross_factory_harness_live.py",
         "scripts/opencode_harness_live.py",
     ],
     "full": [
+        "scripts/cross_factory_harness_live.py",
         "scripts/opencode_harness_live.py",
         "scripts/task_harness_live.py",
         "scripts/workbuddy_harness_live.py",
     ],
+}
+
+# 无 API Key 也可跑的 live（跨厂 RPC 等）
+KEY_FREE_LIVE: set[str] = {
+    "scripts/cross_factory_harness_live.py",
 }
 
 # 固定回归集（与 docs/FACTORY_EVAL.md 对齐）
@@ -73,6 +80,7 @@ UNIT_SUITE = [
     "tests/unit/test_im_wizard.py",
     "tests/unit/test_presence_samples.py",
     "tests/unit/test_eval_alert_presence.py",
+    "tests/unit/test_external_acl_defaults.py",
     "tests/integration/test_opencode_factory.py",
     "tests/unit/test_factory_gate.py",
 ]
@@ -272,7 +280,10 @@ def resolve_live_tier(args: argparse.Namespace) -> str:
 
 
 def stage_live(*, tier: str = "full") -> dict[str, Any]:
-    """返回 live 阶段结果。tier: none | smoke | full"""
+    """返回 live 阶段结果。tier: none | smoke | full
+
+    key-free 脚本（跨厂 RPC）即使无 API Key 也会跑；LLM harness 仍需 Key。
+    """
     print(f"==> stage: live (tier={tier})")
     if tier == "none":
         print("[SKIP] live — tier=none")
@@ -283,18 +294,31 @@ def stage_live(*, tier: str = "full") -> dict[str, Any]:
         has_key = ensure_api_keys()
     except Exception:
         has_key = False
-    if not has_key:
-        print("[SKIP] live — 无 API Key（.env / Studio DB）")
-        return {"ok": True, "skipped": True, "tier": tier, "scripts": []}
 
-    scripts = list(LIVE_TIER_SCRIPTS.get(tier) or LIVE_TIER_SCRIPTS["full"])
+    all_scripts = list(LIVE_TIER_SCRIPTS.get(tier) or LIVE_TIER_SCRIPTS["full"])
+    key_free = [s for s in all_scripts if s in KEY_FREE_LIVE]
+    key_gated = [s for s in all_scripts if s not in KEY_FREE_LIVE]
+
+    scripts: list[str] = list(key_free)
+    if has_key:
+        scripts.extend(key_gated)
+    elif key_gated:
+        print(f"[SKIP] live LLM — 无 API Key（跳过 {len(key_gated)} 个 harness）")
+
+    if not scripts:
+        print("[SKIP] live — 无可跑脚本（无 Key 且无 key-free）")
+        return {"ok": True, "skipped": True, "tier": tier, "scripts": [], "reason": "no-key"}
+
     results: list[dict[str, Any]] = []
     ok = True
+    any_ran = False
+    all_skipped = True
     for rel in scripts:
         path = ROOT / rel
         if not path.is_file():
             ok = _ok(rel, False, "missing") and ok
             results.append({"script": rel, "ok": False, "detail": "missing"})
+            all_skipped = False
             continue
         code, out = _run([sys.executable, str(path)], cwd=ROOT)
         tail = ""
@@ -302,10 +326,21 @@ def stage_live(*, tier: str = "full") -> dict[str, Any]:
             if line.strip():
                 tail = line.strip()[:160]
                 break
+        if code == 2:
+            print(f"[SKIP] {rel} — {tail or 'skipped'}")
+            results.append({"script": rel, "ok": True, "skipped": True, "exit_code": 2, "detail": tail})
+            continue
+        any_ran = True
+        all_skipped = False
         passed = code == 0
         ok = _ok(rel, passed, tail) and ok
         results.append({"script": rel, "ok": passed, "exit_code": code, "detail": tail})
-    return {"ok": ok, "skipped": False, "tier": tier, "scripts": results}
+
+    # 仅当全部被 skip（exit 2）且无失败时视为 skipped；有 key-free 跑通则 skipped=False
+    skipped = all_skipped and not any_ran and ok
+    if skipped:
+        print("[SKIP] live — 全部脚本跳过")
+    return {"ok": ok, "skipped": skipped, "tier": tier, "scripts": results, "has_key": has_key}
 
 
 def main() -> int:

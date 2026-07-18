@@ -113,9 +113,10 @@
 ㉗ 定时心跳 + Presence↔通讯录对齐  ✅ heartbeat-loop · factories/align
 ㉘ 离线告警 + 通讯录拉入画布       ✅ monitor/alerts · 运维「拉入画布」
 ㉙ Eval↔值班墙 + 跨厂投递样例     ✅ eval.fail 去观 · cross-factory-task
+㉚ 跨厂 live smoke + 外部 ACL 默认  ✅ key-free cross_factory · agent:call:external:*
 ```
 
-下一刀：真 IM（仍暂缓）· 跨厂投递 live smoke · ACL 对外部 Agent 默认策略。
+下一刀：真 IM（仍暂缓）· 外部 Agent 授权向导 UX · Presence 告警铃铛。
 
 ---
 

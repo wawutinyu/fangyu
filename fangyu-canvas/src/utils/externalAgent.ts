@@ -227,32 +227,35 @@ export async function buildExternalAgentFromFactory(factory: {
     factory.label || factory.card_name || card.name || factory.id || '外部工厂',
   )
   const id = `ext_fac_${(factory.id || name).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 24) || Date.now()}`
-  return {
-    id,
-    label: name,
-    type: 'a2a-external',
-    position: {
-      x: 220 + Math.random() * 280,
-      y: 80 + Math.random() * 220,
-    },
-    agentCard: {
-      name,
-      version: card.version || '1.0.0',
-      description: card.description,
-      capabilities: card.capabilities || { streaming: false, pushNotifications: false },
-      skills: card.skills?.length ? card.skills : [{ id: 'default', name: 'default' }],
-      defaultInterface: card.defaultInterface || { type: 'a2a', url: discovered.rpc_url },
-      metadata: { ...(card.metadata || {}), external: true, factory_id: factory.id, factory_base: factory.base_url },
-    },
-    externalConfig: {
-      rpcUrl: discovered.rpc_url,
-      agentId: discovered.identity?.agent_id || '',
-      publicKey: discovered.identity?.public_key || '',
-      remoteName: name,
-      authorized: false,
-      allowedSkills: ['*'],
-    },
-  }
+    const skillIds = (card.skills || [])
+      .map(s => (typeof s === 'string' ? s : s?.id))
+      .filter((id): id is string => !!id && id.trim().length > 0)
+    return {
+      id,
+      label: name,
+      type: 'a2a-external',
+      position: {
+        x: 220 + Math.random() * 280,
+        y: 80 + Math.random() * 220,
+      },
+      agentCard: {
+        name,
+        version: card.version || '1.0.0',
+        description: card.description,
+        capabilities: card.capabilities || { streaming: false, pushNotifications: false },
+        skills: card.skills?.length ? card.skills : [{ id: 'default', name: 'default' }],
+        defaultInterface: card.defaultInterface || { type: 'a2a', url: discovered.rpc_url },
+        metadata: { ...(card.metadata || {}), external: true, factory_id: factory.id, factory_base: factory.base_url },
+      },
+      externalConfig: {
+        rpcUrl: discovered.rpc_url,
+        agentId: discovered.identity?.agent_id || '',
+        publicKey: discovered.identity?.public_key || '',
+        remoteName: name,
+        authorized: false,
+        allowedSkills: skillIds.length ? skillIds : ['default'],
+      },
+    }
 }
 
 /** 派发到 App：写入画布并切到序·Agent */
