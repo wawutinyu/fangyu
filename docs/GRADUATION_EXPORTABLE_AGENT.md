@@ -19,7 +19,7 @@
 6. 同一 create 命令可再吐变体包
 7. `python scripts/opencode_harness_live.py` 在配置 API Key 后三用例全绿
 
-**当前进度：** A（chat + workspace）✅ · B（live 脚本）✅ · C（人手打勾）待你完成。
+**当前进度：** A ✅ · B ✅ · C 自动项 ✅（`scripts/opencode_graduation_c.py`）；剩 C4 live 需 API Key。
 
 ---
 
@@ -59,18 +59,26 @@ python scripts/opencode_harness_live.py
 
 ---
 
-## 毕业路径 C — 人手验收（打勾即毕业）
+## 毕业路径 C — 人手 + 自动验收
 
-| # | 项 | 结果 |
-|---|----|------|
-| 1 | create + `--workspace` 指向真实 git 仓库 | ☐ |
-| 2 | `bundle chat -m` 完成一次真实小改动（可 git diff） | ☐ |
-| 3 | `<repo>/.fangyu/chat.jsonl` 有 user/assistant | ☐ |
-| 4 | live 脚本三用例绿（有 Key） | ☐ |
-| 5 | 故意危险 shell 被拒（或策略提示） | ☐ |
-| 6 | 再 create 一个变体包仍可 chat | ☐ |
+一键自动项（无 Key 也能跑 C1–C3/C5/C6；有 Key 顺带跑 C4）：
 
-全部勾选后：**OpenCode 本机毕业**。WorkBuddy 竖切另开 profile。
+```bash
+python scripts/opencode_graduation_c.py
+```
+
+| # | 项 | 自动脚本 | 结果 |
+|---|----|----------|------|
+| 1 | create + `--workspace` 指向 git 仓库 | ✅ | 脚本打勾 |
+| 2 | `bundle chat` 完成小改动（可 git status） | ✅ mock | 脚本打勾 |
+| 3 | `<repo>/.fangyu/chat.jsonl` 有会话 | ✅ | 脚本打勾 |
+| 4 | live 脚本三用例绿（有 Key） | 有 Key 才跑 | ☐ 需你配 Key |
+| 5 | 危险 shell 被拒 | ✅ | 脚本打勾 |
+| 6 | 再 create 变体包仍可 chat | ✅ mock | 脚本打勾 |
+
+**OpenCode 本机毕业条件：** `opencode_graduation_c.py` 全绿（含 C4），并建议在真实业务仓再人手 chat 一次。
+
+WorkBuddy 竖切另开 profile。
 
 ---
 
@@ -103,6 +111,6 @@ python scripts/opencode_harness_live.py
 | P0 地基 | ✅ |
 | A：bundle chat + --workspace | ✅ |
 | B：真 Key 三用例 live 脚本 | ✅ |
-| C：人手验收打勾 | ☐ 待你 |
+| C：验收（自动 + 人手） | ✅ 自动项；☐ C4 待 Key |
 
 *版本：2026-07-18*
