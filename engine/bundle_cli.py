@@ -10,6 +10,14 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="fangyu bundle", description="Agent Bundle 工具")
     sub = p.add_subparsers(dest="command", required=True)
 
+    create_p = sub.add_parser("create", help="按 profile 工厂生成 Bundle")
+    create_p.add_argument("--profile", default="opencode", help="opencode | action")
+    create_p.add_argument("--dest", default="", help="输出目录（须为空或不存在）")
+    create_p.add_argument("--name", default=None, help="Agent 显示名")
+    create_p.add_argument("--port", type=int, default=9001)
+    create_p.add_argument("--max-turns", type=int, default=12)
+    create_p.add_argument("--list-profiles", action="store_true", help="列出可用 profile")
+
     run_p = sub.add_parser("run", help="启动 Bundle A2A daemon")
     run_p.add_argument("bundle_dir", help="Bundle 目录路径")
     run_p.add_argument("--host", default="127.0.0.1")
@@ -34,6 +42,31 @@ def build_parser() -> argparse.ArgumentParser:
     add_p.add_argument("--from", dest="peer_dir", required=True, help="对端 Bundle 目录")
 
     return p
+
+
+def cmd_create(args: argparse.Namespace) -> int:
+    from fangyu.core.agent_factory import build_from_profile, list_profiles
+
+    if args.list_profiles:
+        print(json.dumps(list_profiles(), ensure_ascii=False, indent=2))
+        return 0
+    if not args.dest:
+        print("error: --dest is required (unless --list-profiles)", file=sys.stderr)
+        return 2
+    root = build_from_profile(
+        args.profile,
+        args.dest,
+        name=args.name,
+        a2a_port=args.port,
+        max_turns=args.max_turns,
+    )
+    print(json.dumps({
+        "ok": True,
+        "profile": args.profile,
+        "bundle": str(root),
+        "run": f"python -m fangyu --run-bundle {root}",
+    }, ensure_ascii=False, indent=2))
+    return 0
 
 
 def cmd_run(args: argparse.Namespace) -> int:
@@ -140,6 +173,8 @@ def cmd_trust_add(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.command == "create":
+        return cmd_create(args)
     if args.command == "run":
         return cmd_run(args)
     if args.command == "rpc":

@@ -72,6 +72,9 @@ def create_agent_bundle(
     identity: AgentIdentity | None = None,
     embed_private_key: bool = True,
     mqtt_triggers: list[dict[str, Any]] | None = None,
+    constitution: dict[str, Any] | None = None,
+    toolbelt: str | None = None,
+    profile: str | None = None,
 ) -> Path:
     """创建 Agent Bundle 目录。"""
     root = Path(dest)
@@ -124,6 +127,8 @@ def create_agent_bundle(
     })
     if "metadata" not in card:
         card["metadata"] = {"agentKind": agent_kind, "workerOnly": worker_only}
+    if profile:
+        card.setdefault("metadata", {})["profile"] = profile
 
     manifest = {
         "bundle_version": BUNDLE_VERSION,
@@ -131,21 +136,26 @@ def create_agent_bundle(
         "agent_id": agent_id,
         "name": name,
         "exported_at": _utc_now(),
-        "runtime_entry": "runtime/main.py",
+        "runtime_entry": "python -m fangyu --run-bundle",
         "capabilities": {
             "a2a_server": True,
             "a2a_client": True,
             "user_interface": user_enabled,
             "worker_only": worker_only,
             "agent_kind": agent_kind,
+            "harness": profile == "opencode" or any(
+                (f.get("meta") or {}).get("kind") == "harness" for f in skills.values()
+            ),
         },
         "protocols": ["a2a/1.0", "fangyu-envelope/1.0"],
         "skills": list(skills.keys()),
     }
+    if profile:
+        manifest["profile"] = profile
 
-    constitution = load_constitution()
+    constitution_doc = constitution if isinstance(constitution, dict) else load_constitution()
     const_payload = json.dumps(
-        {"agent_id": agent_id, "constitution_version": constitution.get("version", "1.0"), "signed_at": _utc_now()},
+        {"agent_id": agent_id, "constitution_version": constitution_doc.get("version", "1.0"), "signed_at": _utc_now()},
         sort_keys=True,
     )
     const_sig = ident.sign(const_payload)
@@ -155,7 +165,7 @@ def create_agent_bundle(
         "algorithm": "Ed25519",
         "public_key": ident.public_key,
         "constitution": {
-            "version": constitution.get("version", "1.0"),
+            "version": constitution_doc.get("version", "1.0"),
             "payload": const_payload,
             "signature": const_sig,
         },
@@ -181,16 +191,33 @@ def create_agent_bundle(
     (root / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     (root / "agent.card.json").write_text(json.dumps(card, ensure_ascii=False, indent=2), encoding="utf-8")
     (root / "identity.json").write_text(json.dumps(identity_doc, ensure_ascii=False, indent=2), encoding="utf-8")
-    (root / "constitution.json").write_text(json.dumps(constitution, ensure_ascii=False, indent=2), encoding="utf-8")
+    (root / "constitution.json").write_text(json.dumps(constitution_doc, ensure_ascii=False, indent=2), encoding="utf-8")
     (root / "config").mkdir(exist_ok=True)
     (root / "config" / "interfaces.json").write_text(json.dumps(interfaces, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    # 工具闭包清单（运行时 coding_toolbelt 实现仍在引擎内；清单随包可审计）
+    if toolbelt:
+        from fangyu.engine.bundle_tools import coding_toolbelt
+        if toolbelt == "coding":
+            tb = {
+                "id": "coding",
+                "tools": sorted(coding_toolbelt().keys()),
+                "scope": "bundle/workspace",
+            }
+            (root / "config" / "toolbelt.json").write_text(
+                json.dumps(tb, ensure_ascii=False, indent=2), encoding="utf-8",
+            )
 
     # 包内 DATA_DIR：run-bundle 时切到这里，宪法/审计与宿主隔离
     data_dir = root / "data"
     data_dir.mkdir(exist_ok=True)
     (data_dir / "constitution.json").write_text(
-        json.dumps(constitution, ensure_ascii=False, indent=2), encoding="utf-8",
+        json.dumps(constitution_doc, ensure_ascii=False, indent=2), encoding="utf-8",
     )
+    # 技能注册表占位（闭包：将来可拷贝 md skills）
+    skills_data = data_dir / "skills"
+    skills_data.mkdir(exist_ok=True)
+    (skills_data / "registry.json").write_text("[]", encoding="utf-8")
 
     (root / "workspace").mkdir(exist_ok=True)
     (root / "workspace" / ".fangyu").mkdir(exist_ok=True)

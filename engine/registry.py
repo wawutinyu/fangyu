@@ -29,6 +29,7 @@ def _init_registry():
         "loop": ("循环", "流程控制", [{"name": "array", "type": "array", "required": True}, {"name": "body", "type": "any"}], [{"name": "result", "type": "array"}]),
         "trigger": ("触发器", "流程控制", [{"name": "message", "type": "string"}], [{"name": "message", "type": "string"}, {"name": "triggered", "type": "boolean"}]),
         "llm": ("大模型调用", "AI 能力", [{"name": "input", "type": "string"}, {"name": "system_prompt", "type": "string"}, {"name": "context", "type": "array"}], [{"name": "result", "type": "string"}, {"name": "usage", "type": "object"}]),
+        "agent-loop": ("Agent 工具环", "AI 能力", [{"name": "input", "type": "string"}], [{"name": "result", "type": "any"}, {"name": "success", "type": "boolean"}, {"name": "turns", "type": "number"}]),
         "code": ("代码执行", "AI 能力", [{"name": "input", "type": "any"}, {"name": "params", "type": "object"}], [{"name": "result", "type": "any"}, {"name": "error", "type": "string"}]),
         "knowledge": ("知识库检索", "AI 能力", [{"name": "query", "type": "string", "required": True}], [{"name": "results", "type": "array"}, {"name": "context", "type": "string"}]),
         "prompt-assembly": ("提示词组装", "AI 能力", [{"name": "context", "type": "string"}, {"name": "volatile", "type": "string"}], [{"name": "assembled", "type": "string"}]),
@@ -85,4 +86,5 @@ def register_executors():
     from .exec_memory import register as r4
     from .exec_tools import register as r5
     from .exec_unified import register as r6
-    r1(); r2(); r3(); r4(); r5(); r6()
+    from .exec_agent import register as r7
+    r1(); r2(); r3(); r4(); r5(); r6(); r7()

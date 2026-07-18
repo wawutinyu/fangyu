@@ -21,7 +21,7 @@ def test_all_core_executors_registered():
     expected = {
         "start", "end", "condition", "switch", "loop", "composite", "composite-node",
         "approval", "trigger", "input", "output",
-        "llm", "code", "knowledge", "search", "prompt-assembly",
+        "llm", "agent-loop", "code", "knowledge", "search", "prompt-assembly",
         "json-parse", "variable-set", "variable-get", "transform", "text-process",
         "memory-read", "memory-write", "extract-memory", "search-sessions",
         "http", "tool-call", "register-tool", "execute-skill", "learn-skill",
