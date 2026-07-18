@@ -106,6 +106,39 @@ export async function probeAndSaveFactory(input: {
   return data
 }
 
+export async function heartbeatFactories(input?: {
+  factory_ids?: string[]
+  sync_presence?: boolean
+  ttl_sec?: number
+}): Promise<{
+  ok: boolean
+  total: number
+  online: number
+  offline: number
+  results: Array<{ id: string; base_url: string; ok: boolean; online: boolean; error?: string | null }>
+  factories?: Array<{
+    id: string
+    base_url: string
+    label?: string
+    online?: boolean
+    last_heartbeat_at?: number
+    card_name?: string
+  }>
+}> {
+  const resp = await fetch('/api/v1/a2a/factories/heartbeat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      factory_ids: input?.factory_ids || [],
+      sync_presence: input?.sync_presence !== false,
+      ttl_sec: input?.ttl_sec ?? 120,
+    }),
+  })
+  const data = await resp.json()
+  if (!resp.ok) throw new Error(data.detail || `批量心跳失败 (${resp.status})`)
+  return data
+}
+
 export async function deleteRemoteFactory(factoryId: string): Promise<void> {
   const resp = await fetch(`/api/v1/a2a/factories/${encodeURIComponent(factoryId)}`, {
     method: 'DELETE',

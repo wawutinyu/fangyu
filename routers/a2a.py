@@ -1,7 +1,7 @@
 """A2A Protocol API 端点"""
 import json
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 from fangyu.engine.a2a_runtime import AgentRegistry, AgentBus, AgentOrchestrator
@@ -213,6 +213,12 @@ class FactoryProbeSaveBody(BaseModel):
     persist: bool = True
 
 
+class FactoryHeartbeatBody(BaseModel):
+    factory_ids: list[str] = Field(default_factory=list)
+    sync_presence: bool = True
+    ttl_sec: float = 120
+
+
 @router.get("/discovery")
 def local_discovery():
     """本厂公开发现目录：已注册 Agent + well-known 提示。"""
@@ -330,6 +336,19 @@ def factories_probe_save(body: FactoryProbeSaveBody):
 def factories_list():
     from fangyu.core.a2a_factories import load_factories
     return {"factories": load_factories()}
+
+
+@router.post("/factories/heartbeat")
+def factories_heartbeat(body: FactoryHeartbeatBody | None = None):
+    """批量心跳：探测通讯录全部（或指定 id）并可选同步 Presence。"""
+    from fangyu.core.a2a_factories import heartbeat_factories
+
+    req = body or FactoryHeartbeatBody()
+    return heartbeat_factories(
+        factory_ids=req.factory_ids or None,
+        sync_presence=req.sync_presence,
+        ttl_sec=req.ttl_sec,
+    )
 
 
 @router.post("/factories")

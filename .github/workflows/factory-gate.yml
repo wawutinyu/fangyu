@@ -1,0 +1,98 @@
+# Eval / 出厂门禁 — CI 模板
+#
+# 默认：无 Key 的 --live-tier none（unit + card）
+# 可选：仓库变量 RUN_LIVE_SMOKE=true + Secret OPENAI_API_KEY（或兼容名）跑 smoke live
+
+name: Factory Gate
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      live_tier:
+        description: 'none | smoke | full'
+        required: true
+        default: 'none'
+        type: choice
+        options:
+          - none
+          - smoke
+          - full
+
+jobs:
+  gate-none:
+    name: factory_gate (live-tier none)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install fangyu
+        run: pip install -e ".[dev]" pytest cryptography
+
+      - name: Factory gate (no live)
+        run: python scripts/factory_gate.py --live-tier none
+
+      - name: Upload eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: factory-eval-report-none
+          path: |
+            .fangyu/factory_eval_report.json
+            data/factory_eval_report.json
+          if-no-files-found: ignore
+
+  gate-smoke-live:
+    name: factory_gate (live-tier smoke)
+    runs-on: ubuntu-latest
+    # 手动触发且选 smoke/full，或仓库变量开启 + 有 Key
+    if: >-
+      (github.event_name == 'workflow_dispatch' && (inputs.live_tier == 'smoke' || inputs.live_tier == 'full'))
+      || (vars.RUN_LIVE_SMOKE == 'true')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install fangyu
+        run: pip install -e ".[dev]" pytest cryptography
+
+      - name: Resolve live tier
+        id: tier
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=${{ inputs.live_tier }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=smoke" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Factory gate live
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "${OPENAI_API_KEY}${ANTHROPIC_API_KEY}" ]; then
+            echo "No API key in secrets — running --live-tier none instead"
+            python scripts/factory_gate.py --live-tier none
+          else
+            python scripts/factory_gate.py --live-tier "${{ steps.tier.outputs.value }}" --strict-live
+          fi
+
+      - name: Upload eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: factory-eval-report-live
+          path: |
+            .fangyu/factory_eval_report.json
+            data/factory_eval_report.json
+          if-no-files-found: ignore

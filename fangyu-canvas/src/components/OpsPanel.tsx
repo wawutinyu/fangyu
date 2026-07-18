@@ -11,6 +11,7 @@ import {
 } from '../utils/authApi'
 import {
   deleteRemoteFactory,
+  heartbeatFactories,
   listRemoteFactories,
   probeAndSaveFactory,
   probeRemoteFactory,
@@ -86,6 +87,8 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
     label?: string
     card_name?: string
     updated_at?: number
+    online?: boolean
+    last_heartbeat_at?: number
   }>>([])
   const [facProbe, setFacProbe] = useState<{
     ok?: boolean
@@ -311,6 +314,21 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
     try {
       await deleteRemoteFactory(id)
       await reloadFactories()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+    setLoading(false)
+  }
+
+  const onHeartbeatFactories = async () => {
+    setLoading(true)
+    setError(null)
+    setFacNote(null)
+    try {
+      const out = await heartbeatFactories({ sync_presence: true })
+      if (out.factories) setFactories(out.factories)
+      else await reloadFactories()
+      setFacNote(`批量心跳：在线 ${out.online}/${out.total}（已同步 Presence）`)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
@@ -1015,6 +1033,17 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
             <button className="notion-btn primary" style={{ fontSize: 12 }} type="button" onClick={() => void onSaveFactory()} disabled={loading} data-testid="factory-save">
               探测入库
             </button>
+            <button
+              className="notion-btn"
+              style={{ fontSize: 12 }}
+              type="button"
+              onClick={() => void onHeartbeatFactories()}
+              disabled={loading || factories.length === 0}
+              data-testid="factory-heartbeat"
+              title="批量探测通讯录并同步到观·主机"
+            >
+              批量心跳
+            </button>
           </div>
           {facProbe && (
             <div style={{ fontSize: 11, padding: 8, borderRadius: 6, border: '1px solid var(--border-light)' }}>
@@ -1034,7 +1063,14 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
               key={f.id}
               style={{ border: '1px solid var(--border-light)', borderRadius: 6, padding: 10 }}
             >
-              <div style={{ fontWeight: 600 }}>{f.label || f.card_name || f.id}</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <strong>{f.label || f.card_name || f.id}</strong>
+                {f.online != null && (
+                  <span style={{ fontSize: 11, color: f.online ? '#1a7f37' : '#c0392b' }}>
+                    {f.online ? '在线' : '离线'}
+                  </span>
+                )}
+              </div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', wordBreak: 'break-all' }}>
                 {f.base_url}
                 {f.rpc_url ? ` · rpc ${f.rpc_url}` : ''}

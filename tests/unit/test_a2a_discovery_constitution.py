@@ -124,6 +124,44 @@ def test_factories_probe_save(monkeypatch, tmp_path):
         assert any(f["base_url"] == "http://peer.example:9000" for f in fac.load_factories())
 
 
+def test_factories_batch_heartbeat(monkeypatch, tmp_path):
+    from fangyu.core import a2a_discovery as disc
+    from fangyu.core import a2a_factories as fac
+    from fangyu.core import config as config_mod
+    from fangyu.core.remote_hosts import clear_remote_hosts, list_remote_hosts
+
+    config_mod.set_data_dir(tmp_path / "data")
+    (tmp_path / "data").mkdir(parents=True, exist_ok=True)
+    clear_remote_hosts()
+    fac.save_factories([])
+
+    upsert_factory(base_url="http://hb.example:8001", label="HB")
+    monkeypatch.setattr(
+        disc,
+        "probe_factory",
+        lambda url: {
+            "ok": True,
+            "base_url": "http://hb.example:8001",
+            "rpc_url": "http://hb.example:8001/api/v1/a2a/rpc",
+            "card": {"name": "HB"},
+            "hits": [],
+        },
+    )
+
+    with TestClient(app) as client:
+        r = client.post("/api/v1/a2a/factories/heartbeat", json={"sync_presence": True})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["ok"] is True
+        assert body["online"] == 1
+        assert body["total"] == 1
+        rows = fac.load_factories()
+        assert rows[0].get("online") is True
+        assert rows[0].get("last_heartbeat_at")
+        hosts = list_remote_hosts()
+        assert any(h.get("role") == "factory" for h in hosts)
+
+
 def test_constitution_bundle_roundtrip(tmp_path):
     bundle = tmp_path / "b"
     bundle.mkdir()

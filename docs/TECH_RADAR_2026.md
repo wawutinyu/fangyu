@@ -109,9 +109,10 @@
 ㉓ 跨机回放样例 + live 可选档     ✅ fixtures/cross-host · --live-tier none/smoke/full
 ㉔ Eval 对比页 + A2A 工厂目录 UI  ✅ eval-compare · 观测对比 · 运维·工厂
 ㉕ 对端一键入库 + 值班墙跨机默认  ✅ probe-save/peer-probe · 墙默认 host
+㉖ 工厂批量心跳 + Eval smoke CI    ✅ factories/heartbeat · factory-gate.yml
 ```
 
-下一刀：真 IM（仍暂缓）· 工厂通讯录批量心跳 · Eval smoke CI 模板。
+下一刀：真 IM（仍暂缓）· 工厂心跳定时任务 · Presence 主机与工厂通讯录双向对齐。
 
 ---
 

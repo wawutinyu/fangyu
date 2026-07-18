@@ -61,4 +61,15 @@ Studio「观测 → Eval 报告」展示最近结果 + 趋势条；API：
 
 Studio「观测 → Eval」含 **最近 / 对比**：选两条历史看 stage 差异与并排摘要。
 
+## CI 模板
+
+工作流：[`.github/workflows/factory-gate.yml`](../.github/workflows/factory-gate.yml)
+
+| Job | 何时 | 命令 |
+|-----|------|------|
+| `gate-none` | push / PR | `python scripts/factory_gate.py --live-tier none` |
+| `gate-smoke-live` | `workflow_dispatch` 选 smoke/full，或仓库变量 `RUN_LIVE_SMOKE=true` | 有 Key 则 `--live-tier smoke|full --strict-live`，否则回退 none |
+
+报告产物上传为 artifact（`factory-eval-report-*`）。Secrets 可选：`OPENAI_API_KEY` / `ANTHROPIC_API_KEY`。
+
 Harness Trace：`GET /api/v1/monitor/harness-traces`（观测面板默认页）。

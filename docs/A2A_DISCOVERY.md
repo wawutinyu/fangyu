@@ -17,6 +17,7 @@
 | `POST /api/v1/a2a/agents/discover` | `rpc_url` 或 `base_url` → Card + identity |
 | `POST /api/v1/a2a/factories/probe` | 多路径探测（well-known / card / discovery / health） |
 | `GET/POST/DELETE /api/v1/a2a/factories` | 跨厂通讯录（`DATA_DIR/a2a_factories.json`） |
+| `POST /api/v1/a2a/factories/heartbeat` | 批量心跳：探测通讯录 · 可选同步 Presence 主机 |
 
 探测顺序（拉 Card）：
 
@@ -37,7 +38,7 @@ Studio 外部 Agent「发现」可填工厂根 URL（不必手写 `/rpc`）。
 | `POST /api/v1/a2a/factories/probe-save` | `base_url` / `instance_id` → 探测并写入通讯录 |
 | 运维 · 托管 → **入库工厂** | 用托管实例的 `http://host:port` 一键入库 |
 | 运维 · 工厂 → **探测入库** | URL 探测后立刻持久化 |
-| CLI `python -m fangyu bundle peer-probe <url> --save` | 或 `--instance <id>` |
+运维 · 工厂 → **批量心跳**：探测全部通讯录，更新在线态并 `host.heartbeat` 进观。
 
 ```bash
 python -m fangyu bundle peer-probe http://127.0.0.1:9101 --save --label demo

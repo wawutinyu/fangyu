@@ -86,3 +86,108 @@ def remove_factory(factory_id: str) -> bool:
         return False
     save_factories(nxt)
     return True
+
+
+def heartbeat_factories(
+    *,
+    factory_ids: list[str] | None = None,
+    sync_presence: bool = True,
+    ttl_sec: float = 120.0,
+) -> dict[str, Any]:
+    """对通讯录批量探测：更新 online / last_heartbeat_at；可选同步到 Presence 主机。"""
+    from fangyu.core.a2a_discovery import probe_factory
+
+    want = {x.strip() for x in (factory_ids or []) if x and str(x).strip()}
+    rows = load_factories()
+    now = time.time()
+    results: list[dict[str, Any]] = []
+    online_n = 0
+
+    for row in rows:
+        fid = str(row.get("id") or "")
+        base = str(row.get("base_url") or "")
+        if want and fid not in want and base not in want:
+            continue
+        if not base:
+            results.append({"id": fid, "ok": False, "error": "no base_url"})
+            continue
+        probe: dict[str, Any] | None = None
+        err = ""
+        try:
+            probe = probe_factory(base)
+            ok = bool(probe.get("ok"))
+        except Exception as exc:
+            ok = False
+            err = str(exc)
+            probe = None
+
+        row["online"] = ok
+        row["last_heartbeat_at"] = now
+        row["last_probe_ok"] = ok
+        row["updated_at"] = now
+        if probe and isinstance(probe.get("card"), dict) and probe["card"].get("name"):
+            row["card_name"] = probe["card"]["name"]
+        if probe and probe.get("rpc_url"):
+            row["rpc_url"] = probe["rpc_url"]
+        meta = dict(row.get("meta") or {})
+        meta["last_heartbeat_error"] = err or None
+        row["meta"] = meta
+        if ok:
+            online_n += 1
+
+        if sync_presence:
+            try:
+                from fangyu.core.collaboration import emit_event
+                from fangyu.core.remote_hosts import upsert_remote_host
+
+                host_id = f"factory:{fid or base}"
+                if ok:
+                    host = upsert_remote_host(
+                        host_id=host_id,
+                        label=str(row.get("label") or row.get("card_name") or base),
+                        base_url=base,
+                        role="factory",
+                        meta={"factory_id": fid, "source": "a2a_factories"},
+                        ttl_sec=ttl_sec,
+                    )
+                    emit_event(
+                        "host.heartbeat",
+                        actor=f"host:{host['id']}",
+                        message=f"工厂在线 {host.get('label')}",
+                        detail={
+                            "host_id": host["id"],
+                            "base_url": base,
+                            "role": "factory",
+                            "factory_id": fid,
+                        },
+                    )
+                else:
+                    emit_event(
+                        "host.offline",
+                        actor=f"host:{host_id}",
+                        message=f"工厂离线 {row.get('label') or base}",
+                        detail={"host_id": host_id, "base_url": base, "factory_id": fid},
+                        severity="warn",
+                    )
+            except Exception:
+                pass
+
+        results.append({
+            "id": fid,
+            "base_url": base,
+            "ok": ok,
+            "online": ok,
+            "error": err or None,
+            "card_name": row.get("card_name"),
+        })
+
+    save_factories(rows)
+    return {
+        "ok": True,
+        "ts": now,
+        "total": len(results),
+        "online": online_n,
+        "offline": len(results) - online_n,
+        "results": results,
+        "factories": rows,
+    }
