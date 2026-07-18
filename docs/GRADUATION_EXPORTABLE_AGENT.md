@@ -57,7 +57,7 @@
 |---|----|------|
 | 1 | 至少一条 IM 通道可对话触发 Agent（**飞书**先做） | ✅ 解析+challenge+入站；真机订阅待配凭证 |
 | 2 | 消息 → Bundle/harness → 回复回 IM | 部分（有 Key 可回飞书；否则 `im_outbox.jsonl`） |
-| 3 | 凭证与回调配置可进 Bundle/部署文档 | ✅ `config/im.json` · `bundle im-bind` · `/im/feishu` |
+| 3 | 凭证与回调配置可进 Bundle/部署文档 | ✅ `config/im.json` · `bundle im-bind` · `/im/feishu` · **运维·飞书向导** `/api/v1/im/status` |
 
 ### G2-C 企业权限（在毕业范围内）
 

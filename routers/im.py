@@ -83,7 +83,7 @@ async def feishu_events(body: dict[str, Any], bundle_dir: str = ""):
 
 @router.post("/feishu/bind")
 def feishu_bind(body: FeishuBindBody):
-    from fangyu.engine.im_feishu import bind_feishu_channel
+    from fangyu.engine.im_feishu import bind_feishu_channel, feishu_channel_status
 
     path = bind_feishu_channel(
         body.bundle_dir,
@@ -94,9 +94,19 @@ def feishu_bind(body: FeishuBindBody):
     )
     global _default_bundle
     _default_bundle = body.bundle_dir
+    status = feishu_channel_status(body.bundle_dir, default_bundle=_default_bundle)
     return {
         "ok": True,
         "im_config": str(path),
         "default_bundle": _default_bundle,
-        "events_url_hint": "/api/v1/im/feishu?bundle_dir=" + body.bundle_dir,
+        "events_url_hint": status.get("events_url_hint"),
+        "status": status,
     }
+
+
+@router.get("/status")
+def im_status(bundle_dir: str = ""):
+    """飞书/IM 凭证向导状态（密钥掩码）。"""
+    from fangyu.engine.im_feishu import feishu_channel_status
+
+    return feishu_channel_status(bundle_dir or None, default_bundle=_default_bundle)

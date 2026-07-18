@@ -57,6 +57,7 @@ UNIT_SUITE = [
     "tests/unit/test_monitor_eval.py",
     "tests/unit/test_a2a_discovery_constitution.py",
     "tests/unit/test_managed_eval_trend.py",
+    "tests/unit/test_im_wizard.py",
     "tests/integration/test_opencode_factory.py",
     "tests/unit/test_factory_gate.py",
 ]

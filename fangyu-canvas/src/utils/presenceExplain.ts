@@ -100,8 +100,7 @@ export function explainCollabEvent(ev: CollaborationEvent): PlainExplanation {
     }
   }
 
-  if (
-    kind.startsWith('worker.complete')
+  if (kind.startsWith('worker.complete')
     || kind === 'worker.task_done'
     || kind.includes('task_done')
   ) {
@@ -111,6 +110,42 @@ export function explainCollabEvent(ev: CollaborationEvent): PlainExplanation {
         ? `行「${ev.actor}」做完了${ev.target ? `（回告 ${ev.target}）` : ''}：「${msg}」。`
         : `行「${ev.actor}」任务已结束。`,
       nextStep: '结果可在行任务详情查看；失败时看 error 字段再决定是否重派。',
+      severity,
+    }
+  }
+
+  if (kind === 'managed.start') {
+    return {
+      title: '托管上线',
+      plain: msg
+        ? `托管实例「${ev.target || ev.actor}」已启动：「${msg}」。`
+        : `托管「${ev.target || ev.actor}」进入在线。`,
+      nextStep: '观里筛「托管」可见；回放时间轴到此帧应显示 online。',
+      severity,
+    }
+  }
+
+  if (kind === 'managed.stop') {
+    return {
+      title: '托管下线',
+      plain: msg
+        ? `托管实例「${ev.target || ev.actor}」已停止：「${msg}」。`
+        : `托管「${ev.target || ev.actor}」已离线。`,
+      nextStep: '回放此帧应显示 offline；需要再起可去运维·托管重启。',
+      severity,
+    }
+  }
+
+  if (kind === 'managed.upgrade' || kind === 'managed.restart') {
+    const from = String((ev.detail as { from?: string } | undefined)?.from || '')
+    const to = String((ev.detail as { to?: string } | undefined)?.to || '')
+    return {
+      title: kind === 'managed.restart' ? '托管重启' : '托管升级',
+      plain: msg
+        || (from && to
+          ? `托管由 ${from} 切换到 ${to}。`
+          : `托管「${ev.target || ev.actor}」已${kind === 'managed.restart' ? '重启' : '升级'}。`),
+      nextStep: '回放应对齐新旧实例在线态；运维面板可查看新实例日志。',
       severity,
     }
   }

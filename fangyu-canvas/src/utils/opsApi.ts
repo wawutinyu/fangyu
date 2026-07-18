@@ -216,3 +216,64 @@ export async function denyApproval(id: string): Promise<{ ok: boolean; approval:
   if (!res.ok) throw new Error(body.detail || '拒绝失败')
   return body
 }
+
+/** 飞书 / IM 凭证向导 */
+export interface ImWizardStep {
+  id: string
+  label: string
+  ok: boolean
+  hint?: string
+}
+
+export interface ImStatus {
+  ok: boolean
+  bundle_dir?: string | null
+  default_bundle?: string | null
+  exists?: boolean
+  channel?: string
+  mode?: string
+  enabled?: boolean
+  im_config_path?: string | null
+  app_id?: string
+  app_id_set?: boolean
+  app_secret_set?: boolean
+  verification_token_set?: boolean
+  verification_token?: string
+  events_url_hint?: string
+  bundle_events_url_hint?: string
+  steps?: ImWizardStep[]
+  ready_for_challenge?: boolean
+  ready_for_reply?: boolean
+  note?: string
+}
+
+export async function fetchImStatus(bundleDir = ''): Promise<ImStatus> {
+  const q = bundleDir ? `?bundle_dir=${encodeURIComponent(bundleDir)}` : ''
+  const res = await apiFetch(`/api/v1/im/status${q}`)
+  const body = await res.json()
+  if (!res.ok) throw new Error(body.detail || '读取 IM 状态失败')
+  return body
+}
+
+export async function bindFeishuChannel(input: {
+  bundle_dir: string
+  mode?: string
+  verification_token?: string
+  app_id?: string
+  app_secret?: string
+}): Promise<{ ok: boolean; im_config?: string; events_url_hint?: string; status?: ImStatus }> {
+  const res = await apiFetch('/api/v1/im/feishu/bind', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      bundle_dir: input.bundle_dir,
+      mode: input.mode || 'chat',
+      verification_token: input.verification_token || '',
+      app_id: input.app_id || '',
+      app_secret: input.app_secret || '',
+    }),
+  })
+  const body = await res.json()
+  if (!res.ok) throw new Error(body.detail || '绑定飞书失败')
+  return body
+}

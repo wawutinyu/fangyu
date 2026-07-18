@@ -1,4 +1,4 @@
-/** 运维面板 — 托管启停 + 组织 ACL + 人审 + SSO（G2-D / G2-C Studio 面） */
+/** 运维面板 — 托管启停 + 组织 ACL + 人审 + SSO + 飞书凭证向导 */
 import { useCallback, useEffect, useState } from 'react'
 import {
   fetchAuthConfig,
@@ -12,10 +12,12 @@ import {
 import {
   addAclMember,
   approveApproval,
+  bindFeishuChannel,
   checkAcl,
   denyApproval,
   enableAcl,
   fetchAcl,
+  fetchImStatus,
   fetchManagedLogs,
   initAcl,
   listApprovals,
@@ -28,6 +30,7 @@ import {
   upgradeManaged,
   type AclDoc,
   type ApprovalItem,
+  type ImStatus,
   type ManagedInstance,
 } from '../utils/opsApi'
 
@@ -36,7 +39,7 @@ interface OpsPanelProps {
 }
 
 export default function OpsPanel({ headerless }: OpsPanelProps) {
-  const [tab, setTab] = useState<'managed' | 'acl' | 'approvals' | 'sso'>('managed')
+  const [tab, setTab] = useState<'managed' | 'acl' | 'approvals' | 'sso' | 'im'>('managed')
   const [instances, setInstances] = useState<ManagedInstance[]>([])
   const [acl, setAcl] = useState<AclDoc | null>(null)
   const [approvals, setApprovals] = useState<ApprovalItem[]>([])
@@ -59,6 +62,14 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
   const [authCfg, setAuthCfg] = useState<AuthConfig | null>(null)
   const [authMe, setAuthMe] = useState<AuthMe | null>(null)
   const [authNote, setAuthNote] = useState<string | null>(null)
+
+  const [imStatus, setImStatus] = useState<ImStatus | null>(null)
+  const [imBundleDir, setImBundleDir] = useState('')
+  const [imMode, setImMode] = useState('chat')
+  const [imAppId, setImAppId] = useState('')
+  const [imAppSecret, setImAppSecret] = useState('')
+  const [imToken, setImToken] = useState('')
+  const [imNote, setImNote] = useState<string | null>(null)
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -139,6 +150,50 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
       setAuthNote(out.hint ? `${base} · ${out.hint}` : base)
       await reload()
       await reloadAuth()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+    setLoading(false)
+  }
+
+  const reloadIm = useCallback(async (dir?: string) => {
+    const target = (dir ?? imBundleDir).trim()
+    try {
+      const st = await fetchImStatus(target)
+      setImStatus(st)
+      if (st.bundle_dir && !imBundleDir.trim()) setImBundleDir(st.bundle_dir)
+      else if (!target && st.default_bundle) setImBundleDir(st.default_bundle)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }, [imBundleDir])
+
+  useEffect(() => {
+    if (tab !== 'im') return
+    void reloadIm()
+  }, [tab, reloadIm])
+
+  const onBindFeishu = async () => {
+    const dir = imBundleDir.trim()
+    if (!dir) {
+      setError('请填写 Bundle 目录')
+      return
+    }
+    setLoading(true)
+    setError(null)
+    setImNote(null)
+    try {
+      const out = await bindFeishuChannel({
+        bundle_dir: dir,
+        mode: imMode,
+        verification_token: imToken,
+        app_id: imAppId,
+        app_secret: imAppSecret,
+      })
+      setImStatus(out.status || await fetchImStatus(dir))
+      setImNote(`已写入 ${out.im_config || 'config/im.json'} · 回调 ${out.events_url_hint || ''}`)
+      setImAppSecret('')
+      setImToken('')
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
@@ -341,6 +396,14 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
           title="企业 OIDC / 本地 Bearer"
         >
           SSO
+        </button>
+        <button
+          className="notion-btn"
+          style={{ fontSize: 12, fontWeight: tab === 'im' ? 600 : 400 }}
+          onClick={() => setTab('im')}
+          title="飞书凭证配置向导（真机订阅暂缓）"
+        >
+          飞书
         </button>
         <div style={{ flex: 1 }} />
         <button className="notion-btn" style={{ fontSize: 12 }} onClick={reload} disabled={loading}>
@@ -680,6 +743,116 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
           </div>
         </div>
       )}
+
+      {tab === 'im' && (
+        <div style={{ flex: 1, overflow: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {imNote && <div style={{ color: '#1a7f37' }}>{imNote}</div>}
+          <div style={{ color: 'var(--text-muted)', lineHeight: 1.45 }}>
+            {imStatus?.note || '真机事件订阅仍暂缓；此处只写 Bundle 凭证与回调 URL。'}
+          </div>
+          <input
+            className="notion-input"
+            style={{ fontSize: 12 }}
+            placeholder="Bundle 目录绝对路径"
+            value={imBundleDir}
+            onChange={e => setImBundleDir(e.target.value)}
+            data-testid="im-bundle-dir"
+          />
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <select
+              className="notion-input"
+              style={{ fontSize: 12, minWidth: 100 }}
+              value={imMode}
+              onChange={e => setImMode(e.target.value)}
+            >
+              <option value="chat">mode=chat</option>
+              <option value="orchestrate">mode=orchestrate</option>
+            </select>
+            <input
+              className="notion-input"
+              style={{ flex: 1, minWidth: 120, fontSize: 12 }}
+              placeholder="App ID"
+              value={imAppId}
+              onChange={e => setImAppId(e.target.value)}
+              data-testid="im-app-id"
+            />
+            <input
+              className="notion-input"
+              style={{ flex: 1, minWidth: 120, fontSize: 12 }}
+              placeholder="App Secret"
+              type="password"
+              value={imAppSecret}
+              onChange={e => setImAppSecret(e.target.value)}
+              data-testid="im-app-secret"
+            />
+            <input
+              className="notion-input"
+              style={{ flex: 1, minWidth: 140, fontSize: 12 }}
+              placeholder="Verification Token"
+              type="password"
+              value={imToken}
+              onChange={e => setImToken(e.target.value)}
+              data-testid="im-verification-token"
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              className="notion-btn primary"
+              style={{ fontSize: 12 }}
+              type="button"
+              onClick={() => void onBindFeishu()}
+              disabled={loading}
+              data-testid="im-bind"
+            >
+              写入并设为默认
+            </button>
+            <button
+              className="notion-btn"
+              style={{ fontSize: 12 }}
+              type="button"
+              onClick={() => void reloadIm()}
+              disabled={loading}
+              data-testid="im-refresh"
+            >
+              刷新检查清单
+            </button>
+          </div>
+          <div style={{
+            display: 'flex', flexDirection: 'column', gap: 6,
+            padding: 10, borderRadius: 6, border: '1px solid var(--border-light)',
+          }} data-testid="im-checklist">
+            {(imStatus?.steps || []).map(step => (
+              <div key={step.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <span style={{ color: step.ok ? '#1a7f37' : '#c0392b', minWidth: 16 }}>
+                  {step.ok ? '✓' : '○'}
+                </span>
+                <div>
+                  <div>{step.label}</div>
+                  {step.hint && (
+                    <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>{step.hint}</div>
+                  )}
+                </div>
+              </div>
+            ))}
+            {!imStatus?.steps?.length && (
+              <div style={{ color: 'var(--text-muted)' }}>填写 Bundle 后点刷新，查看检查清单。</div>
+            )}
+          </div>
+          <div style={{ color: 'var(--text-muted)', lineHeight: 1.5, fontSize: 11 }}>
+            challenge 就绪={String(!!imStatus?.ready_for_challenge)}
+            {' · '}
+            主动回消息就绪={String(!!imStatus?.ready_for_reply)}
+            <br />
+            事件 URL：<code>{imStatus?.events_url_hint || '—'}</code>
+            {imStatus?.im_config_path ? (
+              <>
+                <br />
+                配置：<code>{imStatus.im_config_path}</code>
+              </>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   )
 
@@ -688,7 +861,7 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-light)', fontWeight: 600, fontSize: 13 }}>
-        运维 · 托管 / ACL / 人审 / SSO
+        运维 · 托管 / ACL / 人审 / SSO / 飞书
       </div>
       {body}
     </div>

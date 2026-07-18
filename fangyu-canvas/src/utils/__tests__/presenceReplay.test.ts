@@ -78,4 +78,47 @@ describe('presenceReplay', () => {
     expect(edges.find(e => e.source === 'A' && e.target === 'B')?.count).toBe(2)
     expect(edges).toHaveLength(2)
   })
+
+  it('aligns managed start/stop/upgrade on replay frames', () => {
+    const events = sortEventsAsc([
+      ev({
+        id: 'm1',
+        kind: 'managed.start',
+        actor: 'managed:aaa',
+        target: 'demo',
+        ts: 1,
+        detail: { instance_id: 'aaa', host: '127.0.0.1', port: 9101 },
+      }),
+      ev({
+        id: 'm2',
+        kind: 'managed.stop',
+        actor: 'managed:aaa',
+        target: 'demo',
+        ts: 2,
+        detail: { instance_id: 'aaa' },
+      }),
+      ev({
+        id: 'm3',
+        kind: 'managed.upgrade',
+        actor: 'managed:bbb',
+        target: 'demo',
+        ts: 3,
+        detail: { from: 'aaa', to: 'bbb', port: 9101 },
+      }),
+    ])
+    const afterStart = frameAtIndex([], events, 0)
+    const started = afterStart.presence.find(p => p.id === 'managed:aaa')!
+    expect(started.online).toBe(true)
+    expect(started.status).toBe('online')
+    expect(started.kind).toBe('managed')
+
+    const afterStop = frameAtIndex([], events, 1)
+    expect(afterStop.presence.find(p => p.id === 'managed:aaa')!.online).toBe(false)
+
+    const afterUpgrade = frameAtIndex([], events, 2)
+    expect(afterUpgrade.presence.find(p => p.id === 'managed:aaa')!.online).toBe(false)
+    const neu = afterUpgrade.presence.find(p => p.id === 'managed:bbb')!
+    expect(neu.online).toBe(true)
+    expect(neu.status).toBe('online')
+  })
 })

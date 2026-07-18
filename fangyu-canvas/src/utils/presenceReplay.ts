@@ -113,7 +113,100 @@ function skillGuess(kind: string, message: string): string | null {
   return kind.split('.').pop() || null
 }
 
+function managedIdFromActor(actor: string): string | null {
+  const a = (actor || '').trim()
+  if (a.startsWith('managed:')) return a.slice('managed:'.length) || null
+  return null
+}
+
+function upsertManaged(
+  presence: MutablePresence[],
+  instanceId: string,
+  patch: Partial<MutablePresence> & { online: boolean; status: string },
+): MutablePresence {
+  const id = `managed:${instanceId}`
+  let cur = presence.find(p => p.id === id)
+  if (!cur) {
+    cur = {
+      id,
+      kind: 'managed',
+      name: String(patch.name || instanceId),
+      label: String(patch.label || patch.name || instanceId),
+      status: patch.status,
+      online: patch.online,
+      department: '托管',
+      department_id: 'dept-managed',
+      current_skill: null,
+      task_id: null,
+    }
+    presence.push(cur)
+  }
+  Object.assign(cur, patch)
+  return cur
+}
+
+/** 托管启停/升级：回放帧与 live Presence 对齐（不按 start→busy 误判） */
+function applyManagedEvent(presence: MutablePresence[], ev: CollaborationEvent): boolean {
+  const kind = String(ev.kind || '')
+  if (!kind.startsWith('managed.')) return false
+
+  const detail = (ev.detail || {}) as Record<string, unknown>
+  const fromId = String(detail.from || '').trim()
+  const toId = String(detail.to || managedIdFromActor(ev.actor) || detail.instance_id || '').trim()
+  const name = String(ev.target || detail.name || toId || fromId || '托管')
+  const host = detail.host != null ? String(detail.host) : undefined
+  const port = typeof detail.port === 'number' ? detail.port : undefined
+  const bundleDir = detail.bundle_dir != null ? String(detail.bundle_dir) : undefined
+
+  if (kind === 'managed.stop') {
+    const iid = String(detail.instance_id || managedIdFromActor(ev.actor) || toId || '').trim()
+    if (iid) {
+      upsertManaged(presence, iid, {
+        online: false,
+        status: 'offline',
+        name,
+        label: name,
+        host,
+        port,
+        bundle_dir: bundleDir,
+        current_skill: null,
+        task_id: null,
+      })
+    }
+    return true
+  }
+
+  if (kind === 'managed.start' || kind === 'managed.upgrade' || kind === 'managed.restart') {
+    if (kind === 'managed.upgrade' && fromId && fromId !== toId) {
+      upsertManaged(presence, fromId, {
+        online: false,
+        status: 'offline',
+        current_skill: null,
+        task_id: null,
+      })
+    }
+    if (toId) {
+      upsertManaged(presence, toId, {
+        online: true,
+        status: 'online',
+        name,
+        label: name,
+        host,
+        port,
+        bundle_dir: bundleDir,
+        current_skill: kind === 'managed.upgrade' ? 'upgrade' : null,
+        task_id: null,
+      })
+    }
+    return true
+  }
+
+  return true
+}
+
 function applyEvent(presence: MutablePresence[], ev: CollaborationEvent): void {
+  if (applyManagedEvent(presence, ev)) return
+
   const actors = resolveEntities(presence, ev.actor)
   const targets = resolveEntities(presence, ev.target)
   const touched = [...actors, ...targets]
@@ -161,13 +254,16 @@ export function frameAtIndex(
     : Math.max(-1, Math.min(index, maxIdx))
 
   const eventsUpTo = clamped < 0 ? [] : eventsAsc.slice(0, clamped + 1)
-  const presence: MutablePresence[] = basePresence.map(p => ({
-    ...p,
-    status: 'idle',
-    current_skill: null,
-    task_id: null,
-    online: p.online,
-  }))
+  const presence: MutablePresence[] = basePresence.map(p => {
+    const isHostLike = p.kind === 'managed' || p.kind === 'host'
+    return {
+      ...p,
+      status: isHostLike ? (p.online ? 'online' : 'offline') : 'idle',
+      current_skill: null,
+      task_id: null,
+      online: p.online,
+    }
+  })
 
   for (const ev of eventsUpTo) applyEvent(presence, ev)
 

@@ -48,4 +48,24 @@ describe('explainCollabEvent', () => {
     expect(e.title).toContain('行')
     expect(e.plain).toContain('demo-行')
   })
+
+  it('explains managed lifecycle', () => {
+    const start = explainCollabEvent(ev({
+      kind: 'managed.start',
+      actor: 'managed:x',
+      target: 'demo',
+      message: '托管启动 demo :9100',
+    }))
+    expect(start.title).toContain('托管')
+    expect(start.plain).toContain('demo')
+
+    const up = explainCollabEvent(ev({
+      kind: 'managed.upgrade',
+      actor: 'managed:y',
+      target: 'demo',
+      detail: { from: 'x', to: 'y' },
+    }))
+    expect(up.title).toContain('升级')
+    expect(up.plain).toContain('x')
+  })
 })

@@ -105,9 +105,10 @@
 ⑲ Presence↔托管 + 技能目录 UX    ✅ 观筛托管/停实例 · materials/skills 全文预览
 ⑳ A2A 跨厂发现 + 律产品面        ✅ discovery/probe/factories · 律禁项/Bundle 宪法
 ㉑ 托管升级 + Eval 趋势           ✅ restart/upgrade · eval-history/trend
+㉒ 飞书向导 + Presence 托管回放   ✅ im/status·运维飞书页 · managed.* 帧对齐
 ```
 
-下一刀：真 IM（仍暂缓）· 飞书凭证配置向导 · Presence 回放与托管事件对齐。
+下一刀：真 IM（仍暂缓）· Presence 跨机回放样例包 · Eval 门禁挂 live 可选档。
 
 ---
 

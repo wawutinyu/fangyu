@@ -212,3 +212,108 @@ def bind_feishu_channel(
         "app_secret": app_secret,
         "endpoint_hint": "POST /im/feishu  (bundle serve) 或 POST /api/v1/im/feishu",
     })
+
+
+def _mask_secret(value: str) -> str:
+    s = (value or "").strip()
+    if not s:
+        return ""
+    if len(s) <= 4:
+        return "****"
+    return f"{s[:2]}***{s[-2:]}"
+
+
+def feishu_channel_status(
+    bundle_dir: str | Path | None = None,
+    *,
+    default_bundle: str | None = None,
+) -> dict[str, Any]:
+    """凭证配置向导用：掩码状态 + 检查清单（真机订阅仍暂缓）。"""
+    root_s = (str(bundle_dir or default_bundle or "")).strip()
+    root = Path(root_s).expanduser() if root_s else None
+    exists = bool(root and root.is_dir())
+    cfg = load_im_config(root) if exists else {}
+    im_path = (root / "config" / "im.json") if root else None
+    has_im_file = bool(im_path and im_path.is_file())
+
+    app_id = str(cfg.get("app_id") or os.getenv("FEISHU_APP_ID") or "")
+    app_secret = str(cfg.get("app_secret") or os.getenv("FEISHU_APP_SECRET") or "")
+    vtoken = str(cfg.get("verification_token") or os.getenv("FEISHU_VERIFICATION_TOKEN") or "")
+    channel = str(cfg.get("channel") or "generic")
+    mode = str(cfg.get("mode") or "chat")
+    enabled = cfg.get("enabled") is not False
+
+    events_url = (
+        f"/api/v1/im/feishu?bundle_dir={root.resolve()}" if exists and root else "/api/v1/im/feishu"
+    )
+    steps = [
+        {
+            "id": "bundle",
+            "label": "指定 Bundle 目录",
+            "ok": exists,
+            "hint": "导出或托管实例的 Bundle 根路径",
+        },
+        {
+            "id": "im_config",
+            "label": "已有 config/im.json",
+            "ok": has_im_file,
+            "hint": "运维向导绑定或 `python -m fangyu bundle im-bind`",
+        },
+        {
+            "id": "channel",
+            "label": "通道 = feishu",
+            "ok": channel == "feishu",
+            "hint": "绑定后 channel 应为 feishu",
+        },
+        {
+            "id": "verification_token",
+            "label": "Verification Token",
+            "ok": bool(vtoken),
+            "hint": "飞书开放平台 → 事件订阅 → Verification Token",
+        },
+        {
+            "id": "app_credentials",
+            "label": "App ID + App Secret（主动回消息）",
+            "ok": bool(app_id and app_secret),
+            "hint": "无凭证时仍可 challenge/入站；回复写入 im_outbox.jsonl",
+        },
+        {
+            "id": "default_bundle",
+            "label": "平台默认 Bundle 已指向此处",
+            "ok": bool(
+                default_bundle
+                and exists
+                and root
+                and Path(default_bundle).expanduser().resolve() == root.resolve()
+            ),
+            "hint": "绑定成功会自动设为默认；也可 POST /api/v1/im/default-bundle",
+        },
+    ]
+    ready_challenge = exists and channel == "feishu"
+    ready_reply = ready_challenge and bool(app_id and app_secret)
+    return {
+        "ok": True,
+        "bundle_dir": str(root.resolve()) if exists and root else root_s or None,
+        "default_bundle": default_bundle,
+        "exists": exists,
+        "channel": channel,
+        "mode": mode,
+        "enabled": enabled,
+        "im_config_path": str(im_path) if has_im_file else None,
+        "app_id": _mask_secret(app_id) if app_id else "",
+        "app_id_set": bool(app_id),
+        "app_secret_set": bool(app_secret),
+        "verification_token_set": bool(vtoken),
+        "verification_token": _mask_secret(vtoken) if vtoken else "",
+        "events_url_hint": events_url,
+        "bundle_events_url_hint": "/im/feishu  (bundle serve)",
+        "env_fallback": {
+            "FEISHU_APP_ID": bool(os.getenv("FEISHU_APP_ID")),
+            "FEISHU_APP_SECRET": bool(os.getenv("FEISHU_APP_SECRET")),
+            "FEISHU_VERIFICATION_TOKEN": bool(os.getenv("FEISHU_VERIFICATION_TOKEN")),
+        },
+        "steps": steps,
+        "ready_for_challenge": ready_challenge,
+        "ready_for_reply": ready_reply,
+        "note": "真机事件订阅仍暂缓；本向导只落 Bundle 凭证与回调 URL 提示。",
+    }
