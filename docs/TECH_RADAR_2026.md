@@ -116,9 +116,10 @@
 ㉚ 跨厂 live smoke + 外部 ACL 默认  ✅ key-free cross_factory · agent:call:external:*
 ㉛ 授权向导 + 观告警铃铛           ✅ ExternalAuthWizard · PresenceAlertBell
 ㉜ 授权后部署校验 + 大屏告警条     ✅ verify 步骤 · PresenceAlertStrip
+㉝ 试跑 ping + 告警铃铛 SSE        ✅ wizard 试跑 · Presence SSE 刷新 alerts
 ```
 
-下一刀：真 IM（仍暂缓）· 外部 Agent 调用试跑样例 · Eval 红铃铛推 SSE。
+下一刀：真 IM（仍暂缓）· 试跑结果写 Presence 事件 · 工厂通讯录健康分。
 
 ---
 

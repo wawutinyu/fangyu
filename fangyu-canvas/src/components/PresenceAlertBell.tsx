@@ -15,7 +15,7 @@ function formatTs(ts?: number) {
 }
 
 export default function PresenceAlertBell({ wallMode, pollMs = 45000 }: Props) {
-  const { meta, alerts, badge, error, reload } = useMonitorAlerts(pollMs)
+  const { meta, alerts, badge, error, reload, sseLive } = useMonitorAlerts(pollMs)
   const [open, setOpen] = useState(false)
   const btnRef = useRef<HTMLButtonElement | null>(null)
   const [pos, setPos] = useState<{ top: number; right: number }>({ top: 48, right: 16 })
@@ -60,7 +60,7 @@ export default function PresenceAlertBell({ wallMode, pollMs = 45000 }: Props) {
         type="button"
         className="notion-btn"
         data-testid="presence-alert-bell"
-        title="观测告警：工厂离线 / Eval"
+        title={sseLive ? '观测告警（SSE 实时）' : '观测告警：工厂离线 / Eval'}
         onClick={openPopover}
         style={{
           fontSize: wallMode ? 13 : 11,
@@ -71,7 +71,7 @@ export default function PresenceAlertBell({ wallMode, pollMs = 45000 }: Props) {
           background: wallMode ? '#1a222c' : undefined,
         }}
       >
-        告警
+        告警{sseLive ? '·' : ''}
         {badge > 0 && (
           <span
             data-testid="presence-alert-badge"

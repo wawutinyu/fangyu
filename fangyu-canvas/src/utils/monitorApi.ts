@@ -33,3 +33,15 @@ export async function fetchMonitorAlerts(limit = 20): Promise<MonitorAlertsRespo
     alerts: body.alerts || [],
   }
 }
+
+/** 协作事件是否应刷新观测告警铃铛 */
+export function isMonitorAlertKind(kind: string): boolean {
+  const k = (kind || '').trim()
+  if (!k) return false
+  return (
+    k.startsWith('eval.')
+    || k === 'factory.offline'
+    || k === 'host.offline'
+    || k === 'factory.online'
+  )
+}

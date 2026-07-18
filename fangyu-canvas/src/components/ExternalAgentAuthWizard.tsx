@@ -10,6 +10,10 @@ import {
   verifyExternalAgentDeploy,
   type VerifyResult,
 } from '../utils/verifyExternalAgent'
+import {
+  pingExternalAgent,
+  type PingResult,
+} from '../utils/pingExternalAgent'
 
 interface Props {
   open: boolean
@@ -39,6 +43,8 @@ export default function ExternalAgentAuthWizard({ open, node, onClose, onAuthori
   const [localNode, setLocalNode] = useState<AgentCanvasNode | null>(null)
   const [authorizedNode, setAuthorizedNode] = useState<AgentCanvasNode | null>(null)
   const [verify, setVerify] = useState<VerifyResult | null>(null)
+  const [ping, setPing] = useState<PingResult | null>(null)
+  const [pingBusy, setPingBusy] = useState(false)
 
   useEffect(() => {
     if (!open || !node) return
@@ -49,6 +55,7 @@ export default function ExternalAgentAuthWizard({ open, node, onClose, onAuthori
     setStep(0)
     setAuthorizedNode(null)
     setVerify(null)
+    setPing(null)
   }, [open, node])
 
   const skills = useMemo(() => {
@@ -121,6 +128,23 @@ export default function ExternalAgentAuthWizard({ open, node, onClose, onAuthori
       setBusy(false)
     }
   }, [])
+
+  const runPing = useCallback(async (target: AgentCanvasNode) => {
+    setPingBusy(true)
+    setPing(null)
+    try {
+      const skill = selected[0]
+        || target.externalConfig?.allowedSkills?.[0]
+        || 'default'
+      const result = await pingExternalAgent(target, {
+        skillId: skill === '*' ? 'default' : skill,
+      })
+      setPing(result)
+      return result
+    } finally {
+      setPingBusy(false)
+    }
+  }, [selected])
 
   const submit = useCallback(async () => {
     if (!localNode || !confirmed || selected.length === 0) return
@@ -349,6 +373,16 @@ export default function ExternalAgentAuthWizard({ open, node, onClose, onAuthori
               </button>
               <button
                 type="button"
+                className="notion-btn"
+                disabled={pingBusy || !authorizedNode}
+                onClick={() => authorizedNode && void runPing(authorizedNode)}
+                data-testid="external-auth-ping"
+                title="经平台 A2A 向对端发一条 ping"
+              >
+                {pingBusy ? '试跑中…' : '试跑 ping'}
+              </button>
+              <button
+                type="button"
                 className="notion-btn primary"
                 onClick={finish}
                 data-testid="external-auth-finish"
@@ -356,6 +390,26 @@ export default function ExternalAgentAuthWizard({ open, node, onClose, onAuthori
                 完成
               </button>
             </div>
+            {ping && (
+              <div
+                data-testid="external-auth-ping-result"
+                style={{
+                  marginTop: 10, padding: '8px 10px', borderRadius: 6,
+                  border: '1px solid var(--border-light)',
+                  borderLeft: `3px solid ${ping.ok ? '#52c41a' : '#dc2626'}`,
+                }}
+              >
+                <strong>{ping.ok ? '✓ 试跑通过' : '✗ 试跑未过'}</strong>
+                {ping.state && (
+                  <span style={{ marginLeft: 8, color: 'var(--text-muted)' }}>state={ping.state}</span>
+                )}
+                {(ping.excerpt || ping.error) && (
+                  <div style={{ color: 'var(--text-muted)', marginTop: 4, wordBreak: 'break-word' }}>
+                    {ping.excerpt || ping.error}
+                  </div>
+                )}
+              </div>
+            )}
             {verify && !verify.ok && (
               <div style={{ marginTop: 10, color: 'var(--text-muted)', fontSize: 11 }}>
                 授权已写入；对端不可达时可稍后重试。完成仍会把节点标为已授权。
