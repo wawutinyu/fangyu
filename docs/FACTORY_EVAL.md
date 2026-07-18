@@ -7,12 +7,22 @@
 ## 怎么跑
 
 ```bash
-python scripts/factory_gate.py --skip-live   # 无 Key 必绿
-python scripts/factory_gate.py              # 有 Key 再加 live
+python scripts/factory_gate.py --skip-live          # 无 Key 必绿（= --live-tier none）
+python scripts/factory_gate.py --live-tier smoke    # 有 Key：仅 opencode harness
+python scripts/factory_gate.py --live-tier full     # 有 Key：opencode + task + workbuddy
+python scripts/factory_gate.py                      # 默认 full（无 Key 则跳过 live → exit 2）
 python scripts/factory_gate.py --unit-only
 ```
 
 退出码：`0` 全绿；`1` 失败；`2` unit+card 绿但 live 跳过（`--strict-live` 可打成 1）。
+
+### live 可选档
+
+| `--live-tier` | 脚本 | 说明 |
+|---------------|------|------|
+| `none` | （无） | 等价 `--skip-live`，CI 无 Key 默认 |
+| `smoke` | `opencode_harness_live` | 最短 live 冒烟 |
+| `full` | + `task_harness_live` + `workbuddy_harness_live` | 毕业全档 |
 
 ## 固定套件（出厂必绿）
 

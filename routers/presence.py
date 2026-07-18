@@ -132,6 +132,51 @@ def get_replays(limit: int = Query(50, ge=1, le=200)):
     return {"replays": list_replays(limit=limit)}
 
 
+@router.get("/replays/samples")
+def get_replay_samples():
+    """内置观回放样例（跨机等，只读）。"""
+    from fangyu.core.presence_samples import list_sample_meta
+
+    return {"samples": list_sample_meta()}
+
+
+@router.get("/replays/samples/{sample_id}")
+def get_replay_sample(sample_id: str):
+    from fangyu.core.presence_samples import load_sample_pack
+
+    try:
+        pack = load_sample_pack(sample_id)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    return {"sample_id": sample_id, "pack": pack}
+
+
+@router.post("/replays/samples/{sample_id}/load")
+def load_replay_sample(sample_id: str, persist: bool = Query(True)):
+    """加载内置样例为 snapshot；默认写入回放库便于时间轴选用。"""
+    from fangyu.core.presence_samples import list_sample_meta, load_sample_pack
+
+    try:
+        pack = load_sample_pack(sample_id)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    title = sample_id
+    for m in list_sample_meta():
+        if m["id"] == sample_id or str(m.get("path", "")).endswith(f"{sample_id}.json"):
+            title = m["title"]
+            break
+    meta = None
+    if persist:
+        meta = save_replay(title=title, pack=pack)
+    return {
+        "ok": True,
+        "sample_id": sample_id,
+        "title": title,
+        "replay": meta,
+        "snapshot": pack_to_snapshot(pack),
+    }
+
+
 @router.post("/replays")
 def post_replay(body: SaveReplayRequest):
     """存库：导出包或导入包写入 collaboration.db。"""

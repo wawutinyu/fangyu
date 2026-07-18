@@ -121,4 +121,32 @@ describe('presenceReplay', () => {
     expect(neu.online).toBe(true)
     expect(neu.status).toBe('online')
   })
+
+  it('aligns host heartbeat and offline on replay frames', () => {
+    const events = sortEventsAsc([
+      ev({
+        id: 'h1',
+        kind: 'host.heartbeat',
+        actor: 'host:east',
+        ts: 1,
+        detail: { host_id: 'east', label: '东厂', base_url: 'https://east.example' },
+      }),
+      ev({
+        id: 'h2',
+        kind: 'host.offline',
+        actor: 'host:east',
+        ts: 2,
+        detail: { host_id: 'east' },
+        severity: 'warn',
+      }),
+    ])
+    const on = frameAtIndex([], events, 0)
+    const east = on.presence.find(p => p.id === 'host:east')!
+    expect(east.online).toBe(true)
+    expect(east.status).toBe('online')
+    expect(east.kind).toBe('host')
+
+    const off = frameAtIndex([], events, 1)
+    expect(off.presence.find(p => p.id === 'host:east')!.online).toBe(false)
+  })
 })

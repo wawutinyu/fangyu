@@ -204,8 +204,83 @@ function applyManagedEvent(presence: MutablePresence[], ev: CollaborationEvent):
   return true
 }
 
+function hostIdFromActor(actor: string): string | null {
+  const a = (actor || '').trim()
+  if (a.startsWith('host:')) return a.slice('host:'.length) || null
+  return null
+}
+
+function upsertHost(
+  presence: MutablePresence[],
+  hostId: string,
+  patch: Partial<MutablePresence> & { online: boolean; status: string },
+): MutablePresence {
+  const id = hostId.startsWith('host:') ? hostId : `host:${hostId}`
+  let cur = presence.find(p => p.id === id)
+  if (!cur) {
+    cur = {
+      id,
+      kind: 'host',
+      name: String(patch.name || hostId),
+      label: String(patch.label || patch.name || hostId),
+      status: patch.status,
+      online: patch.online,
+      department: '跨机',
+      department_id: 'dept-hosts',
+      current_skill: null,
+      task_id: null,
+    }
+    presence.push(cur)
+  }
+  Object.assign(cur, patch)
+  return cur
+}
+
+/** 跨机主机心跳 / 离线 */
+function applyHostEvent(presence: MutablePresence[], ev: CollaborationEvent): boolean {
+  const kind = String(ev.kind || '')
+  if (!kind.startsWith('host.')) return false
+
+  const detail = (ev.detail || {}) as Record<string, unknown>
+  const hid = String(
+    detail.host_id || hostIdFromActor(ev.actor) || '',
+  ).trim()
+  if (!hid) return true
+
+  const label = String(detail.label || ev.target || hid)
+  const baseUrl = detail.base_url != null ? String(detail.base_url) : undefined
+  const role = detail.role != null ? String(detail.role) : undefined
+
+  if (kind === 'host.heartbeat' || kind === 'host.online') {
+    upsertHost(presence, hid, {
+      online: true,
+      status: 'online',
+      name: hid,
+      label,
+      base_url: baseUrl,
+      role,
+    })
+    return true
+  }
+
+  if (kind === 'host.offline' || kind === 'host.leave' || kind === 'host.expired') {
+    upsertHost(presence, hid, {
+      online: false,
+      status: 'offline',
+      name: hid,
+      label,
+      base_url: baseUrl,
+      role,
+    })
+    return true
+  }
+
+  return true
+}
+
 function applyEvent(presence: MutablePresence[], ev: CollaborationEvent): void {
   if (applyManagedEvent(presence, ev)) return
+  if (applyHostEvent(presence, ev)) return
 
   const actors = resolveEntities(presence, ev.actor)
   const targets = resolveEntities(presence, ev.target)

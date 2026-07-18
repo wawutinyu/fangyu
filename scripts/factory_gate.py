@@ -18,7 +18,8 @@
 用法（仓库根）：
   python scripts/factory_gate.py
   python scripts/factory_gate.py --skip-live
-  python scripts/factory_gate.py --strict-live
+  python scripts/factory_gate.py --live-tier smoke
+  python scripts/factory_gate.py --live-tier full --strict-live
 
 文档：docs/FACTORY_EVAL.md
 """
@@ -36,6 +37,18 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+LIVE_TIER_SCRIPTS: dict[str, list[str]] = {
+    "none": [],
+    "smoke": [
+        "scripts/opencode_harness_live.py",
+    ],
+    "full": [
+        "scripts/opencode_harness_live.py",
+        "scripts/task_harness_live.py",
+        "scripts/workbuddy_harness_live.py",
+    ],
+}
 
 # 固定回归集（与 docs/FACTORY_EVAL.md 对齐）
 UNIT_SUITE = [
@@ -58,6 +71,7 @@ UNIT_SUITE = [
     "tests/unit/test_a2a_discovery_constitution.py",
     "tests/unit/test_managed_eval_trend.py",
     "tests/unit/test_im_wizard.py",
+    "tests/unit/test_presence_samples.py",
     "tests/integration/test_opencode_factory.py",
     "tests/unit/test_factory_gate.py",
 ]
@@ -212,15 +226,46 @@ def stage_card() -> dict[str, Any]:
             ht.resolve_trace_path = orig_resolve  # type: ignore
         checks.append({"id": "harness_trace", "ok": ok_trace})
 
+        from fangyu.core.presence_samples import list_sample_meta, load_sample_pack
+
+        samples = list_sample_meta()
+        ok_samples = _ok(
+            "presence replay samples",
+            any(s.get("id") == "cross-host" for s in samples),
+            f"n={len(samples)}",
+        )
+        checks.append({"id": "presence_samples", "ok": ok_samples, "count": len(samples)})
+        if ok_samples:
+            pack = load_sample_pack("cross-host")
+            kinds = {e.get("kind") for e in (pack.get("events") or [])}
+            ok_xh = _ok(
+                "cross-host sample events",
+                "host.heartbeat" in kinds and "managed.start" in kinds,
+                f"kinds={len(kinds)}",
+            )
+            checks.append({"id": "cross_host_sample", "ok": ok_xh})
+
         ok = all(c.get("ok") for c in checks)
         return {"ok": ok, "checks": checks}
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-def stage_live() -> dict[str, Any]:
-    """返回 live 阶段结果。"""
-    print("==> stage: live")
+def resolve_live_tier(args: argparse.Namespace) -> str:
+    if args.skip_live or args.live_tier == "none":
+        return "none"
+    if args.live_tier:
+        return str(args.live_tier)
+    return "full"
+
+
+def stage_live(*, tier: str = "full") -> dict[str, Any]:
+    """返回 live 阶段结果。tier: none | smoke | full"""
+    print(f"==> stage: live (tier={tier})")
+    if tier == "none":
+        print("[SKIP] live — tier=none")
+        return {"ok": True, "skipped": True, "tier": tier, "scripts": [], "reason": "tier-none"}
+
     try:
         from fangyu.core.credentials import ensure_api_keys
         has_key = ensure_api_keys()
@@ -228,13 +273,9 @@ def stage_live() -> dict[str, Any]:
         has_key = False
     if not has_key:
         print("[SKIP] live — 无 API Key（.env / Studio DB）")
-        return {"ok": True, "skipped": True, "scripts": []}
+        return {"ok": True, "skipped": True, "tier": tier, "scripts": []}
 
-    scripts = [
-        "scripts/opencode_harness_live.py",
-        "scripts/task_harness_live.py",
-        "scripts/workbuddy_harness_live.py",
-    ]
+    scripts = list(LIVE_TIER_SCRIPTS.get(tier) or LIVE_TIER_SCRIPTS["full"])
     results: list[dict[str, Any]] = []
     ok = True
     for rel in scripts:
@@ -252,12 +293,18 @@ def stage_live() -> dict[str, Any]:
         passed = code == 0
         ok = _ok(rel, passed, tail) and ok
         results.append({"script": rel, "ok": passed, "exit_code": code, "detail": tail})
-    return {"ok": ok, "skipped": False, "scripts": results}
+    return {"ok": ok, "skipped": False, "tier": tier, "scripts": results}
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="fangyu factory gate")
-    parser.add_argument("--skip-live", action="store_true", help="跳过 live 阶段")
+    parser.add_argument("--skip-live", action="store_true", help="跳过 live（等价 --live-tier none）")
+    parser.add_argument(
+        "--live-tier",
+        choices=["none", "smoke", "full"],
+        default=None,
+        help="live 档：none / smoke(仅 opencode) / full(全部 harness)",
+    )
     parser.add_argument("--strict-live", action="store_true", help="无 Key 跳过 live 时仍返回失败")
     parser.add_argument("--unit-only", action="store_true", help="只跑 unit")
     parser.add_argument("--no-report", action="store_true", help="不写 Eval 报告文件")
@@ -267,6 +314,7 @@ def main() -> int:
     stages: dict[str, Any] = {}
     failed = False
     live_skipped = False
+    live_tier = resolve_live_tier(args)
 
     unit = stage_unit()
     stages["unit"] = unit
@@ -274,7 +322,7 @@ def main() -> int:
         failed = True
     if args.unit_only:
         exit_code = 1 if failed else 0
-        _emit_report(stages, exit_code, args, live_skipped=False)
+        _emit_report(stages, exit_code, args, live_skipped=False, live_tier=live_tier)
         return exit_code
 
     card = stage_card()
@@ -282,34 +330,30 @@ def main() -> int:
     if not card.get("ok"):
         failed = True
 
-    if not args.skip_live:
-        live = stage_live()
-        stages["live"] = live
-        live_skipped = bool(live.get("skipped"))
-        if not live.get("ok"):
-            failed = True
-        if live_skipped and args.strict_live:
-            failed = True
-            print("[FAIL] --strict-live：live 被跳过视为失败")
-    else:
-        stages["live"] = {"ok": True, "skipped": True, "reason": "skip-live"}
-        live_skipped = True
+    live = stage_live(tier=live_tier)
+    stages["live"] = live
+    live_skipped = bool(live.get("skipped"))
+    if not live.get("ok"):
+        failed = True
+    if live_skipped and args.strict_live:
+        failed = True
+        print("[FAIL] --strict-live：live 被跳过视为失败")
 
     print()
     if failed:
         print("[FAIL] 出厂门禁未过")
         exit_code = 1
-    elif args.skip_live:
-        print("[OK] 出厂门禁通过（--skip-live，未跑 live）")
+    elif live_tier == "none":
+        print("[OK] 出厂门禁通过（live-tier=none）")
         exit_code = 0
     elif live_skipped:
-        print("[OK] 出厂门禁通过（live 跳过）")
+        print(f"[OK] 出厂门禁通过（live 跳过，tier={live_tier}）")
         exit_code = 2
     else:
-        print("[OK] 出厂门禁全绿")
+        print(f"[OK] 出厂门禁全绿（live-tier={live_tier}）")
         exit_code = 0
 
-    _emit_report(stages, exit_code, args, live_skipped=live_skipped)
+    _emit_report(stages, exit_code, args, live_skipped=live_skipped, live_tier=live_tier)
     return exit_code
 
 
@@ -319,6 +363,7 @@ def _emit_report(
     args: argparse.Namespace,
     *,
     live_skipped: bool,
+    live_tier: str = "full",
 ) -> None:
     if args.no_report:
         return
@@ -328,7 +373,8 @@ def _emit_report(
         path = write_eval_report({
             "exit_code": exit_code,
             "ok": exit_code in (0, 2),
-            "skip_live": bool(args.skip_live),
+            "skip_live": bool(args.skip_live) or live_tier == "none",
+            "live_tier": live_tier,
             "strict_live": bool(args.strict_live),
             "unit_only": bool(args.unit_only),
             "live_skipped": live_skipped,

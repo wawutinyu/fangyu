@@ -87,6 +87,40 @@ export async function deletePresenceReplay(replayId: string): Promise<void> {
   if (!res.ok) throw new Error(`删除回放失败 (${res.status})`)
 }
 
+export interface PresenceSampleMeta {
+  id: string
+  title: string
+  path?: string
+  events: number
+  presence: number
+  exported_at?: string
+}
+
+export async function listPresenceSamples(): Promise<PresenceSampleMeta[]> {
+  const res = await fetch('/api/v1/presence/replays/samples')
+  if (!res.ok) throw new Error(`样例列表失败 (${res.status})`)
+  const data = await res.json() as { samples: PresenceSampleMeta[] }
+  return data.samples || []
+}
+
+export async function loadPresenceSample(
+  sampleId: string,
+  persist = true,
+): Promise<{
+  sample_id: string
+  title?: string
+  replay: PresenceReplayMeta | null
+  snapshot: PresenceSnapshot
+}> {
+  const q = persist ? '?persist=true' : '?persist=false'
+  const res = await fetch(
+    `/api/v1/presence/replays/samples/${encodeURIComponent(sampleId)}/load${q}`,
+    { method: 'POST' },
+  )
+  if (!res.ok) throw new Error(`加载样例失败 (${res.status})`)
+  return res.json()
+}
+
 export async function fetchPresenceEvents(opts?: {
   limit?: number
   kind?: string

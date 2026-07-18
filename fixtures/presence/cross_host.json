@@ -1,0 +1,202 @@
+{
+  "format": "fangyu.guan.replay",
+  "version": 1,
+  "id": "cross-host",
+  "title": "跨机 Presence 样例",
+  "exported_at": "2026-07-18T16:00:00Z",
+  "summary": {
+    "agents": 2,
+    "agents_busy": 0,
+    "workers": 1,
+    "workers_online": 1,
+    "managed": 1,
+    "hosts": 2,
+    "events": 8
+  },
+  "departments": [
+    {
+      "id": "dept-sense",
+      "label": "感知",
+      "houses": [{ "id": "house-sense-0", "label": "感知·正厅" }]
+    },
+    {
+      "id": "dept-managed",
+      "label": "托管",
+      "houses": [{ "id": "house-managed-0", "label": "托管·正厅" }]
+    },
+    {
+      "id": "dept-hosts",
+      "label": "跨机",
+      "houses": [{ "id": "house-hosts-0", "label": "跨机·正厅" }]
+    },
+    {
+      "id": "dept-xing",
+      "label": "行",
+      "houses": [{ "id": "house-xing-0", "label": "行·正厅" }]
+    }
+  ],
+  "presence": [
+    {
+      "id": "agent:检索",
+      "kind": "agent",
+      "name": "检索",
+      "label": "检索",
+      "status": "idle",
+      "online": true,
+      "department": "感知",
+      "department_id": "dept-sense"
+    },
+    {
+      "id": "agent:汇总",
+      "kind": "agent",
+      "name": "汇总",
+      "label": "汇总",
+      "status": "idle",
+      "online": true,
+      "department": "感知",
+      "department_id": "dept-sense"
+    },
+    {
+      "id": "worker:edge-1",
+      "kind": "worker",
+      "name": "edge-1",
+      "label": "边缘行",
+      "status": "idle",
+      "online": true,
+      "department": "行",
+      "department_id": "dept-xing"
+    },
+    {
+      "id": "managed:demo-a",
+      "kind": "managed",
+      "name": "demo-a",
+      "label": "本机托管 A",
+      "status": "offline",
+      "online": false,
+      "department": "托管",
+      "department_id": "dept-managed",
+      "host": "127.0.0.1",
+      "port": 9101
+    },
+    {
+      "id": "host:studio-east",
+      "kind": "host",
+      "name": "studio-east",
+      "label": "东厂 Studio",
+      "status": "offline",
+      "online": false,
+      "department": "跨机",
+      "department_id": "dept-hosts",
+      "base_url": "https://east.example:8787",
+      "role": "studio"
+    },
+    {
+      "id": "host:studio-west",
+      "kind": "host",
+      "name": "studio-west",
+      "label": "西厂 Studio",
+      "status": "offline",
+      "online": false,
+      "department": "跨机",
+      "department_id": "dept-hosts",
+      "base_url": "https://west.example:8787",
+      "role": "studio"
+    }
+  ],
+  "events": [
+    {
+      "id": "xh-1",
+      "ts": 1710000001.0,
+      "kind": "host.heartbeat",
+      "actor": "host:studio-east",
+      "target": null,
+      "message": "主机在线 东厂 Studio",
+      "detail": {
+        "host_id": "studio-east",
+        "base_url": "https://east.example:8787",
+        "role": "studio",
+        "label": "东厂 Studio"
+      },
+      "severity": "info"
+    },
+    {
+      "id": "xh-2",
+      "ts": 1710000002.0,
+      "kind": "host.heartbeat",
+      "actor": "host:studio-west",
+      "target": null,
+      "message": "主机在线 西厂 Studio",
+      "detail": {
+        "host_id": "studio-west",
+        "base_url": "https://west.example:8787",
+        "role": "studio",
+        "label": "西厂 Studio"
+      },
+      "severity": "info"
+    },
+    {
+      "id": "xh-3",
+      "ts": 1710000003.0,
+      "kind": "managed.start",
+      "actor": "managed:demo-a",
+      "target": "本机托管 A",
+      "message": "托管启动 本机托管 A :9101",
+      "detail": {
+        "instance_id": "demo-a",
+        "host": "127.0.0.1",
+        "port": 9101
+      },
+      "severity": "info"
+    },
+    {
+      "id": "xh-4",
+      "ts": 1710000004.0,
+      "kind": "a2a.send",
+      "actor": "检索",
+      "target": "汇总",
+      "message": "东厂材料交西厂汇总",
+      "detail": { "via_host": "studio-east" },
+      "severity": "info"
+    },
+    {
+      "id": "xh-5",
+      "ts": 1710000005.0,
+      "kind": "worker.enqueued",
+      "actor": "汇总",
+      "target": "edge-1",
+      "message": "边缘校验",
+      "detail": {},
+      "severity": "info"
+    },
+    {
+      "id": "xh-6",
+      "ts": 1710000006.0,
+      "kind": "worker.complete",
+      "actor": "edge-1",
+      "target": "汇总",
+      "message": "校验通过",
+      "detail": {},
+      "severity": "info"
+    },
+    {
+      "id": "xh-7",
+      "ts": 1710000007.0,
+      "kind": "a2a.complete",
+      "actor": "汇总",
+      "target": "检索",
+      "message": "跨机交付完成",
+      "detail": {},
+      "severity": "info"
+    },
+    {
+      "id": "xh-8",
+      "ts": 1710000008.0,
+      "kind": "host.offline",
+      "actor": "host:studio-west",
+      "target": null,
+      "message": "西厂心跳过期",
+      "detail": { "host_id": "studio-west" },
+      "severity": "warn"
+    }
+  ]
+}

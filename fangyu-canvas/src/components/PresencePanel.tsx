@@ -12,6 +12,7 @@ import {
   savePresenceReplay,
   importPresenceReplay,
   loadPresenceReplay,
+  loadPresenceSample,
   deletePresenceReplay,
   type PresenceReplayMeta,
 } from '../utils/presenceApi'
@@ -165,6 +166,28 @@ export default function PresencePanel() {
       setDemoBusy(false)
     }
   }, [])
+
+  const loadCrossHostSample = useCallback(async () => {
+    setDemoBusy(true)
+    setDemoHint(null)
+    try {
+      const out = await loadPresenceSample('cross-host', true)
+      applyArchiveSnapshot(out.snapshot, out.title || out.replay?.title || '跨机 Presence 样例')
+      try {
+        setLibrary(await listPresenceReplays(40))
+      } catch {
+        /* ignore */
+      }
+      setDemoHint(`已加载跨机样例 · ${out.snapshot.events?.length || 0} 事件 — 可拖回放`)
+      setReplayIndex(0)
+      setReplayPlaying(true)
+      window.setTimeout(() => setDemoHint(null), 5000)
+    } catch (e) {
+      setDemoHint(e instanceof Error ? e.message : String(e))
+    } finally {
+      setDemoBusy(false)
+    }
+  }, [applyArchiveSnapshot])
 
   const reload = useCallback(async () => {
     if (archiveModeRef.current) return
@@ -488,6 +511,17 @@ export default function PresencePanel() {
               title="注入检索/分析/汇总/行，并写入协作事件"
             >
               {demoBusy ? '上演中…' : '演示剧本'}
+            </button>
+            <button
+              type="button"
+              className="notion-btn"
+              data-testid="presence-cross-host-sample"
+              style={{ fontSize: 11 }}
+              disabled={demoBusy}
+              onClick={() => { void loadCrossHostSample() }}
+              title="加载内置跨机 Presence 回放样例（host + managed）"
+            >
+              跨机样例
             </button>
           </>
         )}

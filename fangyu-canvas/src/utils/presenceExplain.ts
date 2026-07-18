@@ -150,6 +150,27 @@ export function explainCollabEvent(ev: CollaborationEvent): PlainExplanation {
     }
   }
 
+  if (kind === 'host.heartbeat' || kind === 'host.online') {
+    return {
+      title: '跨机心跳',
+      plain: msg
+        || `主机「${ev.actor}」上报在线${(ev.detail as { base_url?: string } | undefined)?.base_url
+          ? `（${(ev.detail as { base_url?: string }).base_url}）`
+          : ''}。`,
+      nextStep: '观里筛「主机」可见；心跳过期后应变 offline。',
+      severity,
+    }
+  }
+
+  if (kind === 'host.offline' || kind === 'host.leave' || kind === 'host.expired') {
+    return {
+      title: '跨机离线',
+      plain: msg || `主机「${ev.actor}」已离线或心跳过期。`,
+      nextStep: '回放此帧应显示 offline；确认对端 Studio 是否仍在跑 heartbeat。',
+      severity: severity === 'info' ? 'warn' : severity,
+    }
+  }
+
   if (kind.includes('fail') || kind.includes('error') || severity === 'error') {
     return {
       title: '协作出错',

@@ -106,9 +106,10 @@
 ⑳ A2A 跨厂发现 + 律产品面        ✅ discovery/probe/factories · 律禁项/Bundle 宪法
 ㉑ 托管升级 + Eval 趋势           ✅ restart/upgrade · eval-history/trend
 ㉒ 飞书向导 + Presence 托管回放   ✅ im/status·运维飞书页 · managed.* 帧对齐
+㉓ 跨机回放样例 + live 可选档     ✅ fixtures/cross-host · --live-tier none/smoke/full
 ```
 
-下一刀：真 IM（仍暂缓）· Presence 跨机回放样例包 · Eval 门禁挂 live 可选档。
+下一刀：真 IM（仍暂缓）· Eval 趋势进 Studio 对比页 · A2A 工厂目录 UI。
 
 ---
 
