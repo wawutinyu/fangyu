@@ -10,13 +10,19 @@ from fangyu.engine.workspace import init_bundle_workspace
 
 def test_list_subagent_types():
     ids = {x["id"] for x in list_subagent_types()}
-    assert ids == {"explore", "general", "review"}
+    assert ids == {"explore", "general", "review", "scout"}
 
 
 def test_explore_tools_readonly():
     tools = tools_for_subagent("explore")
-    assert set(tools) == {"read", "list", "search"}
-    assert "write" not in tools and "task" not in tools
+    assert "read" in tools and "glob" in tools and "grep" in tools
+    assert "write" not in tools and "task" not in tools and "webfetch" not in tools
+
+
+def test_scout_has_web_tools():
+    tools = tools_for_subagent("scout")
+    assert "webfetch" in tools and "websearch" in tools
+    assert "write" not in tools
 
 
 @pytest.mark.asyncio

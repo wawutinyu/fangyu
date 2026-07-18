@@ -11,10 +11,8 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from fangyu.engine.bundle_tools import (
+    builtin_tool_impls,
     coding_toolbelt,
-    tool_list,
-    tool_read,
-    tool_search,
 )
 
 LlmFn = Callable[[list[dict[str, str]]], Awaitable[str]]
@@ -23,7 +21,7 @@ EXPLORE_SYSTEM = (
     "你是只读探索子 Agent（explore）。每轮只输出一个 JSON 对象，不要 Markdown 围栏。\n"
     '调用工具: {"action":"tool","name":"<name>","args":{...}}\n'
     '结束: {"action":"done","result":"<给父 Agent 的简洁发现>"}\n'
-    "只用 list / search / read；不要改文件。结论要含具体路径与要点。\n"
+    "只用 list / glob / grep / search / read；不要改文件。结论要含具体路径与要点。\n"
     "可用工具会在用户消息中列出。"
 )
 
@@ -31,7 +29,7 @@ GENERAL_SYSTEM = (
     "你是通用执行子 Agent（general）。每轮只输出一个 JSON 对象，不要 Markdown 围栏。\n"
     '调用工具: {"action":"tool","name":"<name>","args":{...}}\n'
     '结束: {"action":"done","result":"<给父 Agent 的结论>"}\n'
-    "在工作区内完成指派的编码子任务；改完用简洁结果汇报。\n"
+    "在工作区内完成指派的编码子任务；不确定时可用 question；改完用简洁结果汇报。\n"
     "可用工具会在用户消息中列出。"
 )
 
@@ -39,13 +37,21 @@ REVIEW_SYSTEM = (
     "你是只读审查子 Agent（review）。每轮只输出一个 JSON 对象，不要 Markdown 围栏。\n"
     '调用工具: {"action":"tool","name":"<name>","args":{...}}\n'
     '结束: {"action":"done","result":"<审查结论：问题/风险/建议>"}\n'
-    "只用 list / search / read；聚焦正确性、安全与明显缺陷。\n"
+    "只用 list / glob / grep / search / read；聚焦正确性、安全与明显缺陷。\n"
+    "可用工具会在用户消息中列出。"
+)
+
+SCOUT_SYSTEM = (
+    "你是外研子 Agent（scout）。每轮只输出一个 JSON 对象，不要 Markdown 围栏。\n"
+    '调用工具: {"action":"tool","name":"<name>","args":{...}}\n'
+    '结束: {"action":"done","result":"<调研结论：来源 URL + 要点>"}\n'
+    "优先 websearch / webfetch；需要对照本地时用 glob/grep/read。不要改文件。\n"
     "可用工具会在用户消息中列出。"
 )
 
 SUBAGENT_TYPES: dict[str, dict[str, Any]] = {
     "explore": {
-        "description": "只读探索代码库（list/search/read）",
+        "description": "只读探索代码库（list/glob/grep/read）",
         "system": EXPLORE_SYSTEM,
         "require_plan": False,
         "max_turns": 8,
@@ -59,10 +65,17 @@ SUBAGENT_TYPES: dict[str, dict[str, Any]] = {
         "readonly": False,
     },
     "review": {
-        "description": "只读代码审查（list/search/read）",
+        "description": "只读代码审查（list/glob/grep/read）",
         "system": REVIEW_SYSTEM,
         "require_plan": False,
         "max_turns": 8,
+        "readonly": True,
+    },
+    "scout": {
+        "description": "外网调研 + 只读仓内对照（webfetch/websearch）",
+        "system": SCOUT_SYSTEM,
+        "require_plan": False,
+        "max_turns": 10,
         "readonly": True,
     },
 }
@@ -81,20 +94,25 @@ def clear_task_sessions() -> None:
     _SESSIONS.clear()
 
 
-def _readonly_tools() -> dict[str, Any]:
-    return {
-        "read": tool_read,
-        "list": tool_list,
-        "search": tool_search,
-    }
-
-
 def tools_for_subagent(subagent_type: str) -> dict[str, Any]:
     meta = SUBAGENT_TYPES.get(subagent_type)
     if not meta:
         raise ValueError(f"未知 subagent_type: {subagent_type}；可选: {', '.join(SUBAGENT_TYPES)}")
+    from fangyu.core.materials import role_tool_ids
+
+    ids = role_tool_ids(subagent_type)
+    impls = builtin_tool_impls()
+    if ids:
+        out = {tid: impls[tid] for tid in ids if tid in impls}
+        if out:
+            return out
     if meta.get("readonly"):
-        return _readonly_tools()
+        # 回退只读集
+        return {
+            k: impls[k]
+            for k in ("read", "list", "glob", "grep", "search")
+            if k in impls
+        }
     return coding_toolbelt()
 
 

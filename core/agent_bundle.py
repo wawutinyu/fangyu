@@ -198,7 +198,9 @@ def create_agent_bundle(
     # 工具闭包清单（运行时 toolbelt 实现仍在引擎内；清单随包可审计）
     if toolbelt:
         from fangyu.core.agent_factory import toolbelt_manifest
+        from fangyu.core.materials import default_materials, write_materials
 
+        write_materials(root, default_materials())
         tb = toolbelt_manifest(toolbelt)
         if tb:
             (root / "config" / "toolbelt.json").write_text(

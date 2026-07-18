@@ -31,14 +31,17 @@ CODING_SYSTEM = (
     '1) 规划（多步任务必须先 plan，可随时用新 plan 修正）:\n'
     '   {"action":"plan","steps":["探索相关文件","修改 A","跑验证","总结"]}\n'
     '2) 工具: {"action":"tool","name":"<name>","args":{...}}\n'
+    "   仓内: read/write/list/glob/grep/search/apply_patch/shell\n"
+    "   外网: websearch / webfetch；不确定问人: question\n"
     '3) 委派子 Agent:\n'
-    '   单个: {"action":"tool","name":"task","args":{"subagent_type":"explore|general|review","prompt":"...","description":"短描述"}}\n'
-    '   并行: {"action":"tool","name":"task","args":{"tasks":[{"subagent_type":"explore","prompt":"..."},{"subagent_type":"review","prompt":"..."}]}}\n'
+    '   单个: {"action":"tool","name":"task","args":{"subagent_type":"explore|general|review|scout","prompt":"...","description":"短描述"}}\n'
+    '   并行: {"action":"tool","name":"task","args":{"tasks":[{"subagent_type":"explore","prompt":"..."},{"subagent_type":"scout","prompt":"..."}]}}\n'
     '   后台: 同上并加 "background":true（完成后自动回灌；勿轮询）\n'
     '   可用 task_id 续跑。子 Agent 默认不能再 task。\n'
     '4) 结束: {"action":"done","result":"<结论>"}\n'
     "稳定性要求：\n"
-    "- 陌生代码库可先 task explore，或自行 list/search/read，再改文件；禁止臆造路径。\n"
+    "- 陌生代码库可先 task explore，或自行 glob/grep/read，再改文件；禁止臆造路径。\n"
+    "- 外部资料用 scout 或 websearch/webfetch；引用带来源。\n"
     "- 一次改动尽量小而可验证；失败则根据工具错误调整，不要盲目重复同一调用。\n"
     "- 多文件任务按 plan 推进；完成前用 list/search 或 shell 做最小验证（若允许）。\n"
     "- 危险命令不要执行；只在工作区内读写。\n"

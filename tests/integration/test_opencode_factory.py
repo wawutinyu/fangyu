@@ -34,6 +34,9 @@ def test_factory_opencode_bundle_layout(tmp_path, restore_data_dir):
     tb = json.loads((root / "config" / "toolbelt.json").read_text(encoding="utf-8"))
     assert "write" in tb["tools"] and "shell" in tb["tools"]
     assert "task" in tb["tools"]
+    assert "webfetch" in tb["tools"] and "glob" in tb["tools"]
+    assert "scout" in (tb.get("subagents") or [])
+    assert (root / "config" / "materials.json").is_file()
     assert "explore" in (tb.get("subagents") or [])
     flow = json.loads((root / "skills" / "default" / "flow.json").read_text(encoding="utf-8"))
     types = [

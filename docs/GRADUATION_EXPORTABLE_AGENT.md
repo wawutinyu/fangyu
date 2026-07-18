@@ -3,7 +3,7 @@
 > 方隅的目的是 **批量、快速产出高质量 Agent 的平台**。  
 > 毕业 ≠ Studio 好用，而是：**用平台搭出并能导出**达到 OpenCode harness **与** WorkBuddy（含 IM / 企业权限 / 托管 / **多 Agent 编排**）档的独立智能体。
 
-关联：[愿景](VISION_AND_PRODUCT.md) · [评估](PROJECT_ASSESSMENT.md) · [L1 路线图](L1_ROADMAP.md)
+关联：[愿景](VISION_AND_PRODUCT.md) · [评估](PROJECT_ASSESSMENT.md) · [L1 路线图](L1_ROADMAP.md) · [工厂原料目录](FACTORY_MATERIALS.md)
 
 **口径更正（2026-07-18）：** IM、企业权限、托管、**多 Agent 编排** **属于毕业范围**，不是「以后再说」的附加项。
 

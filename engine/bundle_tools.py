@@ -31,7 +31,12 @@ def tool_list(path: str = ".") -> list[str]:
 
 
 def tool_search(pattern: str = "", path: str = ".", max_hits: int = 50) -> list[dict[str, Any]]:
-    """在工作区内按正则搜文件内容（简易 ripgrep）。"""
+    """在工作区内按正则搜文件内容（grep 别名，兼容旧名）。"""
+    return tool_grep(pattern=pattern, path=path, max_hits=max_hits)
+
+
+def tool_grep(pattern: str = "", path: str = ".", max_hits: int = 50) -> list[dict[str, Any]]:
+    """在工作区内按正则搜文件内容。"""
     ws = _ws()
     root = ws.resolve(path)
     if not pattern:
@@ -55,6 +60,160 @@ def tool_search(pattern: str = "", path: str = ".", max_hits: int = 50) -> list[
                 if len(hits) >= max_hits:
                     return hits
     return hits
+
+
+def tool_glob(pattern: str = "**/*", path: str = ".") -> list[str]:
+    """按 glob 模式列出工作区相对路径（文件）。"""
+    import fnmatch
+
+    ws = _ws()
+    base = ws.resolve(path)
+    pat = (pattern or "**/*").strip() or "**/*"
+    out: list[str] = []
+    if base.is_file():
+        rel = str(base.relative_to(ws.root))
+        if fnmatch.fnmatch(rel, pat) or fnmatch.fnmatch(base.name, pat):
+            return [rel]
+        return []
+    # 支持 ** 与简单后缀
+    if "**" in pat or "/" in pat:
+        files = sorted(base.rglob("*"))
+        for f in files:
+            if not f.is_file() or ".fangyu" in f.parts:
+                continue
+            rel = str(f.relative_to(ws.root))
+            # 相对 path 根的匹配 + 相对 workspace 根
+            try:
+                rel_base = str(f.relative_to(base))
+            except ValueError:
+                rel_base = rel
+            if fnmatch.fnmatch(rel, pat) or fnmatch.fnmatch(rel_base, pat) or fnmatch.fnmatch(f.name, pat):
+                out.append(rel)
+    else:
+        for f in sorted(base.rglob(pat)):
+            if f.is_file() and ".fangyu" not in f.parts:
+                out.append(str(f.relative_to(ws.root)))
+    return out[:500]
+
+
+def _strip_html(html: str) -> str:
+    text = re.sub(r"(?is)<script[^>]*>.*?</script>", " ", html)
+    text = re.sub(r"(?is)<style[^>]*>.*?</style>", " ", text)
+    text = re.sub(r"(?s)<[^>]+>", " ", text)
+    text = re.sub(r"&nbsp;", " ", text)
+    text = re.sub(r"&amp;", "&", text)
+    text = re.sub(r"&lt;", "<", text)
+    text = re.sub(r"&gt;", ">", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
+def tool_webfetch(url: str = "", max_chars: int = 12000) -> dict[str, Any]:
+    """拉取 URL 文本（HTML 粗转文本）。工厂原料 webfetch。"""
+    import httpx
+
+    u = (url or "").strip()
+    if not u:
+        raise ValueError("url 为空")
+    if not re.match(r"^https?://", u, re.I):
+        raise ValueError("仅允许 http/https URL")
+    with httpx.Client(timeout=20.0, follow_redirects=True) as client:
+        resp = client.get(u, headers={"User-Agent": "fangyu-webfetch/1.0"})
+        resp.raise_for_status()
+        ctype = (resp.headers.get("content-type") or "").lower()
+        raw = resp.text
+        final_url = str(resp.url)
+        status_code = resp.status_code
+    if "html" in ctype or raw.lstrip().startswith("<"):
+        body = _strip_html(raw)
+    else:
+        body = raw
+    total_len = len(body)
+    truncated = total_len > max_chars
+    if truncated:
+        body = body[:max_chars] + f"\n…(truncated, total {total_len} chars)"
+    return {
+        "url": final_url,
+        "status_code": status_code,
+        "content_type": ctype,
+        "text": body,
+        "truncated": truncated,
+    }
+
+
+def tool_websearch(query: str = "", max_results: int = 5) -> dict[str, Any]:
+    """互联网搜索（DuckDuckGo Instant Answer API，无 Key）。"""
+    import httpx
+    from urllib.parse import urlencode
+
+    q = (query or "").strip()
+    if not q:
+        raise ValueError("query 为空")
+    n = max(1, min(int(max_results or 5), 10))
+    params = urlencode({"q": q, "format": "json", "no_html": "1", "skip_disambig": "1"})
+    api = f"https://api.duckduckgo.com/?{params}"
+    with httpx.Client(timeout=20.0, follow_redirects=True) as client:
+        resp = client.get(api, headers={"User-Agent": "fangyu-websearch/1.0"})
+        resp.raise_for_status()
+        data = resp.json()
+    results: list[dict[str, str]] = []
+    abstract = (data.get("AbstractText") or "").strip()
+    abstract_url = (data.get("AbstractURL") or "").strip()
+    if abstract:
+        results.append({
+            "title": data.get("Heading") or q,
+            "url": abstract_url,
+            "snippet": abstract[:500],
+        })
+    for topic in data.get("RelatedTopics") or []:
+        if len(results) >= n:
+            break
+        if isinstance(topic, dict) and topic.get("Text"):
+            results.append({
+                "title": (topic.get("Text") or "")[:80],
+                "url": str(topic.get("FirstURL") or ""),
+                "snippet": (topic.get("Text") or "")[:400],
+            })
+        elif isinstance(topic, dict) and isinstance(topic.get("Topics"), list):
+            for sub in topic["Topics"]:
+                if len(results) >= n:
+                    break
+                if isinstance(sub, dict) and sub.get("Text"):
+                    results.append({
+                        "title": (sub.get("Text") or "")[:80],
+                        "url": str(sub.get("FirstURL") or ""),
+                        "snippet": (sub.get("Text") or "")[:400],
+                    })
+    return {"query": q, "results": results[:n], "source": "duckduckgo"}
+
+
+def tool_question(prompt: str = "", options: str = "") -> dict[str, Any]:
+    """向人类提问（观察结果回灌；调用方应在 done 中转述并等待）。"""
+    q = (prompt or "").strip()
+    if not q:
+        raise ValueError("prompt 为空")
+    opts = [o.strip() for o in (options or "").split("|") if o.strip()]
+    # 落盘便于观/审计
+    try:
+        ws = _ws()
+        log = ws.root / ".fangyu" / "questions.jsonl"
+        log.parent.mkdir(parents=True, exist_ok=True)
+        import json as _json
+        import time
+        with log.open("a", encoding="utf-8") as f:
+            f.write(_json.dumps({
+                "ts": time.time(),
+                "question": q,
+                "options": opts,
+            }, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+    return {
+        "status": "needs_user",
+        "question": q,
+        "options": opts,
+        "hint": "请把问题转述给用户；取得答复前不要臆造答案。",
+    }
 
 
 def tool_apply_patch(path: str = "", old: str = "", new: str = "") -> str:
@@ -97,15 +256,76 @@ def tool_shell(command: str = "", timeout_sec: float = 30) -> dict[str, Any]:
 
 
 def coding_toolbelt() -> dict[str, Any]:
-    """agent_loop 用的默认工具表。"""
+    """agent_loop 用的默认编码工具表（含工厂 P0 原料）。"""
     return {
         "read": tool_read,
         "write": tool_write,
         "list": tool_list,
         "search": tool_search,
+        "grep": tool_grep,
+        "glob": tool_glob,
         "apply_patch": tool_apply_patch,
         "shell": tool_shell,
+        "webfetch": tool_webfetch,
+        "websearch": tool_websearch,
+        "question": tool_question,
     }
+
+
+def office_toolbelt() -> dict[str, Any]:
+    """WorkBuddy 办公工具表：读写 + 成品落盘（无 shell）。"""
+    return {
+        "read": tool_read,
+        "write": tool_write,
+        "list": tool_list,
+        "write_deliverable": tool_write_deliverable,
+        "list_deliverables": tool_list_deliverables,
+    }
+
+
+_BUILTIN_IMPL: dict[str, Any] | None = None
+
+
+def builtin_tool_impls() -> dict[str, Any]:
+    global _BUILTIN_IMPL
+    if _BUILTIN_IMPL is None:
+        _BUILTIN_IMPL = {
+            **coding_toolbelt(),
+            **office_toolbelt(),
+        }
+    return _BUILTIN_IMPL
+
+
+def resolve_toolbelt(
+    toolbelt: str | None,
+    *,
+    materials: dict[str, Any] | None = None,
+    include_runtime: bool = False,
+) -> dict[str, Any]:
+    """按原料注册表解析 toolbelt；未知带回退 coding/office 经典表。"""
+    from fangyu.core.materials import tool_ids_for_belt
+
+    tb = (toolbelt or "coding").strip().lower()
+    if materials is None:
+        try:
+            from fangyu.core.materials import default_materials
+            materials = default_materials()
+        except Exception:
+            materials = None
+    if materials:
+        ids = tool_ids_for_belt(tb, materials)
+        impls = builtin_tool_impls()
+        out: dict[str, Any] = {}
+        for tid in ids:
+            if tid == "task" and not include_runtime:
+                continue  # task 由 agent_loop runtime 注入
+            if tid in impls:
+                out[tid] = impls[tid]
+        if out:
+            return out
+    if tb == "office":
+        return office_toolbelt()
+    return coding_toolbelt()
 
 
 def _normalize_deliverable_rel(path: str, kind: str) -> str:
@@ -371,21 +591,3 @@ def tool_list_deliverables() -> list[str]:
         if f.is_file():
             out.append(str(f.relative_to(ws.root)))
     return out
-
-
-def office_toolbelt() -> dict[str, Any]:
-    """WorkBuddy 办公工具表：读写 + 成品落盘（无 shell）。"""
-    return {
-        "read": tool_read,
-        "write": tool_write,
-        "list": tool_list,
-        "write_deliverable": tool_write_deliverable,
-        "list_deliverables": tool_list_deliverables,
-    }
-
-
-def resolve_toolbelt(toolbelt: str | None) -> dict[str, Any]:
-    tb = (toolbelt or "coding").strip().lower()
-    if tb == "office":
-        return office_toolbelt()
-    return coding_toolbelt()

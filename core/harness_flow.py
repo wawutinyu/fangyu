@@ -64,7 +64,8 @@ CODING_CONSTITUTION: dict[str, Any] = {
         "必须为人类服务",
         "多步任务先 plan 再执行，失败则修正计划",
         "陌生代码库先探索再改；禁止盲目重复同一工具调用",
-        "复杂探索可委派 task 子 Agent（explore/general/review）",
+        "复杂探索可委派 task 子 Agent（explore/general/review/scout）",
+        "外网资料用 webfetch/websearch；不确定时 question 问人",
     ],
     # agent-loop 内工具不走 forbidden_actions 名单；保持空以免误伤
     "forbidden_actions": [],

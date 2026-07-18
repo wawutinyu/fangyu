@@ -43,7 +43,7 @@
 - **用户：** 想造 Agent 的开发者 / 集成商 / 小团队
 - **价值：** 画出来 = 跑起来 = 导出去，比纯 SaaS 更「可带走」
 - **竞争点：** export parity、Bundle、A2A、ATP、Adapter SDK、自托管
-- **成功指标：** 能用平台 **批量导出** 达到 OpenCode harness **与** WorkBuddy 全档（含 **IM、企业权限、托管、多 Agent 编排**）的独立 Agent（见 [毕业标准](GRADUATION_EXPORTABLE_AGENT.md)）；脱离 Studio 仍能多轮干活并受包内宪法约束
+- **成功指标：** 能用平台 **批量导出** 达到 OpenCode harness **与** WorkBuddy 全档（含 **IM、企业权限、托管、多 Agent 编排**）的独立 Agent（见 [毕业标准](GRADUATION_EXPORTABLE_AGENT.md)）；脱离 Studio 仍能多轮干活并受包内宪法约束。工厂视角的工具/技能/角色货架见 [工厂原料目录](FACTORY_MATERIALS.md)。
 
 > **现阶段共识（2026-07-18）：产线地基优先，但毕业范围含 WorkBuddy 全档。**  
 > IM / 企业权限 / 托管 / **多 Agent 编排** **不是可选彩蛋**，与办公竖切同属 G2 毕业要件。  

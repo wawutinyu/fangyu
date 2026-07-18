@@ -125,18 +125,29 @@ def build_from_profile(
 
 
 def toolbelt_manifest(toolbelt: str | None) -> dict[str, Any] | None:
-    if toolbelt == "coding":
+    from fangyu.core.materials import default_materials, list_role_ids, tool_ids_for_belt
+
+    tb = (toolbelt or "").strip().lower()
+    if not tb:
+        return None
+    mat = default_materials()
+    tools = tool_ids_for_belt(tb, mat)
+    if not tools and tb == "coding":
         tools = sorted(set(coding_toolbelt().keys()) | {"task"})
-        return {
-            "id": "coding",
-            "tools": tools,
-            "scope": "bundle/workspace",
-            "subagents": ["explore", "general", "review"],
-        }
-    if toolbelt == "office":
-        return {
-            "id": "office",
-            "tools": sorted(office_toolbelt().keys()),
-            "scope": "bundle/workspace/deliverables",
-        }
-    return None
+    if not tools and tb == "office":
+        tools = sorted(office_toolbelt().keys())
+    if not tools:
+        return None
+    scope = {
+        "coding": "bundle/workspace",
+        "office": "bundle/workspace/deliverables",
+    }.get(tb, "bundle")
+    out: dict[str, Any] = {
+        "id": tb,
+        "tools": tools,
+        "scope": scope,
+        "materials_version": mat.get("version"),
+    }
+    if tb == "coding":
+        out["subagents"] = list_role_ids(mat)
+    return out
