@@ -57,6 +57,26 @@ def build_parser() -> argparse.ArgumentParser:
     im_in_p.add_argument("--workspace", default="")
     im_in_p.add_argument("--mode", default="", choices=["", "chat", "orchestrate"])
 
+    manage_p = sub.add_parser("manage", help="G2-D 托管：启停 / 状态 / 日志")
+    manage_sub = manage_p.add_subparsers(dest="manage_cmd", required=True)
+    ms = manage_sub.add_parser("start", help="后台托管启动 Bundle daemon")
+    ms.add_argument("bundle_dir")
+    ms.add_argument("--name", default="")
+    ms.add_argument("--host", default="127.0.0.1")
+    ms.add_argument("--port", type=int, default=0)
+    ms.add_argument("--workspace", default="")
+    ms.add_argument("--no-wait", action="store_true")
+    manage_sub.add_parser("list", help="列出托管实例")
+    mst = manage_sub.add_parser("status", help="查看实例状态")
+    mst.add_argument("instance_id", nargs="?", default="")
+    mstop = manage_sub.add_parser("stop", help="停止托管实例")
+    mstop.add_argument("instance_id")
+    mlogs = manage_sub.add_parser("logs", help="查看托管日志")
+    mlogs.add_argument("instance_id")
+    mlogs.add_argument("--tail", type=int, default=80)
+    mrm = manage_sub.add_parser("rm", help="停止并移除登记")
+    mrm.add_argument("instance_id")
+
     rpc_p = sub.add_parser("rpc", help="向 Bundle RPC 发送 a2a.send_message")
     rpc_p.add_argument("bundle_dir", help="调用方 Bundle（用于签名身份）")
     rpc_p.add_argument("--url", required=True, help="目标 RPC URL")
@@ -221,6 +241,50 @@ def cmd_im_inbound(args: argparse.Namespace) -> int:
     return 0 if result.get("success") else 1
 
 
+def cmd_manage(args: argparse.Namespace) -> int:
+    from fangyu.engine import managed_host as mh
+
+    cmd = args.manage_cmd
+    try:
+        if cmd == "start":
+            out = mh.start_instance(
+                args.bundle_dir,
+                name=args.name or None,
+                host=args.host,
+                port=args.port or None,
+                workspace=args.workspace or None,
+                wait=not args.no_wait,
+            )
+            print(json.dumps(out, ensure_ascii=False, indent=2, default=str))
+            return 0 if out.get("status") in ("running", "starting") or out.get("alive") else 1
+        if cmd == "list":
+            print(json.dumps({"instances": mh.list_instances()}, ensure_ascii=False, indent=2, default=str))
+            return 0
+        if cmd == "status":
+            if args.instance_id:
+                inst = mh.get_instance(args.instance_id)
+                if not inst:
+                    print(json.dumps({"error": f"not found: {args.instance_id}"}), file=sys.stderr)
+                    return 1
+                print(json.dumps(inst, ensure_ascii=False, indent=2, default=str))
+            else:
+                print(json.dumps({"instances": mh.list_instances()}, ensure_ascii=False, indent=2, default=str))
+            return 0
+        if cmd == "stop":
+            print(json.dumps(mh.stop_instance(args.instance_id), ensure_ascii=False, indent=2, default=str))
+            return 0
+        if cmd == "logs":
+            print(json.dumps(mh.read_logs(args.instance_id, tail=args.tail), ensure_ascii=False, indent=2))
+            return 0
+        if cmd == "rm":
+            print(json.dumps(mh.remove_instance(args.instance_id), ensure_ascii=False, indent=2, default=str))
+            return 0
+    except Exception as e:
+        print(json.dumps({"error": str(e)}, ensure_ascii=False), file=sys.stderr)
+        return 1
+    return 1
+
+
 def cmd_rpc(args: argparse.Namespace) -> int:
     from fangyu.core.agent_bundle import load_agent_bundle
     from fangyu.engine.bundle_a2a_client import identity_from_bundle, rpc_call
@@ -326,6 +390,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_im_bind(args)
     if args.command == "im-inbound":
         return cmd_im_inbound(args)
+    if args.command == "manage":
+        return cmd_manage(args)
     if args.command == "run":
         return cmd_run(args)
     if args.command == "rpc":
