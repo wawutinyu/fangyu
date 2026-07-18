@@ -17,8 +17,8 @@
 |----|------|------|
 | P0-1 | Bundle 运行时 DATA_DIR / 宪法随包 | ✅ |
 | P0-2 | 导出 tools/skills 闭包 | ⬜ |
-| P0-3 | 真 Agentic Loop | ⬜ |
-| P0-4 | Coding 手脚进包 | ⬜ |
+| P0-3 | 真 Agentic Loop | ✅ 原语 |
+| P0-4 | Coding 手脚进包 | ✅ 工具表 |
 | P0-5 | profile→bundle 工厂 + OpenCode 集成测 | ⬜ |
 
 验收总表见 [GRADUATION_EXPORTABLE_AGENT.md](GRADUATION_EXPORTABLE_AGENT.md)。
