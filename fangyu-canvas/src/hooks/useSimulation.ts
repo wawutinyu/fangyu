@@ -4,12 +4,13 @@ import type { PendingInteraction } from '../utils/localExecutor'
 import { convertToExportFormat } from '../utils/flowHelper'
 import { Executor } from '../utils/executor'
 import { saveRunRecord } from '../components/RunHistory'
-import { formatViolationSummary, type ViolationPayload } from '../components/ViolationPanel'
+import { type ViolationPayload } from '../components/ViolationPanel'
 import {
   warningsToViolationPayload,
 } from '../utils/constitutionWarnings'
 import { formatFlowChatOutput } from '../utils/formatFlowOutput'
 import { queuePreviewResult } from '../utils/pendingPreview'
+import { formatPreviewFailure } from '../utils/previewErrors'
 
 export interface ShowResultsOptions {
   constitutionWarnings?: ViolationPayload | null
@@ -61,8 +62,8 @@ export function useSimulation(
       const payload = result.violation as ViolationPayload
       setSimConstitutionWarnings(payload)
       setSimResults([])
-      const summary = formatViolationSummary(payload)
-      showToast(summary, 'warn')
+      const summary = formatPreviewFailure(null, { violation: payload })
+      showToast(summary.split('\n')[0], 'warn')
       window.dispatchEvent(new CustomEvent('fangyu:focus-bottom-chat'))
       queuePreviewResult(summary)
       setLocalNodes(nds => nds.map(n => ({
@@ -115,8 +116,8 @@ export function useSimulation(
       window.dispatchEvent(new CustomEvent('fangyu:focus-bottom-chat'))
       queuePreviewResult(text)
     } else {
-      const errText = result.error || '运行中止'
-      showToast(errText, 'warn')
+      const errText = formatPreviewFailure(result.error || '运行中止')
+      showToast(errText.split('\n')[0], 'warn')
       window.dispatchEvent(new CustomEvent('fangyu:focus-bottom-chat'))
       queuePreviewResult(errText)
     }

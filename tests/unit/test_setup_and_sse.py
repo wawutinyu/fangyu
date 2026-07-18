@@ -97,3 +97,25 @@ def test_setup_copilot_preview_happy(client, monkeypatch):
     assert body["preview"]["recommended_authorized"] is False
     assert "NightBot" in body["preview"]["plain"]
     assert body["discover"]["card"]["name"] == "NightBot"
+
+
+def test_worker_preview_from_description(client):
+    resp = client.post(
+        "/api/v1/setup/worker/preview",
+        json={"description": "产线巡检助手，能跑 shell"},
+    )
+    assert resp.status_code == 200
+    preview = resp.json()["preview"]
+    assert "产线巡检" in preview["name"] or "巡检" in preview["name"]
+    assert "FANGYU_WORKER_NAME" in preview["install_cmd"]
+    assert "shell" in preview["capabilities"]
+    assert preview["confirm_prompt"]
+    assert preview["risks"]
+
+
+def test_build_worker_preview_unit():
+    from fangyu.core.setup_worker import build_worker_preview
+
+    p = build_worker_preview("本机执行助手")
+    assert p["name"]
+    assert "dev-worker" in p["install_cmd"]

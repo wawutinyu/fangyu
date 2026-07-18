@@ -496,3 +496,27 @@ export function layoutHouseSettlement(
 
   return { width, height, houses, paths, actors }
 }
+
+/** 选中协作边时，点亮对应宅间径 */
+export function withSelectedEdgeHighlight(
+  settlement: HouseSettlement,
+  selectedEdge: { source: string; target: string } | null | undefined,
+): HouseSettlement {
+  if (!selectedEdge) return settlement
+  const matchKey = (actor: HouseSettlement['actors'][0], key: string) => {
+    const k = norm(key)
+    return actor.id === key || norm(actor.label) === k || norm(actor.id) === k
+  }
+  const a = settlement.actors.find(x => matchKey(x, selectedEdge.source))
+  const b = settlement.actors.find(x => matchKey(x, selectedEdge.target))
+  if (!a || !b || a.houseId === b.houseId) {
+    return settlement
+  }
+  const paths = settlement.paths.map(p => {
+    const hit =
+      (p.fromHouseId === a.houseId && p.toHouseId === b.houseId)
+      || (p.fromHouseId === b.houseId && p.toHouseId === a.houseId)
+    return hit ? { ...p, hot: true } : p
+  })
+  return { ...settlement, paths }
+}

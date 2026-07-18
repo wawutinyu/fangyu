@@ -3,6 +3,7 @@ import type { CollaborationEdge, PresenceEntity } from '@fangyu/core/schema'
 import {
   HOUSE_PALETTE,
   layoutHouseSettlement,
+  withSelectedEdgeHighlight,
   type GroupHint,
 } from '../utils/houseSettlement'
 import { mountHouseScene, type HouseSceneController } from '../utils/houseScenePixi'
@@ -14,6 +15,7 @@ export interface HouseCommonsSceneProps {
   width?: number
   height?: number
   selectedId?: string | null
+  selectedEdge?: { source: string; target: string } | null
   onSelectActor?: (id: string) => void
   onSelectPath?: (sourceHouseId: string, targetHouseId: string) => void
 }
@@ -26,6 +28,7 @@ export default function HouseCommonsScene({
   width = 1100,
   height = 560,
   selectedId = null,
+  selectedEdge = null,
   onSelectActor,
   onSelectPath,
 }: HouseCommonsSceneProps) {
@@ -42,10 +45,10 @@ export default function HouseCommonsScene({
     if (z != null) setZoomPct(Math.round(z * 100))
   }
 
-  const settlement = useMemo(
-    () => layoutHouseSettlement(presence, edges, { width, height, groupHints }),
-    [presence, edges, groupHints, width, height],
-  )
+  const settlement = useMemo(() => {
+    const base = layoutHouseSettlement(presence, edges, { width, height, groupHints })
+    return withSelectedEdgeHighlight(base, selectedEdge)
+  }, [presence, edges, groupHints, width, height, selectedEdge])
   const settlementRef = useRef(settlement)
   const selectedRef = useRef(selectedId)
   settlementRef.current = settlement

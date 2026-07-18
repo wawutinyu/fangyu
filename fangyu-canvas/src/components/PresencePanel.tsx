@@ -554,6 +554,7 @@ export default function PresencePanel() {
                 width={sceneW}
                 height={sceneH}
                 selectedId={selectedActorId}
+                selectedEdge={selectedEdge}
                 onSelectActor={(id) => {
                   setSelectedActorId(prev => (prev === id ? null : id))
                   setSelectedEdge(null)
@@ -572,6 +573,47 @@ export default function PresencePanel() {
                 }}
               />
             </div>
+            {!wallMode && edges.length > 0 && (
+              <div
+                data-testid="presence-edge-strip"
+                style={{
+                  display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8, flexShrink: 0,
+                }}
+              >
+                {edges.slice(0, 6).map(e => {
+                  const active = selectedEdge?.source === e.source && selectedEdge?.target === e.target
+                  return (
+                    <button
+                      key={`${e.source}->${e.target}`}
+                      type="button"
+                      className="notion-btn"
+                      style={{
+                        fontSize: 10,
+                        fontWeight: active ? 700 : 400,
+                        borderColor: active ? '#c47e3b' : undefined,
+                      }}
+                      onClick={() => {
+                        setSelectedActorId(null)
+                        setPathFilter(null)
+                        setSelectedEdge(prev => (
+                          prev?.source === e.source && prev?.target === e.target
+                            ? null
+                            : { source: e.source, target: e.target }
+                        ))
+                      }}
+                    >
+                      {e.source} → {e.target}
+                      {e.count != null ? ` ·${e.count}` : ''}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            {deptId && scenePresence.length === 0 && (
+              <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+                该部门暂无在场角色 — 切换「全部」或换部门。
+              </div>
+            )}
             {!wallMode && (
               <TimelineReplayBar
                 eventsAsc={eventsAsc}
@@ -779,6 +821,11 @@ export default function PresencePanel() {
                         setReplayPlaying(false)
                         setReplayIndex(i)
                       }
+                      setSelectedActorId(ev.actor)
+                      if (ev.target) {
+                        setSelectedEdge({ source: ev.actor, target: ev.target })
+                        setPathFilter(null)
+                      }
                     }}
                     onKeyDown={(e) => {
                       if (e.key !== 'Enter' && e.key !== ' ') return
@@ -786,6 +833,11 @@ export default function PresencePanel() {
                       if (i >= 0) {
                         setReplayPlaying(false)
                         setReplayIndex(i)
+                      }
+                      setSelectedActorId(ev.actor)
+                      if (ev.target) {
+                        setSelectedEdge({ source: ev.actor, target: ev.target })
+                        setPathFilter(null)
                       }
                     }}
                     style={{

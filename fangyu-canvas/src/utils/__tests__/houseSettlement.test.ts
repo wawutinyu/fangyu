@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CollaborationEdge, PresenceEntity } from '@fangyu/core/schema'
-import { assignHouses, departmentsToGroupHints, layoutHouseSettlement } from '../houseSettlement'
+import { assignHouses, departmentsToGroupHints, layoutHouseSettlement, withSelectedEdgeHighlight } from '../houseSettlement'
 
 describe('houseSettlement', () => {
   const agents: PresenceEntity[] = [
@@ -86,5 +86,14 @@ describe('houseSettlement', () => {
     expect(layout.houses.length).toBe(2)
     expect(layout.paths.length).toBeGreaterThanOrEqual(1)
     expect(layout.paths[0].count).toBe(3)
+  })
+
+  it('highlights house path for selectedEdge', () => {
+    const edges: CollaborationEdge[] = [
+      { source: 'agent:a', target: 'worker:1', count: 2, last_kind: 'a2a.send', last_outcome: 'info' },
+    ]
+    const layout = layoutHouseSettlement([...agents, ...workers], edges, { width: 720, height: 360 })
+    const hot = withSelectedEdgeHighlight(layout, { source: 'agent:a', target: 'worker:1' })
+    expect(hot.paths.some(p => p.hot)).toBe(true)
   })
 })

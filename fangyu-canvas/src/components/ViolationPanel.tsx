@@ -35,7 +35,8 @@ export function formatViolationSummary(v: ViolationPayload): string {
     tool_name: first?.tool_name,
     label: first?.label,
   })
-  return `${ex.title}：${ex.plain}`
+  const next = ex.nextStep ? `\n下一步：${ex.nextStep}` : ''
+  return `${ex.title}：${ex.plain}${next}`
 }
 
 interface Props {

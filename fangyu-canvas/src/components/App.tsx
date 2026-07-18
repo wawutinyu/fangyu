@@ -602,6 +602,7 @@ export default function App() {
         onBatchTest={() => setBatchVisible(true)}
         onOpenAssets={() => setAssetsFocusSignal(s => s + 1)}
         simulating={simulating}
+        apiUp={apiUp}
         dispatching={dispatching}
         workersOnline={workersOnline}
         onlineWorkers={onlineWorkers}

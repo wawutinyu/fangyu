@@ -80,6 +80,17 @@ export function formatFlowChatOutput(
     return `节点执行出错：\n${errors.join('\n')}`
   }
 
+  // 多段 LLM：按节点名串起来，便于 llm→llm 串联可读
+  const llmRows = allOutputs.filter(r => r.type === 'llm' && r.outputs?.result != null)
+  if (llmRows.length >= 2) {
+    const parts = llmRows.map(r => {
+      const label = r.nodeName || 'llm'
+      const body = stringifyOutput(r.outputs?.result)
+      return body ? `【${label}】\n${body}` : ''
+    }).filter(Boolean)
+    if (parts.length) return parts.join('\n\n')
+  }
+
   // 聊天优先展示 LLM 自然语言（不要被 verify JSON 盖住）
   const lastLlm = [...allOutputs].reverse().find(r => r.type === 'llm' && r.outputs?.result != null)
   if (lastLlm) {

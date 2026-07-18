@@ -31,6 +31,17 @@ describe('formatFlowChatOutput', () => {
     expect(text).toBe('你好！有什么可以帮你的？')
   })
 
+  it('joins multi-llm chain with node labels', () => {
+    const text = formatFlowChatOutput([
+      { type: 'llm', nodeName: '起草', outputs: { result: '草稿A' } },
+      { type: 'llm', nodeName: '润色', outputs: { result: '成稿B' } },
+    ])
+    expect(text).toContain('【起草】')
+    expect(text).toContain('草稿A')
+    expect(text).toContain('【润色】')
+    expect(text).toContain('成稿B')
+  })
+
   it('surfaces node errors instead of empty success', () => {
     const text = formatFlowChatOutput([
       { type: 'code', nodeName: 'act', outputs: { result: null, error: '语法错误: invalid' } },

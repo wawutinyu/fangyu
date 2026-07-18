@@ -91,6 +91,9 @@ export default function BatchRunner({ onClose }: { onClose: () => void }) {
         onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid #eee' }}>
           <span style={{ fontSize: 15, fontWeight: 600 }}>批量测试</span>
+          <span style={{ fontSize: 11, color: '#888', marginLeft: 8 }}>
+            浏览器本地沙箱 · 与工具栏预览/底部真跑不同引擎
+          </span>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#888' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>

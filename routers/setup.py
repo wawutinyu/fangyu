@@ -1,14 +1,19 @@
-"""Setup Copilot API — 发现外部 Agent 并生成白话信任确认。"""
+"""Setup Copilot API — 外部 Agent 信任确认 + 本机 Worker 启动预览。"""
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from fangyu.core.setup_copilot import preview_from_discover_payload
+from fangyu.core.setup_worker import build_worker_preview
 
 router = APIRouter(prefix="/api/v1/setup", tags=["Setup Copilot"])
 
 
 class CopilotPreviewRequest(BaseModel):
     rpc_url: str = Field(..., min_length=3)
+
+
+class WorkerPreviewRequest(BaseModel):
+    description: str = Field(..., min_length=1, max_length=500)
 
 
 @router.post("/copilot/preview")
@@ -31,3 +36,8 @@ def copilot_preview(body: CopilotPreviewRequest):
     discover = {"success": True, "rpc_url": rpc_url, "card": card, "identity": identity or None}
     preview = preview_from_discover_payload(discover)
     return {"discover": discover, "preview": preview}
+
+
+@router.post("/worker/preview")
+def worker_preview(body: WorkerPreviewRequest):
+    return {"preview": build_worker_preview(body.description)}

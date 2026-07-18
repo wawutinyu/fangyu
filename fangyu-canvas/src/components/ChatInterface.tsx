@@ -16,6 +16,7 @@ import { ViolationPanel, formatViolationSummary, type ViolationPayload } from '.
 import { warningsToViolationPayload } from '../utils/constitutionWarnings'
 import { formatFlowChatOutput } from '../utils/formatFlowOutput'
 import { takeQueuedPreviewResult } from '../utils/pendingPreview'
+import { formatPreviewFailure } from '../utils/previewErrors'
 
 
 interface ChatMessage {
@@ -244,7 +245,7 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
     try {
       const result = await executor.run()
       if (!result.success && result.violation) {
-        addMsg(formatViolationSummary(result.violation), {
+        addMsg(formatPreviewFailure(null, { violation: result.violation }), {
           _violation: result.violation,
           _showViolation: true,
         })
@@ -253,7 +254,7 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
         return
       }
       if (!result.success && result.error) {
-        addMsg(result.error, { logs: result.logs || [], _showLogs: true })
+        addMsg(formatPreviewFailure(result.error), { logs: result.logs || [], _showLogs: true })
         setRunning(false)
         scrollToBottom()
         return
@@ -284,7 +285,7 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
         }
       }
     } catch (err) {
-      addMsg(`执行出错: ${err instanceof Error ? err.message : String(err)}`, { logs: [], _showLogs: false })
+      addMsg(formatPreviewFailure(err), { logs: [], _showLogs: false })
     }
     setRunning(false)
     scrollToBottom()

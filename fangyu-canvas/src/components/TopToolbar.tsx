@@ -80,6 +80,8 @@ interface Props {
   fullExperienceBusy?: boolean
   onOpenSetupCopilot?: () => void
   simulating?: boolean
+  /** false 时灰掉预览并提示先起 API */
+  apiUp?: boolean | null
   dispatching?: boolean
   workersOnline?: number
   onlineWorkers?: WorkerInfo[]
@@ -255,10 +257,18 @@ export default function TopToolbar(props: Props) {
             <Btn
               onClick={props.onSimulate}
               primary
-              title="与底部预览相同：后端真跑（/api/v1/flow/run/stream）"
-              style={props.simulating ? { opacity: 0.6, pointerEvents: 'none' } : undefined}
+              title={
+                props.apiUp === false
+                  ? '序 API 未连接 — 请先在本机 Terminal 启动 ./dev.sh'
+                  : '与底部预览相同：后端真跑（/api/v1/flow/run/stream）'
+              }
+              style={
+                props.simulating || props.apiUp === false
+                  ? { opacity: 0.55, pointerEvents: 'none' as const }
+                  : undefined
+              }
             >
-              {props.simulating ? '预览中…' : '预览'}
+              {props.simulating ? '预览中…' : props.apiUp === false ? '预览（API 离线）' : '预览'}
             </Btn>
             {props.onDispatchToWorker && (
               <>

@@ -3,6 +3,7 @@ import type { WorkerInfo, WorkerTask, WorkerTaskEvent } from '@fangyu/core/schem
 import { fetchTask, fetchTaskEvents, fetchTasks, fetchWorkers } from '../utils/workerApi'
 import { workerStartHintShort } from '../utils/workerDispatch'
 import { currentWorkLabel, formatTs, payloadSummary } from '../utils/workerTaskFormat'
+import WorkerSetupPanel from './WorkerSetupPanel'
 
 interface Props {
   highlightTaskId?: string | null
@@ -29,6 +30,7 @@ export default function HangBoard({ highlightTaskId }: Props) {
   const [events, setEvents] = useState<WorkerTaskEvent[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [setupOpen, setSetupOpen] = useState(false)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -119,10 +121,19 @@ export default function HangBoard({ highlightTaskId }: Props) {
           {onlineCount} 在线 · {runningCount} 进行中
         </span>
         <div style={{ flex: 1 }} />
+        <button type="button" className="notion-btn primary" onClick={() => setSetupOpen(true)}>
+          添加 Worker
+        </button>
         <button type="button" className="notion-btn" onClick={() => void refresh()} disabled={loading}>
           {loading ? '刷新中…' : '刷新'}
         </button>
       </div>
+
+      <WorkerSetupPanel
+        open={setupOpen}
+        onClose={() => setSetupOpen(false)}
+        onWorkerSeen={() => { void refresh() }}
+      />
 
       {error && (
         <div style={{ padding: '6px 12px', color: '#b42318', fontSize: 12, borderBottom: '1px solid var(--border-light)' }}>
