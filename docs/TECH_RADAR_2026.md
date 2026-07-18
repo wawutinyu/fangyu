@@ -124,9 +124,10 @@
 ㊳ Eval 健康差 + 墙主机再探测     ✅ factories_health_diff · PresenceCard 再探测
 ㊴ 健康回归告警 + 对齐后自动再探测 ✅ eval.health_regression · retest_after
 ㊵ 健康回归去观 + 对齐写观事件     ✅ focusPresenceFromAlert · factory.align
+㊶ 时间轴 kind 筛选 + 批量再探测   ✅ timelineKindFilter · offline batch retest
 ```
 
-下一刀：真 IM（仍暂缓）· 对齐事件时间轴筛选 · Eval 健康差一键再探测批量。
+下一刀：真 IM（仍暂缓）· 值班墙时间轴运维筛选默认 · 批量再探测结果写观事件。
 
 ---
 

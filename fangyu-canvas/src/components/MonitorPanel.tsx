@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../platform'
 import ExternalPingRetestButton from './ExternalPingRetestButton'
-import FactoryOfflineRetestButton from './FactoryOfflineRetestButton'
+import FactoryOfflineRetestButton, { offlineFactoryIds } from './FactoryOfflineRetestButton'
 import { focusPresenceFromAlert } from '../utils/presenceNavigation'
 
 interface LogEntry {
@@ -505,6 +505,14 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
                       : ''}
                     {` · 离线 ${evalReport.factories_health.offline ?? 0}/${evalReport.factories_health.count ?? 0}`}
                   </div>
+                  {(evalReport.factories_health.offline ?? 0) > 0 && (
+                    <FactoryOfflineRetestButton
+                      factoryIds={offlineFactoryIds(evalReport.factories_health.factories || [])}
+                      label={`批量再探测离线厂 (${evalReport.factories_health.offline})`}
+                      onDone={() => { void fetchEval() }}
+                      compact
+                    />
+                  )}
                   {(evalReport.factories_health.factories || []).slice(0, 8).map(f => (
                     <div
                       key={String(f.id || f.label)}
@@ -707,6 +715,23 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
                               </span>
                             )}
                           </div>
+                          {(() => {
+                            const ids = offlineFactoryIds(evalReport?.factories_health?.factories || [])
+                            const leftOff = evalCompare.compare.factories_health_diff.left?.offline ?? 0
+                            const delta = evalCompare.compare.factories_health_diff.offline_delta ?? 0
+                            if (ids.length === 0 || (leftOff <= 0 && delta <= 0)) return null
+                            return (
+                              <FactoryOfflineRetestButton
+                                factoryIds={ids}
+                                label={`批量再探测离线厂 (${ids.length})`}
+                                onDone={() => {
+                                  void fetchEval()
+                                  void fetchCompare(compareI, compareJ)
+                                }}
+                                compact
+                              />
+                            )
+                          })()}
                         </div>
                       )}
                       {(evalCompare.compare.stage_diffs || []).length > 0 ? (

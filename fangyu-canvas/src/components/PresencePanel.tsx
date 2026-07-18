@@ -39,6 +39,12 @@ import EventExplainCard from './EventExplainCard'
 import HouseCommonsScene from './HouseCommonsScene'
 import TimelineReplayBar from './TimelineReplayBar'
 import { stopManaged } from '../utils/opsApi'
+import {
+  eventMatchesTimelineFilter,
+  timelineFilterForFocusKind,
+  TIMELINE_KIND_CHIPS,
+  type TimelineKindFilter,
+} from '../utils/presenceTimelineFilter'
 
 /** 方隅·观 — 宅子共场：序律为轨，人文协作 */
 export default function PresencePanel() {
@@ -66,6 +72,7 @@ export default function PresencePanel() {
   const [archiveTitle, setArchiveTitle] = useState<string | null>(null)
   const [library, setLibrary] = useState<PresenceReplayMeta[]>([])
   const [focusKind, setFocusKind] = useState<string | null>(null)
+  const [timelineKindFilter, setTimelineKindFilter] = useState<TimelineKindFilter>('all')
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const timelineRef = useRef<HTMLDivElement | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
@@ -248,6 +255,8 @@ export default function PresencePanel() {
       const kind = String((e as CustomEvent).detail?.kind || '')
       if (!kind) return
       setFocusKind(kind)
+      const tf = timelineFilterForFocusKind(kind)
+      if (tf) setTimelineKindFilter(tf)
       if (kind.startsWith('factory.') || kind.startsWith('host.') || kind.startsWith('eval.')) {
         setFilter('host')
         setDeptId('dept-hosts')
@@ -948,12 +957,35 @@ export default function PresencePanel() {
                     {pathFilterLabel}
                   </span>
                 )}
-                {(selectedEdge || pathFilter) && (
+                <div
+                  data-testid="timeline-kind-filter"
+                  style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginLeft: 4 }}
+                >
+                  {TIMELINE_KIND_CHIPS.map(chip => (
+                    <button
+                      key={chip.id}
+                      type="button"
+                      className="notion-btn"
+                      data-testid={`timeline-kind-${chip.id}`}
+                      onClick={() => setTimelineKindFilter(chip.id)}
+                      style={{
+                        fontSize: 10, padding: '2px 7px', fontWeight: timelineKindFilter === chip.id ? 700 : 400,
+                        opacity: timelineKindFilter === chip.id ? 1 : 0.7,
+                      }}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+                {(selectedEdge || pathFilter || timelineKindFilter !== 'all') && (
                   <button
                     type="button"
                     className="notion-btn"
                     style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 400 }}
-                    onClick={clearSelection}
+                    onClick={() => {
+                      clearSelection()
+                      setTimelineKindFilter('all')
+                    }}
                   >
                     清除筛选
                   </button>
@@ -971,6 +1003,7 @@ export default function PresencePanel() {
                   </div>
                 )}
                 {events
+                  .filter(ev => eventMatchesTimelineFilter(String(ev.kind || ''), timelineKindFilter))
                   .filter(ev => {
                     if (pathFilter) {
                       return eventMatchesHousePath(
