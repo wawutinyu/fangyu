@@ -108,9 +108,10 @@
 ㉒ 飞书向导 + Presence 托管回放   ✅ im/status·运维飞书页 · managed.* 帧对齐
 ㉓ 跨机回放样例 + live 可选档     ✅ fixtures/cross-host · --live-tier none/smoke/full
 ㉔ Eval 对比页 + A2A 工厂目录 UI  ✅ eval-compare · 观测对比 · 运维·工厂
+㉕ 对端一键入库 + 值班墙跨机默认  ✅ probe-save/peer-probe · 墙默认 host
 ```
 
-下一刀：真 IM（仍暂缓）· Bundle 一键对端探测入库 · 观值班墙跨机筛选默认。
+下一刀：真 IM（仍暂缓）· 工厂通讯录批量心跳 · Eval smoke CI 模板。
 
 ---
 

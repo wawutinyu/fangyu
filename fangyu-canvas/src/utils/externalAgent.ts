@@ -72,6 +72,40 @@ export async function saveRemoteFactory(input: {
   return data.factory || data
 }
 
+export async function probeAndSaveFactory(input: {
+  base_url?: string
+  rpc_url?: string
+  label?: string
+  instance_id?: string
+  persist?: boolean
+}): Promise<{
+  ok: boolean
+  persisted?: boolean
+  probe?: {
+    ok?: boolean
+    base_url?: string
+    rpc_url?: string
+    card?: { name?: string } | null
+    hits?: Array<{ path: string; ok: boolean }>
+  }
+  factory?: { id?: string; base_url?: string; label?: string }
+}> {
+  const resp = await fetch('/api/v1/a2a/factories/probe-save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      base_url: input.base_url || '',
+      rpc_url: input.rpc_url || '',
+      label: input.label || '',
+      instance_id: input.instance_id || '',
+      persist: input.persist !== false,
+    }),
+  })
+  const data = await resp.json()
+  if (!resp.ok) throw new Error(data.detail || `探测入库失败 (${resp.status})`)
+  return data
+}
+
 export async function deleteRemoteFactory(factoryId: string): Promise<void> {
   const resp = await fetch(`/api/v1/a2a/factories/${encodeURIComponent(factoryId)}`, {
     method: 'DELETE',

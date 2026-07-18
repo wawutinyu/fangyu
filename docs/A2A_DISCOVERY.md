@@ -29,3 +29,17 @@
 Studio 外部 Agent「发现」可填工厂根 URL（不必手写 `/rpc`）。
 
 运维面板 **工厂** 页：探测 → 入库 → 列表 / 再探测 / 删除（读写 `DATA_DIR/a2a_factories.json`）。
+
+### 一键对端探测入库
+
+| 入口 | 说明 |
+|------|------|
+| `POST /api/v1/a2a/factories/probe-save` | `base_url` / `instance_id` → 探测并写入通讯录 |
+| 运维 · 托管 → **入库工厂** | 用托管实例的 `http://host:port` 一键入库 |
+| 运维 · 工厂 → **探测入库** | URL 探测后立刻持久化 |
+| CLI `python -m fangyu bundle peer-probe <url> --save` | 或 `--instance <id>` |
+
+```bash
+python -m fangyu bundle peer-probe http://127.0.0.1:9101 --save --label demo
+python -m fangyu bundle peer-probe --instance <managed_id> --save
+```

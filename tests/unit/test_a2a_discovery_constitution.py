@@ -89,6 +89,41 @@ def test_factories_registry_and_probe(monkeypatch):
         assert listed.json()["factories"]
 
 
+def test_factories_probe_save(monkeypatch, tmp_path):
+    from fangyu.core import a2a_discovery as disc
+    from fangyu.core import a2a_factories as fac
+    from fangyu.core import config as config_mod
+
+    config_mod.set_data_dir(tmp_path / "data")
+    (tmp_path / "data").mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr(disc, "_http_get_json", lambda url, **k: {"status": "ok"} if "health" in url else None)
+    monkeypatch.setattr(
+        disc,
+        "fetch_remote_card",
+        lambda rpc: {
+            "name": "PeerFac",
+            "skills": [{"id": "d"}],
+            "version": "1",
+            "interfaces": {"a2a": {"enabled": True, "url": rpc}},
+        },
+    )
+    monkeypatch.setattr("fangyu.engine.a2a_remote.fetch_remote_identity", lambda rpc: {})
+
+    with TestClient(app) as client:
+        r = client.post(
+            "/api/v1/a2a/factories/probe-save",
+            json={"base_url": "http://peer.example:9000", "label": "对端"},
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["ok"] is True
+        assert body["persisted"] is True
+        assert body["factory"]["label"] == "对端"
+        assert body["probe"]["card"]["name"] == "PeerFac"
+        assert any(f["base_url"] == "http://peer.example:9000" for f in fac.load_factories())
+
+
 def test_constitution_bundle_roundtrip(tmp_path):
     bundle = tmp_path / "b"
     bundle.mkdir()

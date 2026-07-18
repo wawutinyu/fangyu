@@ -57,6 +57,13 @@ def build_parser() -> argparse.ArgumentParser:
     im_in_p.add_argument("--workspace", default="")
     im_in_p.add_argument("--mode", default="", choices=["", "chat", "orchestrate"])
 
+    peer_p = sub.add_parser("peer-probe", help="探测对端工厂；--save 写入平台工厂通讯录")
+    peer_p.add_argument("url", nargs="?", default="", help="对端 base_url 或 rpc_url")
+    peer_p.add_argument("--instance", default="", help="托管实例 id（解析为 http://host:port）")
+    peer_p.add_argument("--label", default="")
+    peer_p.add_argument("--save", action="store_true", help="探测后写入 DATA_DIR/a2a_factories.json")
+    peer_p.add_argument("--no-save", action="store_true", help="仅探测不入库（默认）")
+
     manage_p = sub.add_parser("manage", help="G2-D 托管：启停 / 状态 / 日志")
     manage_sub = manage_p.add_subparsers(dest="manage_cmd", required=True)
     ms = manage_sub.add_parser("start", help="后台托管启动 Bundle daemon")
@@ -241,6 +248,54 @@ def cmd_im_inbound(args: argparse.Namespace) -> int:
     return 0 if result.get("success") else 1
 
 
+def cmd_peer_probe(args: argparse.Namespace) -> int:
+    from fangyu.core.a2a_discovery import probe_factory
+    from fangyu.core.a2a_factories import upsert_factory
+
+    target = (args.url or "").strip()
+    label = (args.label or "").strip()
+    meta: dict = {}
+    if args.instance:
+        from fangyu.engine.managed_host import get_instance
+
+        inst = get_instance(args.instance)
+        if not inst:
+            print(json.dumps({"ok": False, "error": f"实例不存在: {args.instance}"}, ensure_ascii=False))
+            return 1
+        host = inst.get("host") or "127.0.0.1"
+        port = int(inst.get("port") or 0)
+        if port <= 0:
+            print(json.dumps({"ok": False, "error": "实例无端口"}, ensure_ascii=False))
+            return 1
+        target = f"http://{host}:{port}"
+        if not label:
+            label = str(inst.get("name") or inst.get("id") or target)
+        meta = {"source": "managed", "instance_id": inst.get("id")}
+    if not target:
+        print(json.dumps({"ok": False, "error": "需要 url 或 --instance"}, ensure_ascii=False))
+        return 1
+
+    try:
+        probe = probe_factory(target)
+    except ValueError as exc:
+        print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))
+        return 1
+
+    out: dict = {"ok": True, "probe": probe, "persisted": False}
+    if args.save and not args.no_save:
+        row = upsert_factory(
+            base_url=str(probe.get("base_url") or target),
+            label=label or (probe.get("card") or {}).get("name") or "",
+            rpc_url=str(probe.get("rpc_url") or ""),
+            card_name=str((probe.get("card") or {}).get("name") or ""),
+            meta={**meta, "probed_ok": bool(probe.get("ok"))},
+        )
+        out["factory"] = row
+        out["persisted"] = True
+    print(json.dumps(out, ensure_ascii=False, indent=2, default=str))
+    return 0 if probe.get("ok") or out.get("persisted") else 1
+
+
 def cmd_manage(args: argparse.Namespace) -> int:
     from fangyu.engine import managed_host as mh
 
@@ -390,6 +445,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_im_bind(args)
     if args.command == "im-inbound":
         return cmd_im_inbound(args)
+    if args.command == "peer-probe":
+        return cmd_peer_probe(args)
     if args.command == "manage":
         return cmd_manage(args)
     if args.command == "run":

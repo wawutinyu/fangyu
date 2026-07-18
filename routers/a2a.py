@@ -204,6 +204,15 @@ class FactorySaveBody(BaseModel):
     meta: dict = {}
 
 
+class FactoryProbeSaveBody(BaseModel):
+    """一键探测并对端入库。"""
+    base_url: str = ""
+    rpc_url: str = ""
+    label: str = ""
+    instance_id: str = ""  # 托管实例 → http://host:port
+    persist: bool = True
+
+
 @router.get("/discovery")
 def local_discovery():
     """本厂公开发现目录：已注册 Agent + well-known 提示。"""
@@ -261,6 +270,60 @@ def factories_probe(body: FactoryProbeBody):
         return probe_factory(target)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
+
+
+@router.post("/factories/probe-save")
+def factories_probe_save(body: FactoryProbeSaveBody):
+    """探测对端工厂并写入通讯录（Bundle/托管一键入库）。"""
+    from fangyu.core.a2a_discovery import probe_factory
+    from fangyu.core.a2a_factories import upsert_factory
+
+    target = (body.base_url or body.rpc_url or "").strip()
+    label = (body.label or "").strip()
+    meta: dict = {}
+
+    if body.instance_id.strip():
+        from fangyu.engine.managed_host import get_instance
+
+        inst = get_instance(body.instance_id.strip())
+        if not inst:
+            raise HTTPException(404, f"托管实例不存在: {body.instance_id}")
+        host = inst.get("host") or "127.0.0.1"
+        port = int(inst.get("port") or 0)
+        if port <= 0:
+            raise HTTPException(400, "实例无有效端口")
+        target = f"http://{host}:{port}"
+        if not label:
+            label = str(inst.get("name") or inst.get("id") or target)
+        meta = {
+            "source": "managed",
+            "instance_id": inst.get("id"),
+            "bundle_dir": inst.get("bundle_dir"),
+        }
+
+    if not target:
+        raise HTTPException(400, "需要 base_url、rpc_url 或 instance_id")
+
+    try:
+        probe = probe_factory(target)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+    factory = None
+    if body.persist:
+        factory = upsert_factory(
+            base_url=str(probe.get("base_url") or target),
+            label=label or (probe.get("card") or {}).get("name") or "",
+            rpc_url=str(probe.get("rpc_url") or ""),
+            card_name=str((probe.get("card") or {}).get("name") or ""),
+            meta={**meta, "probed_ok": bool(probe.get("ok"))},
+        )
+    return {
+        "ok": True,
+        "probe": probe,
+        "factory": factory,
+        "persisted": bool(body.persist and factory),
+    }
 
 
 @router.get("/factories")

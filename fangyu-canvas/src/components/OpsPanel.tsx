@@ -12,8 +12,8 @@ import {
 import {
   deleteRemoteFactory,
   listRemoteFactories,
+  probeAndSaveFactory,
   probeRemoteFactory,
-  saveRemoteFactory,
 } from '../utils/externalAgent'
 import {
   addAclMember,
@@ -271,15 +271,33 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
     setError(null)
     setFacNote(null)
     try {
-      const row = await saveRemoteFactory({
+      const out = await probeAndSaveFactory({
         base_url: url,
         label: facLabel || facProbe?.card?.name || '',
-        rpc_url: facProbe?.rpc_url || '',
-        card_name: facProbe?.card?.name || '',
       })
-      setFacNote(`已入库 ${row.label || row.base_url || url}`)
+      setFacProbe(out.probe || facProbe)
+      setFacNote(`已入库 ${out.factory?.label || out.factory?.base_url || url}`)
       setFacUrl('')
       setFacLabel('')
+      await reloadFactories()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+    setLoading(false)
+  }
+
+  const onRegisterManagedFactory = async (inst: ManagedInstance) => {
+    setLoading(true)
+    setError(null)
+    setFacNote(null)
+    try {
+      const out = await probeAndSaveFactory({
+        instance_id: inst.id,
+        label: inst.name || inst.id,
+      })
+      setTab('factories')
+      setFacProbe(out.probe || null)
+      setFacNote(`托管「${inst.name || inst.id}」已探测入库 · ${out.factory?.base_url || ''}`)
       await reloadFactories()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -598,6 +616,14 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
                   disabled={loading}
                   title="升级：可先在上方填新 Bundle 路径，否则沿用原路径"
                 >升级</button>
+                <button
+                  className="notion-btn"
+                  style={{ fontSize: 11 }}
+                  onClick={() => void onRegisterManagedFactory(inst)}
+                  disabled={loading || !inst.port}
+                  title="探测 http://host:port 并写入 A2A 工厂通讯录"
+                  data-testid="managed-register-factory"
+                >入库工厂</button>
                 {inst.alive && (
                   <button className="notion-btn" style={{ fontSize: 11 }} onClick={() => onStop(inst.id)}>停止</button>
                 )}
@@ -987,7 +1013,7 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
               探测
             </button>
             <button className="notion-btn primary" style={{ fontSize: 12 }} type="button" onClick={() => void onSaveFactory()} disabled={loading} data-testid="factory-save">
-              入库
+              探测入库
             </button>
           </div>
           {facProbe && (

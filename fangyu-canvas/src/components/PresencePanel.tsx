@@ -40,6 +40,8 @@ export default function PresencePanel() {
   const [error, setError] = useState<string | null>(null)
   const [live, setLive] = useState(false)
   const [filter, setFilter] = useState<'all' | 'agent' | 'worker' | 'managed' | 'host'>('all')
+  const [preWallFilter, setPreWallFilter] = useState<'all' | 'agent' | 'worker' | 'managed' | 'host'>('all')
+  const [preWallDept, setPreWallDept] = useState<string | null>(null)
   const [deptId, setDeptId] = useState<string | null>(null)
   const [selectedEdge, setSelectedEdge] = useState<{ source: string; target: string } | null>(null)
   /** 点宅间径：按两端宅成员筛跨宅往来 */
@@ -105,6 +107,11 @@ export default function PresencePanel() {
   }, [])
 
   const enterWallMode = useCallback(async () => {
+    setPreWallFilter(filter)
+    setPreWallDept(deptId)
+    // 值班墙默认聚焦跨机主机（可再改筛选项）
+    setFilter('host')
+    setDeptId('dept-hosts')
     setWallMode(true)
     const el = panelRef.current
     if (el && !document.fullscreenElement) {
@@ -114,10 +121,12 @@ export default function PresencePanel() {
         // 浏览器拒绝全屏时仍用 fixed 覆盖
       }
     }
-  }, [])
+  }, [filter, deptId])
 
   const exitWallMode = useCallback(async () => {
     setWallMode(false)
+    setFilter(preWallFilter)
+    setDeptId(preWallDept)
     if (document.fullscreenElement) {
       try {
         await document.exitFullscreen()
@@ -125,7 +134,7 @@ export default function PresencePanel() {
         /* ignore */
       }
     }
-  }, [])
+  }, [preWallFilter, preWallDept])
 
   useEffect(() => {
     if (!wallMode) return
@@ -133,7 +142,7 @@ export default function PresencePanel() {
       if (e.key === 'Escape') void exitWallMode()
     }
     const onFs = () => {
-      if (!document.fullscreenElement) setWallMode(false)
+      if (!document.fullscreenElement) void exitWallMode()
     }
     window.addEventListener('keydown', onKey)
     document.addEventListener('fullscreenchange', onFs)
@@ -459,6 +468,34 @@ export default function PresencePanel() {
                   fontSize: 11, padding: '3px 8px',
                   fontWeight: filter === f ? 700 : 400,
                   opacity: filter === f ? 1 : 0.7,
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+        {wallMode && (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }} data-testid="wall-kind-filter">
+            {([
+              ['host', '主机'],
+              ['managed', '托管'],
+              ['all', '全部'],
+            ] as const).map(([f, label]) => (
+              <button
+                key={f}
+                type="button"
+                className="notion-btn"
+                onClick={() => {
+                  setFilter(f)
+                  if (f === 'host') setDeptId('dept-hosts')
+                  else if (f === 'managed') setDeptId('dept-managed')
+                  else setDeptId(null)
+                }}
+                style={{
+                  fontSize: 12, padding: '3px 10px',
+                  fontWeight: filter === f ? 700 : 400,
+                  opacity: filter === f ? 1 : 0.75,
                 }}
               >
                 {label}
