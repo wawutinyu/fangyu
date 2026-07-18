@@ -31,6 +31,7 @@ import { useHistory } from '../hooks/useHistory'
 import { useSimulation, type ShowResultsOptions } from '../hooks/useSimulation'
 import { useNodeOperations } from '../hooks/useNodeOperations'
 import { ViolationPanel, type ViolationPayload } from './ViolationPanel'
+import { formatFlowChatOutput } from '../utils/formatFlowOutput'
 
 const nodeTypes = {
   'atom-node': AtomNode,
@@ -487,18 +488,39 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
                 <ViolationPanel violation={simConstitutionWarnings} expanded />
               </div>
             )}
+            {simResults.length > 0 && (
+              <div style={{
+                marginBottom: 12, padding: '10px 12px', borderRadius: 8,
+                background: '#f8fafc', border: '1px solid #e2e8f0',
+                fontSize: 13, lineHeight: 1.5, color: '#334155', whiteSpace: 'pre-wrap',
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 4 }}>摘要</div>
+                {formatFlowChatOutput(simResults.map(r => ({
+                  type: '',
+                  nodeName: r.nodeName,
+                  outputs: r.output,
+                })))}
+              </div>
+            )}
             {simResults.length === 0 ? (
               simConstitutionWarnings && (
                 <div style={{ fontSize: 12, color: '#666' }}>流程未执行（宪法拒绝）</div>
               )
-            ) : simResults.map((r, i) => (
-              <div key={i} style={{ marginBottom: 8, padding: 8, background: '#f8f8f6', borderRadius: 6 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: '#666', marginBottom: 4 }}>{r.nodeName}</div>
-                <pre style={{ margin: 0, fontSize: 11, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#333' }}>
-                  {JSON.stringify(r.output, null, 2)}
-                </pre>
-              </div>
-            ))}
+            ) : (
+              <details style={{ marginTop: 4 }}>
+                <summary style={{ fontSize: 11, color: '#64748b', cursor: 'pointer', userSelect: 'none' }}>
+                  节点明细（JSON）
+                </summary>
+                {simResults.map((r, i) => (
+                  <div key={i} style={{ marginTop: 8, padding: 8, background: '#f8f8f6', borderRadius: 6 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: '#666', marginBottom: 4 }}>{r.nodeName}</div>
+                    <pre style={{ margin: 0, fontSize: 11, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#333' }}>
+                      {JSON.stringify(r.output, null, 2)}
+                    </pre>
+                  </div>
+                ))}
+              </details>
+            )}
           </div>
         </div>,
         document.body,

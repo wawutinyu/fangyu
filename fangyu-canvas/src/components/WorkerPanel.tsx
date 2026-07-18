@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { WorkerInfo, WorkerTask, WorkerTaskEvent } from '@fangyu/core/schema'
 import { fetchTask, fetchTaskEvents, fetchTasks, fetchWorkers, fireMqttWorkerTrigger, fetchMqttTriggerStatus, dispatchAdapterTest } from '../utils/workerApi'
+import { workerStartHintShort } from '../utils/workerDispatch'
 
 interface Props {
   highlightTaskId?: string | null
@@ -208,7 +209,7 @@ export default function WorkerPanel({ highlightTaskId }: Props) {
           </button>
           {workers.length === 0 && (
             <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-muted)' }}>
-              暂无 Worker。运行 <code style={{ fontSize: 11 }}>dev-worker-tray.bat</code>
+              暂无 Worker。运行 <code style={{ fontSize: 11 }}>{workerStartHintShort()}</code>
             </div>
           )}
           {workers.map(w => (

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import type { WorkerInfo, WorkerTask, WorkerTaskEvent } from '@fangyu/core/schema'
 import { fetchTask, fetchTaskEvents, fetchTasks, fetchWorkers } from '../utils/workerApi'
+import { workerStartHintShort } from '../utils/workerDispatch'
 
 interface Props {
   highlightTaskId?: string | null
@@ -185,7 +186,7 @@ export default function HangBoard({ highlightTaskId }: Props) {
           <div style={{ flex: 1, overflow: 'auto' }}>
             {workers.length === 0 && (
               <div style={{ padding: 12, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                暂无 Worker。运行 <code style={{ fontSize: 10 }}>dev-worker-tray.bat</code>
+                暂无 Worker。运行 <code style={{ fontSize: 10 }}>{workerStartHintShort()}</code>
               </div>
             )}
             {workers.map(w => {

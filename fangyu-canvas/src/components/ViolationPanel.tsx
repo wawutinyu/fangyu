@@ -1,3 +1,6 @@
+import { explainViolation } from '../utils/lawExplain'
+import ViolationExplainCard from './ViolationExplainCard'
+
 export interface ViolationDetail {
   rule: string
   message: string
@@ -22,12 +25,17 @@ export interface ViolationPayload {
 }
 
 export function formatViolationSummary(v: ViolationPayload): string {
-  if (v.type === 'trust') return `🛡️ 信任拒绝：${v.message}`
-  if (v.severity === 'warn' || v.violations?.every(i => i.severity === 'warn')) {
-    return `⚠️ 宪法警告：${v.message}`
-  }
-  if (v.type === 'constitution') return `🚫 违宪：${v.message}`
-  return v.message
+  const first = v.violations?.[0]
+  const ex = explainViolation({
+    type: v.type,
+    rule: first?.rule || v.rule || v.type,
+    message: first?.message || v.message,
+    severity: first?.severity || v.severity,
+    node_type: first?.node_type,
+    tool_name: first?.tool_name,
+    label: first?.label,
+  })
+  return `${ex.title}：${ex.plain}`
 }
 
 interface Props {
@@ -64,6 +72,7 @@ export function ViolationPanel({ violation, expanded = true, onToggle }: Props) 
         rule: violation.rule || violation.type,
         message: violation.message,
         context: violation.context,
+        severity: violation.severity,
       }]
 
   return (
@@ -83,6 +92,7 @@ export function ViolationPanel({ violation, expanded = true, onToggle }: Props) 
             const sty = itemStyle(item.severity)
             return (
             <div key={i} style={{ background: sty.background, border: sty.border, borderRadius: 6, padding: '8px 10px' }}>
+              <ViolationExplainCard item={item} compact />
               <div style={{ fontSize: 11, fontWeight: 700, color: sty.title, marginBottom: 4, display: 'flex', gap: 6, alignItems: 'center' }}>
                 <span>{RULE_LABELS[item.rule] || item.rule}</span>
                 {item.severity && (
@@ -91,7 +101,6 @@ export function ViolationPanel({ violation, expanded = true, onToggle }: Props) 
                   </span>
                 )}
               </div>
-              <div style={{ fontSize: 12, color: 'var(--text-primary)', marginBottom: 4 }}>{item.message}</div>
               <div style={{ fontSize: 10, color: '#888', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {item.label && <span>节点: {item.label}</span>}
                 {item.tool_name && <span>工具: {item.tool_name}</span>}
@@ -106,9 +115,18 @@ export function ViolationPanel({ violation, expanded = true, onToggle }: Props) 
               Agent: {violation.agent}{violation.skill_id ? ` · 技能: ${violation.skill_id}` : ''}
             </div>
           )}
+          <button
+            type="button"
+            className="notion-btn"
+            style={{ fontSize: 11, alignSelf: 'flex-start' }}
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('fangyu:goto-law'))
+            }}
+          >
+            打开方隅·律
+          </button>
         </div>
       )}
     </div>
   )
 }
-

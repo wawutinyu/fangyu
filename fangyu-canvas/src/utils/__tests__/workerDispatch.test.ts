@@ -1,5 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { dispatchFlowSnapshot } from '../workerDispatch'
+import {
+  dispatchFlowSnapshot,
+  resolveOnlineWorkerId,
+  workerStartHint,
+  workerStartHintShort,
+  PreferredWorkerOfflineError,
+} from '../workerDispatch'
 import type { ExportFormat } from '@fangyu/core/schema'
 
 const sampleExport: ExportFormat = {
@@ -13,6 +19,33 @@ beforeEach(() => {
 })
 
 describe('workerDispatch', () => {
+  it('workerStartHint is Mac-aware when UA is Mac', () => {
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' })
+    expect(workerStartHint()).toContain('install-worker.sh')
+    expect(workerStartHint()).toContain('Fangyu-Worker.command')
+    expect(workerStartHintShort()).toContain('install-worker.sh')
+  })
+
+  it('workerStartHint keeps bat paths on Windows UA', () => {
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' })
+    expect(workerStartHint()).toContain('dev-worker.bat')
+    expect(workerStartHintShort()).toContain('dev-worker-tray.bat')
+  })
+
+  it('resolveOnlineWorkerId throws PreferredWorkerOfflineError when preferred is offline', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        workers: [
+          { id: 'w-offline', name: 'old', online: false },
+          { id: 'w-online', name: 'alive', online: true },
+        ],
+      }),
+    }))
+    await expect(resolveOnlineWorkerId('w-offline')).rejects.toBeInstanceOf(PreferredWorkerOfflineError)
+    await expect(resolveOnlineWorkerId('w-offline')).rejects.toThrow(/所选 Worker 已离线/)
+  })
+
   it('dispatchFlowSnapshot posts run_flow with snapshot metadata', async () => {
     vi.stubGlobal('fetch', vi.fn()
       .mockResolvedValueOnce({

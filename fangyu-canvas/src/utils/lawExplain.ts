@@ -65,6 +65,42 @@ export function explainViolation(input: PlainViolationInput): PlainExplanation {
     }
   }
 
+  if (rule === 'policy_ssrf' || rule.includes('policy_ssrf') || rule.includes('ssrf')) {
+    return {
+      title: '外连地址被拦住（SSRF）',
+      plain: msg || '请求目标疑似指向内网或未允许的主机，宪法禁止这类外连。',
+      nextStep: '改用公网安全 URL，或在律里收紧/放宽 SSRF 策略（生产勿随意放开内网）。',
+      severity: severity === 'info' ? 'deny' : severity,
+    }
+  }
+
+  if (rule === 'policy_llm_model' || rule.includes('policy_llm_model')) {
+    return {
+      title: '大模型配置不合规',
+      plain: msg || 'LLM 节点缺少模型名，或用不允许的模型。',
+      nextStep: '打开节点配置补上允许的 model；或到「设置」确认默认模型与密钥。',
+      severity: severity === 'info' ? 'warn' : severity,
+    }
+  }
+
+  if (rule === 'policy_loop_limit' || rule.includes('policy_loop_limit') || rule.includes('loop_limit')) {
+    return {
+      title: '循环次数超限',
+      plain: msg || '循环节点可能跑太久，超过宪法允许的上限。',
+      nextStep: '调低循环上限，或加明确退出条件；需要更高上限时在律里改 policy。',
+      severity: severity === 'info' ? 'deny' : severity,
+    }
+  }
+
+  if (rule === 'policy_tool_name' || rule.includes('policy_tool_name')) {
+    return {
+      title: '工具名不合规',
+      plain: msg || `工具「${input.tool_name || input.label || '未知'}」未通过命名/白名单检查。`,
+      nextStep: '检查工具节点名称与允许列表；或在律里更新工具策略。',
+      severity: severity === 'info' ? 'deny' : severity,
+    }
+  }
+
   if (severity === 'warn' || rule.includes('warn') || rule.includes('constitution.warn')) {
     return {
       title: '宪法警告（可继续）',

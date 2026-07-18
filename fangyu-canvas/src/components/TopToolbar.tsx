@@ -281,8 +281,16 @@ export default function TopToolbar(props: Props) {
                 )}
                 <Btn
                   onClick={props.onDispatchToWorker}
-                  title="派发至行 — 本机 Worker 真执行"
-                  style={props.dispatching ? { opacity: 0.6, pointerEvents: 'none' } : undefined}
+                  title={
+                    (props.workersOnline ?? 0) === 0
+                      ? '没有在线 Worker — 点击查看如何启动方隅·行'
+                      : '派发至行 — 本机 Worker 真执行'
+                  }
+                  style={
+                    props.dispatching || (props.workersOnline ?? 0) === 0
+                      ? { opacity: 0.55, ...(props.dispatching ? { pointerEvents: 'none' } : {}) }
+                      : undefined
+                  }
                 >
                   {props.dispatching ? '派发中…' : '派发至行'}
                 </Btn>

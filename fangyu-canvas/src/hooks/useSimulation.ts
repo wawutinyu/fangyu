@@ -36,7 +36,10 @@ export function useSimulation(
         const payload = denyToViolationPayload(scan.deny)
         setSimConstitutionWarnings(payload)
         setSimResults([])
-        showToast(formatViolationSummary(payload), 'warn')
+        const summary = formatViolationSummary(payload)
+        showToast(summary, 'warn')
+        window.dispatchEvent(new CustomEvent('fangyu:focus-bottom-chat'))
+        queuePreviewResult(`[工具栏预览] ${summary}`)
         return
       }
       if (scan.warn.length) {
@@ -92,9 +95,12 @@ export function useSimulation(
       }))
       const text = formatFlowChatOutput(chatRows)
       window.dispatchEvent(new CustomEvent('fangyu:focus-bottom-chat'))
-      queuePreviewResult(text)
+      queuePreviewResult(`[工具栏预览]\n${text}`)
     } else {
-      showToast(result.error || '运行中止', 'warn')
+      const errText = result.error || '运行中止'
+      showToast(errText, 'warn')
+      window.dispatchEvent(new CustomEvent('fangyu:focus-bottom-chat'))
+      queuePreviewResult(`[工具栏预览] ${errText}`)
     }
   }, [nodes, edges, setLocalNodes, showToast, setPendingInteraction, setSimResults, setSimConstitutionWarnings])
 

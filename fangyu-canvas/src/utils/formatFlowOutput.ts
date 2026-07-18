@@ -10,20 +10,63 @@ function isPlanOrActMeta(val: unknown): boolean {
   return phase === 'observe' || phase === 'plan' || phase === 'act' || phase === 'verify'
 }
 
+/** observe / plan / act / verify → 一行人话 */
+export function summarizeActionPhase(val: Record<string, unknown>): string {
+  const phase = String(val.phase || '')
+  if (phase === 'observe') {
+    const goal = val.goal ?? val.observation ?? val.note ?? val.input
+    return goal != null && String(goal).trim()
+      ? `观察：${String(goal).trim()}`
+      : '观察完成'
+  }
+  if (phase === 'plan') {
+    const action = val.action ?? val.next ?? val.plan
+    return action != null && String(action).trim()
+      ? `计划：${String(action).trim()}`
+      : '已生成计划'
+  }
+  if (phase === 'act') {
+    if (val.error) return `执行失败：${String(val.error)}`
+    const done = val.done ?? val.result ?? val.status ?? val.message
+    return done != null && String(done).trim()
+      ? `执行：${String(done).trim()}`
+      : '执行完成'
+  }
+  if (phase === 'verify') {
+    const ok = val.verified === true
+    return ok
+      ? `验证通过：任务已完成（${String(val.status || 'completed')}）。`
+      : `验证未完成（${String(val.status || 'pending')}）。`
+  }
+  return JSON.stringify(val)
+}
+
 function stringifyOutput(val: unknown): string {
   if (val == null || val === '') return ''
   if (typeof val === 'string') return val
   if (typeof val === 'number' || typeof val === 'boolean') return String(val)
   if (typeof val === 'object') {
-    if (isVerifyLike(val)) {
-      const ok = val.verified === true
-      return ok
-        ? `验证通过：任务已完成（${String(val.status || 'completed')}）。`
-        : `验证未完成（${String(val.status || 'pending')}）。`
+    if (isPlanOrActMeta(val)) {
+      return summarizeActionPhase(val as Record<string, unknown>)
     }
     return JSON.stringify(val, null, 2)
   }
   return String(val)
+}
+
+function formatActionLoopChain(
+  allOutputs: Array<{ type: string; nodeName?: string; outputs?: Record<string, unknown> }>,
+): string | null {
+  const lines: string[] = []
+  for (const r of allOutputs) {
+    const result = r.outputs?.result
+    if (result && typeof result === 'object' && isPlanOrActMeta(result)) {
+      lines.push(summarizeActionPhase(result as Record<string, unknown>))
+    }
+  }
+  if (lines.length >= 2) return lines.join(' → ')
+  if (lines.length === 1) return lines[0]
+  return null
 }
 
 /** 从流程节点结果里抽出给聊天框展示的文本 */
@@ -55,6 +98,9 @@ export function formatFlowChatOutput(
     const text = stringifyOutput(outVal)
     if (text) return text
   }
+
+  const chain = formatActionLoopChain(allOutputs)
+  if (chain) return chain
 
   const verify = [...allOutputs].reverse().find(r =>
     r.nodeName === 'verify' || isVerifyLike(r.outputs?.result),

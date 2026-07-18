@@ -28,4 +28,27 @@ describe('lawExplain', () => {
     expect(e.title).toBeTruthy()
     expect(e.nextStep).toContain('律')
   })
+
+  it('explains policy_ssrf', () => {
+    const e = explainViolation({ rule: 'policy_ssrf', message: '内网地址' })
+    expect(e.title).toContain('SSRF')
+    expect(e.nextStep.length).toBeGreaterThan(4)
+  })
+
+  it('explains policy_llm_model', () => {
+    const e = explainViolation({ rule: 'policy_llm_model', message: '缺 model' })
+    expect(e.title).toContain('大模型')
+    expect(e.nextStep).toMatch(/model|设置/)
+  })
+
+  it('explains policy_loop_limit', () => {
+    const e = explainViolation({ rule: 'policy_loop_limit', message: '超过 100' })
+    expect(e.title).toContain('循环')
+  })
+
+  it('explains policy_tool_name', () => {
+    const e = explainViolation({ rule: 'policy_tool_name', tool_name: 'bad_tool', message: '不允许' })
+    expect(e.title).toContain('工具')
+    expect(e.plain).toMatch(/bad_tool|不允许/)
+  })
 })

@@ -31,7 +31,7 @@ import { convertToExportFormat } from '../utils/flowHelper'
 import { demoFlows } from '../utils/demoFlows'
 import { snapshotFlowFromCanvas, getExportFormatFromCanvas } from '../utils/flowSnapshot'
 import { fetchWorkers, pollTaskUntilDone } from '../utils/workerApi'
-import { publishAndDispatchFromCanvas } from '../utils/workerDispatch'
+import { publishAndDispatchFromCanvas, workerStartHint } from '../utils/workerDispatch'
 import {
   FULL_EXPERIENCE_SCENARIO_ID,
   instantiateScenario,
@@ -93,6 +93,12 @@ export default function App() {
   const [agentAssetPickerOpen, setAgentAssetPickerOpen] = useState(false)
   const [fullExperienceBusy, setFullExperienceBusy] = useState(false)
   const [experienceGuide, setExperienceGuide] = useState<ScenarioInstantiateResult | null>(null)
+  const [hangHint, setHangHint] = useState<string | null>(null)
+
+  const flashHangHint = useCallback((msg: string, ms = 4500) => {
+    setHangHint(msg)
+    window.setTimeout(() => setHangHint(null), ms)
+  }, [])
 
   const loadFlowToCanvas = useCallback((data: unknown) => {
     flowCanvasRef.current?.importFlow(data)
@@ -392,7 +398,7 @@ export default function App() {
       const workers = await fetchWorkers()
       const online = workers.filter(w => w.online)
       if (online.length === 0) {
-        window.alert('没有在线的方隅·行 Worker。\n\n请先运行：dev-worker.bat 或 dev-worker-tray.bat\n（需序 API：dev.bat）')
+        window.alert(workerStartHint())
         return
       }
 
@@ -434,9 +440,14 @@ export default function App() {
         snapshotId: saveEntry.id,
         workerId: selectedWorkerId,
       })
+      const targetId = (selectedWorkerId && online.some(w => w.id === selectedWorkerId))
+        ? selectedWorkerId
+        : online[0].id
+      const workerName = online.find(w => w.id === targetId)?.name ?? 'Worker'
       setHighlightWorkerTaskId(result.task_id)
       setView('worker')
       setWorkersFocusSignal(s => s + 1)
+      flashHangHint(`已派发至 ${workerName} · 任务 ${result.task_id.slice(0, 8)}…`)
 
       void pollTaskUntilDone(result.task_id, {
         onUpdate: (task) => setHighlightWorkerTaskId(task.id),
@@ -445,17 +456,24 @@ export default function App() {
         setView('worker')
         setWorkersFocusSignal(s => s + 1)
         if (task.status === 'failed') {
+          flashHangHint(`任务失败：${task.error ?? '未知错误'}`, 6000)
           window.alert(`任务失败：${task.error ?? '未知错误'}`)
+        } else if (task.status === 'done') {
+          flashHangHint(`任务完成 · ${task.id.slice(0, 8)}…`)
         }
-      }).catch(() => {
+      }).catch((err) => {
         setWorkersFocusSignal(s => s + 1)
+        flashHangHint(
+          `等待任务结果超时或中断：${err instanceof Error ? err.message : String(err)}`,
+          6000,
+        )
       })
     } catch (err) {
       window.alert(`派发失败：${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setDispatching(false)
     }
-  }, [selectedWorkerId])
+  }, [selectedWorkerId, flashHangHint])
 
   useEffect(() => {
     let cancelled = false
@@ -510,6 +528,12 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler)
   }, [handleSaveFlow])
 
+  useEffect(() => {
+    const goLaw = () => setView('law')
+    window.addEventListener('fangyu:goto-law', goLaw)
+    return () => window.removeEventListener('fangyu:goto-law', goLaw)
+  }, [])
+
   const flowDirty = useAppSelector(s => s.flow.dirty)
 
   return (
@@ -559,6 +583,20 @@ export default function App() {
         selectedWorkerId={selectedWorkerId}
         onSelectWorker={setSelectedWorkerId}
       />
+      {hangHint && (
+        <div
+          role="status"
+          style={{
+            padding: '8px 14px',
+            fontSize: 12,
+            background: '#eff6ff',
+            color: '#1e40af',
+            borderBottom: '1px solid var(--border-color)',
+          }}
+        >
+          {hangHint}
+        </div>
+      )}
       <input ref={fileInputRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleFileSelected} />
       {/* 画布始终挂载，通过 display 切换 */}
       <div style={{ display: view === 'flow' && xuMode === 'flow' ? 'flex' : 'none', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
@@ -598,6 +636,7 @@ export default function App() {
           setIntentPanelOpen(false)
           // 展开底部预览，避免「应用了却不知道去哪看输出」
           window.dispatchEvent(new CustomEvent('fangyu:focus-bottom-chat'))
+          flashHangHint('已载入画布 — 点工具栏预览，或在下方预览聊天发一句', 6000)
         }}
         onApplyAgents={(graph) => {
           loadAgentsToCanvas(graph)

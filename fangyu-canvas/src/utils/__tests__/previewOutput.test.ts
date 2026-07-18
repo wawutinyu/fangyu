@@ -39,12 +39,26 @@ describe('formatFlowChatOutput', () => {
     expect(text).toContain('act')
   })
 
-  it('stringifies object results for chat', () => {
+  it('summarizes plan/act phases in plain language', () => {
     const text = formatFlowChatOutput([
       { type: 'code', nodeName: 'plan', outputs: { result: { phase: 'plan', action: 'write_result' } } },
     ])
-    expect(text).toContain('write_result')
+    expect(text).toContain('计划：write_result')
+    expect(text).not.toContain('"phase"')
     expect(text).not.toBe('(流程执行完成，无输出)')
+  })
+
+  it('chains observe → plan → act → verify', () => {
+    const text = formatFlowChatOutput([
+      { type: 'code', nodeName: 'observe', outputs: { result: { phase: 'observe', goal: '巡检' } } },
+      { type: 'code', nodeName: 'plan', outputs: { result: { phase: 'plan', action: 'write_result' } } },
+      { type: 'code', nodeName: 'act', outputs: { result: { phase: 'act', status: 'ok' } } },
+      { type: 'code', nodeName: 'verify', outputs: { result: { phase: 'verify', verified: true, status: 'completed' } } },
+    ])
+    expect(text).toContain('观察：巡检')
+    expect(text).toContain('计划：write_result')
+    expect(text).toContain('→')
+    expect(text).toContain('验证通过')
   })
 })
 
