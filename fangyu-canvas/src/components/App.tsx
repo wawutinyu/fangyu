@@ -32,6 +32,7 @@ import { demoFlows } from '../utils/demoFlows'
 import { snapshotFlowFromCanvas, getExportFormatFromCanvas } from '../utils/flowSnapshot'
 import { fetchWorkers, pollTaskUntilDone } from '../utils/workerApi'
 import { publishAndDispatchFromCanvas, workerStartHint } from '../utils/workerDispatch'
+import { apiDownHint, probeApiHealth } from '../utils/apiHealth'
 import {
   FULL_EXPERIENCE_SCENARIO_ID,
   instantiateScenario,
@@ -94,6 +95,8 @@ export default function App() {
   const [fullExperienceBusy, setFullExperienceBusy] = useState(false)
   const [experienceGuide, setExperienceGuide] = useState<ScenarioInstantiateResult | null>(null)
   const [hangHint, setHangHint] = useState<string | null>(null)
+  /** null=探测中；false=API 不可达 */
+  const [apiUp, setApiUp] = useState<boolean | null>(null)
 
   const flashHangHint = useCallback((msg: string, ms = 4500) => {
     setHangHint(msg)
@@ -501,6 +504,17 @@ export default function App() {
     return () => { cancelled = true; clearInterval(timer) }
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+    const tick = async () => {
+      const ok = await probeApiHealth()
+      if (!cancelled) setApiUp(ok)
+    }
+    void tick()
+    const timer = setInterval(() => { void tick() }, 5000)
+    return () => { cancelled = true; clearInterval(timer) }
+  }, [])
+
   const handleRestore = useCallback((saveData: unknown) => {
     flowCanvasRef.current?.restoreFromSave(saveData)
   }, [])
@@ -533,6 +547,17 @@ export default function App() {
     window.addEventListener('fangyu:goto-law', goLaw)
     return () => window.removeEventListener('fangyu:goto-law', goLaw)
   }, [])
+
+  useEffect(() => {
+    const openIntent = () => setIntentPanelOpen(true)
+    const fullExp = () => { void handleFullExperience() }
+    window.addEventListener('fangyu:open-intent', openIntent)
+    window.addEventListener('fangyu:full-experience', fullExp)
+    return () => {
+      window.removeEventListener('fangyu:open-intent', openIntent)
+      window.removeEventListener('fangyu:full-experience', fullExp)
+    }
+  }, [handleFullExperience])
 
   const flowDirty = useAppSelector(s => s.flow.dirty)
 
@@ -583,6 +608,33 @@ export default function App() {
         selectedWorkerId={selectedWorkerId}
         onSelectWorker={setSelectedWorkerId}
       />
+      {apiUp === false && (
+        <div
+          role="alert"
+          data-testid="api-down-banner"
+          style={{
+            padding: '8px 14px',
+            fontSize: 12,
+            background: '#fef2f2',
+            color: '#991b1b',
+            borderBottom: '1px solid #fecaca',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            flexWrap: 'wrap',
+          }}
+        >
+          <span style={{ flex: 1, minWidth: 200 }}>{apiDownHint()}</span>
+          <button
+            type="button"
+            className="notion-btn"
+            style={{ fontSize: 11 }}
+            onClick={() => { void probeApiHealth().then(setApiUp) }}
+          >
+            重试探测
+          </button>
+        </div>
+      )}
       {hangHint && (
         <div
           role="status"
@@ -636,7 +688,7 @@ export default function App() {
           setIntentPanelOpen(false)
           // 展开底部预览，避免「应用了却不知道去哪看输出」
           window.dispatchEvent(new CustomEvent('fangyu:focus-bottom-chat'))
-          flashHangHint('已载入画布 — 点工具栏预览，或在下方预览聊天发一句', 6000)
+          flashHangHint('已载入画布 — 在下方预览聊天发一句，或点工具栏预览（同一后端引擎）', 6000)
         }}
         onApplyAgents={(graph) => {
           loadAgentsToCanvas(graph)

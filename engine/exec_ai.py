@@ -126,12 +126,13 @@ async def _exec_code(ctx: NodeContext) -> dict[str, Any]:
         if isinstance(nested, dict):
             input_data = {**input_data, **nested}
     elif isinstance(input_val, str):
-        # 字符串也要包成 dict，否则 _input.get 会崩
+        # 字符串也要包成 dict，否则 _input.get 会崩；result 键便于串行 code→code
         input_data = {
             **ext,
             "input": input_val,
             "message": ext.get("message", input_val),
             "query": ext.get("query", input_val),
+            "result": input_val,
         }
     else:
         input_data = {**ext, **ctx.inputs}

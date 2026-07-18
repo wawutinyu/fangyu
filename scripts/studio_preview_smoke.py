@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Studio 双预览回归（脚本可重复部分）
+Studio 预览回归（脚本可重复部分）
 
-覆盖刚翻车的路径：
-  1) 意图生成 → 后端 Flow 执行（≈ 底部「预览」聊天）
-  2) 同一 Flow 的 code 节点可走 execute-code（≈ 工具栏预览里的 Python 沙箱）
+覆盖统一路径：
+  1) 意图生成 → 后端 Flow 执行（与工具栏「预览」/底部「后端真跑」同一引擎）
+  2) 同一 Flow 的 code 节点可走 execute-code（Python 沙箱）
 
 用法（API 须在本机 Terminal 前台跑，勿用已死的 Cursor shell 进程）：
   python scripts/studio_preview_smoke.py
@@ -85,7 +85,7 @@ def export_to_engine(flow: dict) -> tuple[list, list]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Studio preview dual-path smoke")
+    parser = argparse.ArgumentParser(description="Studio preview unified-path smoke")
     parser.add_argument("--base", default=DEFAULT_BASE)
     args = parser.parse_args()
     base = args.base
@@ -100,7 +100,7 @@ def main() -> int:
 
     ok = True
 
-    # --- 路径 1：意图 → 后端 run（底部聊天） ---
+    # --- 路径 1：意图 → 后端 run（统一预览引擎） ---
     try:
         status, intent = api(
             "POST",
@@ -141,7 +141,7 @@ def main() -> int:
             base=base,
             timeout=90,
         )
-        ok &= must_ok("底部路径 flow/run HTTP", status == 200)
+        ok &= must_ok("统一路径 flow/run HTTP", status == 200)
         ok &= must_ok("flow/run success", run.get("success") is True, run.get("error") or "")
         results = run.get("results") or []
         by_name = {r.get("nodeName"): r for r in results}
@@ -150,14 +150,14 @@ def main() -> int:
         ok &= must_ok("聊天文本覆盖输入默认值", goal == CHAT_TEXT, f"goal={goal!r}")
         verify_out = ((by_name.get("verify") or {}).get("outputs") or {}).get("result") or {}
         ok &= must_ok(
-            "verify completed（底部可读输出）",
+            "verify completed（可读输出）",
             verify_out.get("verified") is True and verify_out.get("status") == "completed",
             json.dumps(verify_out, ensure_ascii=False),
         )
     except Exception as exc:
-        ok &= must_ok("底部路径 flow/run", False, str(exc))
+        ok &= must_ok("统一路径 flow/run", False, str(exc))
 
-    # --- 路径 2：execute-code（工具栏 Python 沙箱） ---
+    # --- 路径 2：execute-code（Python 沙箱） ---
     try:
         plan_node = next(n for n in flow["nodes"] if n.get("name") == "plan")
         act_node = next(n for n in flow["nodes"] if n.get("name") == "act")
@@ -171,7 +171,7 @@ def main() -> int:
             base=base,
         )
         ok &= must_ok(
-            "工具栏沙箱 plan",
+            "沙箱 plan",
             plan_res.get("error") in (None, "") and (plan_res.get("result") or {}).get("action") == "write_result",
             json.dumps(plan_res, ensure_ascii=False)[:200],
         )
@@ -183,7 +183,7 @@ def main() -> int:
             base=base,
         )
         ok &= must_ok(
-            "工具栏沙箱 act",
+            "沙箱 act",
             (act_res.get("result") or {}).get("acted") is True,
             json.dumps(act_res, ensure_ascii=False)[:200],
         )
@@ -195,16 +195,16 @@ def main() -> int:
             base=base,
         )
         ok &= must_ok(
-            "工具栏沙箱 verify≈底部语义",
+            "沙箱 verify 语义",
             (ver_res.get("result") or {}).get("status") == "completed",
             json.dumps(ver_res, ensure_ascii=False)[:200],
         )
     except Exception as exc:
-        ok &= must_ok("工具栏沙箱链路", False, str(exc))
+        ok &= must_ok("沙箱链路", False, str(exc))
 
     print()
     if ok:
-        print("[OK] Studio 双预览脚本项全绿")
+        print("[OK] Studio 统一预览脚本项全绿")
         print("仍需人手点一次：意图应用画布 → 底部聊天发一句 → 工具栏点预览")
         return 0
     print("[FAIL] studio_preview_smoke 未通过 — 见 docs/HAPPY_PATH_ACCEPTANCE.md")

@@ -526,17 +526,41 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
         document.body,
       )}
       {nodes.length === 0 && (
-        <div style={{
-          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
-          color: '#bfbeba', pointerEvents: 'none', zIndex: 5,
-        }}>
+        <div
+          data-testid="empty-canvas-guide"
+          style={{
+            position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+            color: '#8c8b88', zIndex: 5, pointerEvents: 'auto',
+            maxWidth: 320, textAlign: 'center',
+          }}
+        >
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" style={{ opacity: 0.5 }}>
             <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
             <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
           </svg>
-          <div style={{ fontSize: 14, fontWeight: 500 }}>空画布</div>
-          <div style={{ fontSize: 12 }}>从左侧面板拖拽节点到此处开始搭建流程</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#5c5b58' }}>空画布</div>
+          <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+            从左侧拖节点，或一句话开始：
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button
+              type="button"
+              className="notion-btn primary"
+              style={{ fontSize: 12, pointerEvents: 'auto' }}
+              onClick={() => window.dispatchEvent(new CustomEvent('fangyu:full-experience'))}
+            >
+              体验全部
+            </button>
+            <button
+              type="button"
+              className="notion-btn"
+              style={{ fontSize: 12, pointerEvents: 'auto' }}
+              onClick={() => window.dispatchEvent(new CustomEvent('fangyu:open-intent'))}
+            >
+              意图生成
+            </button>
+          </div>
         </div>
       )}
       {edgeInsert.visible && edgeInsert.edge && createPortal(

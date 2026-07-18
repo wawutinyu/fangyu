@@ -1,4 +1,8 @@
-"""TrustRegistry — 身份注册 + 授权 + 吊销 + 防重放"""
+"""TrustRegistry — 身份注册 + 授权 + 吊销 + 防重放。
+
+协议实现源。应用代码 / API / 引擎请从 ``fangyu.engine.trust_runtime`` 导入
+（该模块 re-export 本类），勿在业务层直接依赖多套入口。
+"""
 from typing import Optional
 
 

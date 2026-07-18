@@ -15,6 +15,12 @@
 | **最小暴露** | RPC 端点只暴露公钥；私钥永不通过 HTTP 返回 |
 | **开发者默认安全** | 新导出 Bundle `require_envelope=true`；本地调试可显式关闭 |
 
+### 1.1 TrustRegistry 入口
+
+- **应用 / API / 引擎：** `from fangyu.engine.trust_runtime import TrustRegistry`
+- **协议实现源：** `fangyu.a2a.trust.registry`（由 `trust_runtime` re-export，进程内是同一类）
+- 勿在业务代码再维护第二套注册表；单测用 `assert fangyu.a2a.trust.registry.TrustRegistry is fangyu.engine.trust_runtime.TrustRegistry` 防回归
+
 ---
 
 ## 2. 密钥与身份

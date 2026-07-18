@@ -1,4 +1,8 @@
-"""ATP 信任运行时 — 复用 a2a.trust 身份/注册表 + 签名信封 + 授权断言"""
+"""ATP 信任运行时 — 复用 a2a.trust 身份/注册表 + 签名信封 + 授权断言。
+
+**单一入口：** 业务与 routers 请 ``from fangyu.engine.trust_runtime import TrustRegistry``。
+``fangyu.a2a.trust.registry`` 是协议实现源；本模块 re-export，保证进程内同一类对象。
+"""
 from __future__ import annotations
 
 import json

@@ -14,7 +14,7 @@ export interface ExperienceGuideProps {
 }
 
 const STEPS = [
-  { n: 1, title: '序 · 预览', desc: '先看底部是否为「Flow 聊天」，再输入一句话或点「开始预览」。成功时会出现绿色「运行成功」；不要只盯着「执行日志」截断行' },
+  { n: 1, title: '序 · 预览', desc: '展开底部「预览」→ 确认 Flow 聊天 → 发一句；或点工具栏「预览」。二者同一后端引擎。成功看绿色结论，别只盯执行日志' },
   { n: 2, title: '序 · Agent', desc: '顶栏切到「Agent」，看检索→分析→汇总协作拓扑' },
   { n: 3, title: '律', desc: '打开「律」，查看已写入的 LLM / SSRF / 循环 / 工具策略' },
   { n: 4, title: '行', desc: '先 ./install-worker.sh 或 ./dev-worker.sh，再点「派发至行」真执行' },

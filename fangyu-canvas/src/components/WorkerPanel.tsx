@@ -2,46 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { WorkerInfo, WorkerTask, WorkerTaskEvent } from '@fangyu/core/schema'
 import { fetchTask, fetchTaskEvents, fetchTasks, fetchWorkers, fireMqttWorkerTrigger, fetchMqttTriggerStatus, dispatchAdapterTest } from '../utils/workerApi'
 import { workerStartHintShort } from '../utils/workerDispatch'
+import { formatTs, payloadSummary, statusColor } from '../utils/workerTaskFormat'
 
 interface Props {
   highlightTaskId?: string | null
 }
 
 type StatusFilter = 'all' | 'pending' | 'running' | 'done' | 'failed'
-
-function statusColor(status: string): string {
-  if (status === 'done') return '#16a34a'
-  if (status === 'failed') return '#dc2626'
-  if (status === 'running') return '#2563eb'
-  return '#ca8a04'
-}
-
-function formatTs(ts: number | null | undefined): string {
-  if (!ts) return '—'
-  return new Date(ts * 1000).toLocaleString()
-}
-
-function payloadSummary(task: WorkerTask): string {
-  const p = task.payload ?? {}
-  if (task.type === 'run_flow') {
-    const name = typeof p.snapshot_name === 'string' ? p.snapshot_name : null
-    const nodes = Array.isArray(p.nodes) ? p.nodes.length : 0
-    return name ? `${name} · ${nodes} 节点` : `${nodes} 节点`
-  }
-  if (task.type === 'shell') {
-    const cmd = typeof p.command === 'string' ? p.command : ''
-    return cmd.length > 48 ? `${cmd.slice(0, 48)}…` : cmd
-  }
-  if (task.type === 'read_file' || task.type === 'write_file') {
-    return typeof p.path === 'string' ? p.path : ''
-  }
-  if (task.type === 'adapter_invoke') {
-    const action = typeof p.action === 'string' ? p.action : 'invoke'
-    const adapter = typeof p.adapter === 'string' ? p.adapter : ''
-    return adapter ? `${action}:${adapter}` : action
-  }
-  return ''
-}
 
 export default function WorkerPanel({ highlightTaskId }: Props) {
   const [workers, setWorkers] = useState<WorkerInfo[]>([])
@@ -239,7 +206,7 @@ export default function WorkerPanel({ highlightTaskId }: Props) {
               </div>
               {w.last_seen && (
                 <div style={{ color: 'var(--text-muted)', fontSize: 10, marginTop: 2 }}>
-                  心跳 {formatTs(w.last_seen)}
+                  心跳 {formatTs(w.last_seen, true)}
                 </div>
               )}
             </button>
@@ -295,7 +262,7 @@ export default function WorkerPanel({ highlightTaskId }: Props) {
                   <div style={{ fontSize: 11, color: 'var(--text-primary)', marginTop: 4 }}>{payloadSummary(t)}</div>
                 )}
                 <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, fontFamily: 'monospace' }}>
-                  {t.id.slice(0, 8)}… · {formatTs(t.created_at)}
+                  {t.id.slice(0, 8)}… · {formatTs(t.created_at, true)}
                 </div>
               </button>
             ))}
@@ -319,9 +286,9 @@ export default function WorkerPanel({ highlightTaskId }: Props) {
               <div style={{ marginBottom: 6 }}><strong>摘要</strong> {payloadSummary(selected)}</div>
             )}
             <div style={{ marginBottom: 6, color: 'var(--text-muted)', fontSize: 11 }}>
-              创建 {formatTs(selected.created_at)}
-              {selected.started_at ? ` · 开始 ${formatTs(selected.started_at)}` : ''}
-              {selected.finished_at ? ` · 结束 ${formatTs(selected.finished_at)}` : ''}
+              创建 {formatTs(selected.created_at, true)}
+              {selected.started_at ? ` · 开始 ${formatTs(selected.started_at, true)}` : ''}
+              {selected.finished_at ? ` · 结束 ${formatTs(selected.finished_at, true)}` : ''}
             </div>
             {selected.error && (
               <div style={{ marginBottom: 8, color: '#dc2626', whiteSpace: 'pre-wrap' }}>{selected.error}</div>
@@ -333,7 +300,7 @@ export default function WorkerPanel({ highlightTaskId }: Props) {
                   {events.map(ev => (
                     <div key={ev.id} style={{ fontSize: 11, padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}>
                       <span style={{ color: statusColor(ev.event_type), fontWeight: 600 }}>{ev.event_type}</span>
-                      <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>{formatTs(ev.created_at)}</span>
+                      <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>{formatTs(ev.created_at, true)}</span>
                       {ev.message && <div style={{ marginTop: 2, color: 'var(--text-muted)' }}>{ev.message}</div>}
                     </div>
                   ))}

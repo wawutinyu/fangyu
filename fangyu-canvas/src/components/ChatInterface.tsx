@@ -292,7 +292,7 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
 
   const content = (
     <>
-      <div style={{ display: 'flex', gap: 4, padding: '4px 12px', borderBottom: '1px solid var(--border-light)', flexShrink: 0 }}>
+      <div style={{ display: 'flex', gap: 4, padding: '4px 12px', borderBottom: '1px solid var(--border-light)', flexShrink: 0, alignItems: 'center', flexWrap: 'wrap' }}>
         <button onClick={() => setChatMode('flow')} style={{
           padding: '2px 10px', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11,
           background: chatMode === 'flow' ? '#37352f' : 'transparent', color: chatMode === 'flow' ? '#fff' : '#888',
@@ -301,6 +301,11 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
           padding: '2px 10px', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11,
           background: chatMode === 'agent' ? '#722ed1' : 'transparent', color: chatMode === 'agent' ? '#fff' : '#888',
         }} disabled={agents.length === 0}>Agent 聊天</button>
+        {chatMode === 'flow' && (
+          <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 4 }} title="工具栏「预览」与此同引擎">
+            后端真跑 · 本机主路径
+          </span>
+        )}
         {chatMode === 'agent' && canCollab && (
           <button onClick={() => setAgentCollabMode(v => !v)} style={{
             padding: '2px 10px', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11,
@@ -506,6 +511,7 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           <span>运行预览</span>
+          <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-muted)' }}>后端真跑 · 本机主路径</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {messages.length > 0 && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{messages.length} 条消息</span>}

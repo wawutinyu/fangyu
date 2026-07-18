@@ -255,7 +255,7 @@ export default function TopToolbar(props: Props) {
             <Btn
               onClick={props.onSimulate}
               primary
-              title="序内预览 — 设计验证"
+              title="与底部预览相同：后端真跑（/api/v1/flow/run/stream）"
               style={props.simulating ? { opacity: 0.6, pointerEvents: 'none' } : undefined}
             >
               {props.simulating ? '预览中…' : '预览'}

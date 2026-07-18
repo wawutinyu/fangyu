@@ -17,26 +17,28 @@
 
 | # | 动作 | 预期 | 耗时 |
 |---|------|------|------|
-| 1 | `git clone` + `npm install` + `py -m pip install -e .`（或 `install-worker.bat`） | 无报错；桌面出现 `Fangyu-Worker.lnk` | |
-| 2 | `dev-clean.bat`（若需要）+ `dev.bat` | 打开 http://localhost:5173，标题含「方隅·序」 | |
-| 3 | `install-worker.bat` 或 `dev-worker-tray.bat` | 托盘 / Worker 在线；序顶栏出现「行 N」 | |
-| 4a | 创建 → **意图生成** → 应用到画布 → **工具栏「预览」** | 弹出「模拟运行结果」；act/verify 语义成功（非卡住「预览中…」） | |
-| 4b | 同一 Flow → 底部面板展开 **「预览」聊天** → 发一句 | 助手回复**可读**（含验证通过 / completed 等），**不是**「无输出」或「画布为空」 | |
+| 1 | `git clone` + `npm install` + `pip install -e .`（Win：`install-worker.bat` / Mac：`./install-worker.sh`） | 无报错；Mac 可出现 `~/Applications/Fangyu-Worker.command` | |
+| 2 | Win：`dev-clean.bat` + `dev.bat`；Mac：`./dev-clean.sh` + `./dev.sh`（API 在 Terminal 前台） | 打开 http://localhost:5173，标题含「方隅·序」 | |
+| 3 | Win：`install-worker.bat` / `dev-worker-tray.bat`；Mac：`./install-worker.sh` 或 `./dev-worker.sh` | Worker 在线；序顶栏出现「行 N」 | |
+| 4a | 创建 → **意图生成** → 应用到画布 → **工具栏「预览」** | 底部出现可读结论（与 4b 同引擎）；act/verify 语义成功 | |
+| 4b | 同一 Flow → 底部 **「预览」聊天** → 发一句 | 助手回复**可读**（含验证通过 / completed 等），**不是**「无输出」或「画布为空」 | |
 | 5 | **派发至行** | 方隅·行面板任务 `done` | |
-| 6 | `py scripts/worker_happy_path.py --spawn-worker` | 打印 OK（shell + run_flow） | |
-| 7 | 导出 Agent Bundle → `py -m fangyu bundle run …`（或 `py scripts/happy_path_demo.py`） | Bundle 常驻 / RPC 有响应 | |
+| 6 | `python scripts/worker_happy_path.py --spawn-worker` | 打印 OK（shell + run_flow） | |
+| 7 | 导出 Agent Bundle → `python -m fangyu bundle run …`（或 `python scripts/happy_path_demo.py`） | Bundle 常驻 / RPC 有响应 | |
 | 8 | 顶栏 **方隅·观**（或 `GET /api/v1/presence`） | 能看到 Worker Presence；派发后时间线有事件 | |
 | 9 | 顶栏 **方隅·律**（或 `GET /api/v1/constitution/audit/verify`） | 能看到宪法与审计；链验证 `valid=true` 或白话可解释 | |
 
+> **预览引擎：** 4a 与 4b 现为同一后端路径（`/api/v1/flow/run/stream`）。4a 无聊天输入时用节点 default_value。
+
 **脚本复验：**
 
-- API 观/律/路由：`py scripts/happy_path_acceptance_check.py`
-- **Studio 双预览（意图 + 底部路径 + 工具栏沙箱）：** `py scripts/studio_preview_smoke.py`  
+- API 观/律/路由：`python scripts/happy_path_acceptance_check.py`
+- **Studio 预览（意图 + 工具栏 + 底部）：** `python scripts/studio_preview_smoke.py`  
   （API 未起时退出码 2，不当假绿）
 
 ## 通过标准
 
-- 步骤 1–3、**4a + 4b**、6 **必须全绿**（4a/4b 缺一不可：工具栏预览 ≠ 底部聊天）
+- 步骤 1–3、**4a + 4b**、6 **必须全绿**（两条入口都应能跑通同一引擎）
 - 5、7 按环境；缺 Worker 可记「部分通过」
 - 8–9 为四门两包体验验收（观/律）
 

@@ -539,7 +539,7 @@ async function simulateNode(
           return { result: _lastLLMOutput, usage: {}, _mocked: true }
         }
         _lastLLMOutput = `[mock] LLM answer for: ${String(prompt).slice(0, 100)}`
-        return { result: _lastLLMOutput, usage: {}, _mocked: true, error: String(e) }
+        return { result: _lastLLMOutput, usage: {}, _mocked: true }
       }
     }
     case 'json-parse': {

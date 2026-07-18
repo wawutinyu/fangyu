@@ -12,7 +12,7 @@ import WorkerPanel from './WorkerPanel'
 import { useAssetContext } from '../context/AssetContext'
 
 const PRIMARY_TABS = [
-  { key: 'chat', label: '预览', icon: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' },
+  { key: 'chat', label: '预览', title: '后端真跑 · 本机主路径', icon: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' },
   { key: 'workers', label: '行', icon: 'M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z' },
   { key: 'assets', label: '资产', icon: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z' },
 ]
@@ -41,7 +41,7 @@ export default function BottomPanel({
 }) {
   const [activeTab, setActiveTab] = useState('chat')
   const { loadFlowToCanvas, loadAgentsToCanvas, agentBindTarget, setAgentBindTarget, bindAgentSkillFlow } = useAssetContext()
-  const [collapsed, setCollapsed] = useState(true)
+  const [collapsed, setCollapsed] = useState(false)
   const [height, setHeight] = useState(280)
   const [moreOpen, setMoreOpen] = useState(false)
   const moreRef = useRef<HTMLDivElement>(null)
@@ -113,10 +113,11 @@ export default function BottomPanel({
     }
   }, [])
 
-  const tabBtn = (tab: { key: string; label: string; icon: string }, active: boolean) => (
+  const tabBtn = (tab: { key: string; label: string; icon: string; title?: string }, active: boolean) => (
     <button
       key={tab.key}
       type="button"
+      title={tab.title}
       onClick={() => {
         setActiveTab(tab.key)
         setMoreOpen(false)
