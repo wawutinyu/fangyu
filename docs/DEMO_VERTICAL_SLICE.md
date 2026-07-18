@@ -26,7 +26,11 @@ python scripts/demo_vertical_slice.py --keep
 
 成功应看到：`[OK] 可演示竖切通过`，并有 `deliverables/weekly.md`。
 
-## 给人看时怎么讲（口播）
+## Studio 入口
+
+底部面板 **更多 → 运维**：托管启停 / 日志 · 组织 ACL 启停 / 成员 / 权限试探。
+
+口播时可打开该面板，对照 CLI 竖切讲「用户不用敲命令也能管」。
 
 1. 「不是 Chat 玩具，是**能导出的 Agent 产线**。」  
 2. 「意图直接打成 **multi Bundle**，拓扑在包里，脱离 Studio 也能 `orchestrate`。」  

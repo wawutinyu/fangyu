@@ -1,0 +1,123 @@
+/** Studio 运维 API — 托管 + 组织 ACL */
+import { apiFetch } from '../platform'
+
+export interface ManagedInstance {
+  id: string
+  name: string
+  bundle_dir: string
+  host: string
+  port: number
+  status: string
+  alive?: boolean
+  agent?: string
+  health?: { status?: string; mode?: string; uptime_sec?: number }
+  log_path?: string
+}
+
+export interface AclDoc {
+  version?: string
+  org_id?: string
+  org_name?: string
+  enabled: boolean
+  require_principal?: boolean
+  members: Record<string, { name?: string; roles?: string[] }>
+  roles: Record<string, { description?: string; permissions?: string[] }>
+}
+
+export async function listManagedInstances(): Promise<ManagedInstance[]> {
+  const res = await apiFetch('/api/v1/managed/instances')
+  if (!res.ok) return []
+  const body = await res.json()
+  return body.instances ?? []
+}
+
+export async function startManaged(input: {
+  bundle_dir: string
+  name?: string
+  port?: number | null
+}): Promise<ManagedInstance> {
+  const res = await apiFetch('/api/v1/managed/instances', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      bundle_dir: input.bundle_dir,
+      name: input.name || '',
+      port: input.port ?? null,
+      wait: true,
+    }),
+  })
+  const body = await res.json()
+  if (!res.ok) throw new Error(body.detail || body.message || '启动失败')
+  return body
+}
+
+export async function stopManaged(id: string): Promise<ManagedInstance> {
+  const res = await apiFetch(`/api/v1/managed/instances/${encodeURIComponent(id)}/stop`, {
+    method: 'POST',
+  })
+  const body = await res.json()
+  if (!res.ok) throw new Error(body.detail || '停止失败')
+  return body
+}
+
+export async function fetchManagedLogs(id: string, tail = 40): Promise<string[]> {
+  const res = await apiFetch(
+    `/api/v1/managed/instances/${encodeURIComponent(id)}/logs?tail=${tail}`,
+  )
+  if (!res.ok) return []
+  const body = await res.json()
+  return body.lines ?? []
+}
+
+export async function fetchAcl(): Promise<AclDoc | null> {
+  const res = await apiFetch('/api/v1/acl')
+  if (!res.ok) return null
+  return res.json()
+}
+
+export async function initAcl(orgName = '方隅默认组织'): Promise<AclDoc> {
+  const res = await apiFetch('/api/v1/acl/init', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ org_name: orgName, enabled: true, require_principal: true }),
+  })
+  const body = await res.json()
+  if (!res.ok) throw new Error(body.detail || '初始化失败')
+  return body
+}
+
+export async function enableAcl(enabled: boolean): Promise<AclDoc> {
+  const res = await apiFetch('/api/v1/acl/enable', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled, require_principal: enabled ? true : null }),
+  })
+  const body = await res.json()
+  if (!res.ok) throw new Error(body.detail || '切换失败')
+  return body
+}
+
+export async function addAclMember(memberId: string, name: string, roles: string[]): Promise<AclDoc> {
+  const res = await apiFetch('/api/v1/acl/members', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ member_id: memberId, name, roles }),
+  })
+  const body = await res.json()
+  if (!res.ok) throw new Error(body.detail || '添加失败')
+  return body
+}
+
+export async function checkAcl(input: {
+  principal_id: string
+  agent?: string
+  skill?: string
+  tool?: string
+}): Promise<{ allowed: boolean; message?: string; rule?: string }> {
+  const res = await apiFetch('/api/v1/acl/check', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  return res.json()
+}
