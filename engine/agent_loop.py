@@ -32,7 +32,7 @@ CODING_SYSTEM = (
     '   {"action":"plan","steps":["探索相关文件","修改 A","跑验证","总结"]}\n'
     '2) 工具: {"action":"tool","name":"<name>","args":{...}}\n'
     "   仓内: read/write/list/glob/grep/search/apply_patch/shell\n"
-    "   外网: websearch / webfetch；不确定问人: question\n"
+    "   外网: websearch / webfetch / browser_open·snapshot·click；不确定问人: question\n"
     "   技能: skill_load 按需加载工厂技能全文（目录已在 system 摘要里）\n"
     "   shell：只读可直接跑；写文件/安装等须人审："
     "先调用拿到 approval_id，Studio 批准后 "

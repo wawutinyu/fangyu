@@ -100,7 +100,8 @@
 | `research-web` | ✅ md | P0 | `skills/factory/research-web.md` |
 | `office-decompose` | ✅ md | P1 | `skills/factory/office-decompose.md` |
 | `multi-agent-split` | ✅ md | P1 | `skills/factory/multi-agent-split.md`；意图→拓扑 |
-| 领域包（客服/数据/法务/合规） | ✅ md | P2 | customer · data · legal · compliance |
+| 领域包（客服/数据/法务/合规/浏览器） | ✅ md | P2 | + `browser-inspect` |
+| SSO / 企业身份 | ✅ 起 | P1 | 本地 JWT + ACL principal；见 [AUTH_SSO](AUTH_SSO.md) |
 
 **缺口本质：** Flow 里的 skill 与 harness 方法仍需继续统一成「工厂 SKU」；已有 `skills/factory/*.md` + materials 注册。
 
@@ -139,7 +140,7 @@
 | 原料注册表（统一 ID） | ✅ | P0 | `core/materials.py` + Bundle `config/materials.json` |
 | MCP 进包声明 | ✅ | P0 | materials.mcp → `mcp_*`；Tasks 见 [MCP_TASKS](MCP_TASKS.md) |
 | 技能包 md | ✅ | P0 | explore / research / review / implement / office-decompose |
-| SSO / 企业身份 | ❌ | P2 | 真 IM 同级后置 |
+| SSO / 企业身份 | ✅ 起 | P1 | 本地 JWT + ACL；见 [AUTH_SSO](AUTH_SSO.md) |
 
 ---
 

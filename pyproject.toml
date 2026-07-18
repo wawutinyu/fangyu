@@ -27,6 +27,8 @@ mqtt = ["paho-mqtt>=2.0.0"]
 vector = ["sentence-transformers>=2.2.0"]
 # 更丰富的 Word 排版（未装时用内置简易 OOXML 写 docx）
 office = ["python-docx>=1.1.0"]
+# 真实浏览器 Computer-use（未装时用 static HTML 引擎）
+browser = ["playwright>=1.40.0"]
 
 [project.scripts]
 fangyu = "fangyu.__main__:main"

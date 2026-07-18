@@ -63,6 +63,7 @@ def stage_unit() -> bool:
         "tests/unit/test_approvals.py",
         "tests/unit/test_mcp_tasks.py",
         "tests/unit/test_mcp_http_presence.py",
+        "tests/unit/test_browser_sso.py",
         "tests/integration/test_opencode_factory.py",
         "tests/unit/test_factory_gate.py",
     ]

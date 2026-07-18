@@ -3,7 +3,7 @@
 > 行业已收敛：**MCP（工具）· Skills（方法）· A2A（协作）· Harness（机床）· Eval（质检）**。  
 > 方隅定位是 **Agent 工厂**：批量组装可导出的公民，而不是再做一个聊天壳。
 
-关联：[工厂原料](FACTORY_MATERIALS.md) · [拓扑与 task](TOPOLOGY_AND_TASK.md) · [MCP Tasks](MCP_TASKS.md) · [毕业标准](GRADUATION_EXPORTABLE_AGENT.md) · [愿景](VISION_AND_PRODUCT.md)
+关联：[工厂原料](FACTORY_MATERIALS.md) · [拓扑与 task](TOPOLOGY_AND_TASK.md) · [MCP Tasks](MCP_TASKS.md) · [浏览器](BROWSER_TOOL.md) · [认证 SSO](AUTH_SSO.md) · [毕业标准](GRADUATION_EXPORTABLE_AGENT.md) · [愿景](VISION_AND_PRODUCT.md)
 
 ---
 
@@ -64,7 +64,7 @@
 
 ### 以后（不挡主线）
 
-9. 真 IM、平级 Teams、Computer-use / 浏览器、SSO（**真 IM 仍暂缓**）  
+9. 真 IM、平级 Teams（**真 IM 仍暂缓**）；Computer-use / 浏览器 ✅ [BROWSER_TOOL](BROWSER_TOOL.md)；SSO ✅ [AUTH_SSO](AUTH_SSO.md)  
 10. MCP Tasks 扩展 ✅；无状态 HTTP ✅ `POST /mcp/v1/messages`  
 11. 云托管升级与跨机 Presence ✅ 托管进观 + `/presence/hosts/heartbeat`  
 12. 领域技能包 · 人审 UI ✅ legal/compliance + 运维人审
@@ -97,9 +97,10 @@
 ⑪ 领域技能 + 人审 UI             ✅ customer/data-brief + 运维·人审
 ⑫ 法务/合规技能 + MCP Tasks      ✅ legal/compliance + SEP-2663 最小子集
 ⑬ 无状态 MCP HTTP + 跨机 Presence ✅ /mcp/v1/messages + hosts heartbeat
+⑭ 浏览器原料 + SSO JWT           ✅ browser_* + /api/v1/auth
 ```
 
-下一刀：真 IM（仍暂缓）· Computer-use / 浏览器 · SSO。
+下一刀：真 IM（仍暂缓）· playwright 深度 Computer-use · 企业 OIDC JWKS。
 
 ---
 

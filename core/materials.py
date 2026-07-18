@@ -23,6 +23,10 @@ DEFAULT_MATERIALS: dict[str, Any] = {
         {"id": "shell", "source": "builtin", "belts": ["coding", "general"]},
         {"id": "webfetch", "source": "builtin", "belts": ["coding", "scout"]},
         {"id": "websearch", "source": "builtin", "belts": ["coding", "scout"]},
+        {"id": "browser_open", "source": "builtin", "belts": ["coding", "scout"]},
+        {"id": "browser_snapshot", "source": "builtin", "belts": ["coding", "scout"]},
+        {"id": "browser_click", "source": "builtin", "belts": ["coding", "scout"]},
+        {"id": "browser_type", "source": "builtin", "belts": ["coding"]},
         {"id": "question", "source": "builtin", "belts": ["coding", "general"]},
         {"id": "skill_load", "source": "builtin", "belts": ["coding", "general", "plan"]},
         {"id": "task", "source": "runtime", "belts": ["coding"]},
@@ -41,6 +45,7 @@ DEFAULT_MATERIALS: dict[str, Any] = {
             "tools": [
                 "read", "write", "list", "glob", "grep", "search",
                 "apply_patch", "shell", "question", "skill_load",
+                "browser_open", "browser_snapshot", "browser_click",
             ],
         },
         {
@@ -54,6 +59,7 @@ DEFAULT_MATERIALS: dict[str, Any] = {
             "tools": [
                 "read", "list", "glob", "grep", "search",
                 "webfetch", "websearch",
+                "browser_open", "browser_snapshot", "browser_click",
             ],
         },
         {
@@ -63,6 +69,7 @@ DEFAULT_MATERIALS: dict[str, Any] = {
             "tools": [
                 "read", "list", "glob", "grep", "search",
                 "webfetch", "websearch", "question", "skill_load",
+                "browser_open", "browser_snapshot",
             ],
         },
     ],
@@ -78,6 +85,7 @@ DEFAULT_MATERIALS: dict[str, Any] = {
         {"id": "data-brief", "status": "active", "path": "skills/factory/data-brief.md"},
         {"id": "legal-review", "status": "active", "path": "skills/factory/legal-review.md"},
         {"id": "compliance-check", "status": "active", "path": "skills/factory/compliance-check.md"},
+        {"id": "browser-inspect", "status": "active", "path": "skills/factory/browser-inspect.md"},
     ],
     "mcp": [
         {"id": "__internal__", "tools": ["current_time"]},

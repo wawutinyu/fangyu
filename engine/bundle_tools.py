@@ -307,6 +307,12 @@ def tool_shell(
 def coding_toolbelt() -> dict[str, Any]:
     """agent_loop 用的默认编码工具表（含工厂 P0 原料）。"""
     from fangyu.core.skill_pack import tool_skill_load
+    from fangyu.engine.browser_tool import (
+        tool_browser_click,
+        tool_browser_open,
+        tool_browser_snapshot,
+        tool_browser_type,
+    )
 
     return {
         "read": tool_read,
@@ -319,6 +325,10 @@ def coding_toolbelt() -> dict[str, Any]:
         "shell": tool_shell,
         "webfetch": tool_webfetch,
         "websearch": tool_websearch,
+        "browser_open": tool_browser_open,
+        "browser_snapshot": tool_browser_snapshot,
+        "browser_click": tool_browser_click,
+        "browser_type": tool_browser_type,
         "question": tool_question,
         "skill_load": tool_skill_load,
     }
@@ -346,6 +356,11 @@ def builtin_tool_impls() -> dict[str, Any]:
             **office_toolbelt(),
         }
     return _BUILTIN_IMPL
+
+
+def reset_builtin_tool_impls_for_tests() -> None:
+    global _BUILTIN_IMPL
+    _BUILTIN_IMPL = None
 
 
 def resolve_toolbelt(

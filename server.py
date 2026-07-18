@@ -40,6 +40,7 @@ from .routers import acl as acl_router
 from .routers import materials as materials_router
 from .routers import approvals as approvals_router
 from .routers import mcp_http as mcp_http_router
+from .routers import auth as auth_router
 
 
 @asynccontextmanager
@@ -75,6 +76,44 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def auth_principal_middleware(request: Request, call_next):
+    """Bearer JWT → ACL principal；SSO 关闭时允许 X-Fangyu-Principal 旁路。"""
+    from fangyu.core.org_acl import reset_principal, set_principal
+    from fangyu.core.sso import (
+        load_sso_config,
+        principal_from_payload,
+        verify_access_token,
+    )
+
+    request.state.principal_id = None
+    request.state.auth_payload = None
+    cfg = load_sso_config()
+    principal = None
+    auth = request.headers.get("authorization") or ""
+    if auth.lower().startswith("bearer "):
+        raw = auth.split(" ", 1)[1].strip()
+        try:
+            payload = verify_access_token(raw, config=cfg)
+            principal = principal_from_payload(payload)
+            request.state.auth_payload = payload
+        except ValueError:
+            if cfg.get("enabled"):
+                return JSONResponse(status_code=401, content={"detail": "invalid or expired token"})
+    if not principal and not cfg.get("enabled"):
+        bypass = (request.headers.get("x-fangyu-principal") or "").strip()
+        if bypass:
+            principal = bypass
+    token = set_principal(principal) if principal else None
+    if principal:
+        request.state.principal_id = principal
+    try:
+        return await call_next(request)
+    finally:
+        if token is not None:
+            reset_principal(token)
 
 
 @app.exception_handler(FangyuError)
@@ -114,6 +153,7 @@ app.include_router(acl_router.router)
 app.include_router(materials_router.router)
 app.include_router(approvals_router.router)
 app.include_router(mcp_http_router.router)
+app.include_router(auth_router.router)
 
 
 @app.get("/api/health")
