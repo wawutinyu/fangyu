@@ -27,7 +27,7 @@
 |----|------|------|
 | Harness | 较强 | plan/build、task、ask shell、压缩/稳定性 |
 | 原料 Tools | 中上 | materials.json + coding 带；MCP 仅 `__internal__` 起头 |
-| Skills | 起步 | 已有 implement-and-verify；缺渐进加载与标准 frontmatter |
+| Skills | 中 | frontmatter + skill_load；Studio 技能目录渐进预览 |
 | A2A | 中 | 有 RPC/编排；Agent Card / 任务态 / 跨厂发现未满 |
 | Eval | 中 | `FACTORY_EVAL` + `factory_gate` 固定套件；live 仍需 Key |
 | 沙箱/观测 | 中 | 宪法/ACL/审计；Studio 观测读 harness_trace + Eval 报告 |
@@ -102,9 +102,10 @@
 ⑯ Eval 回归 + OIDC 登录页        ✅ FACTORY_EVAL + oidc/start·callback + 运维 SSO
 ⑰ workbuddy live + ACL↔SSO       ✅ gate live 挂 WB · sync-sso / 运维一键入库
 ⑱ 观测 Trace + Eval 报告         ✅ monitor harness/eval · factory_eval_report.json
+⑲ Presence↔托管 + 技能目录 UX    ✅ 观筛托管/停实例 · materials/skills 全文预览
 ```
 
-下一刀：真 IM（仍暂缓）· Presence 面板与托管联动 · Skills 渐进目录 UX。
+下一刀：真 IM（仍暂缓）· A2A 跨厂发现加厚 · 宪法策略产品面。
 
 ---
 

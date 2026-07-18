@@ -1,9 +1,9 @@
-export type PresenceKind = 'agent' | 'worker'
-export type PresenceStatus = 'idle' | 'busy' | 'offline' | 'error' | 'unauthorized'
+export type PresenceKind = 'agent' | 'worker' | 'managed' | 'host'
+export type PresenceStatus = 'idle' | 'busy' | 'offline' | 'error' | 'unauthorized' | 'online'
 
 export interface PresenceEntity {
   id: string
-  kind: PresenceKind
+  kind: PresenceKind | string
   name: string
   label: string
   status: PresenceStatus | string
@@ -22,6 +22,14 @@ export interface PresenceEntity {
   department_id?: string | null
   /** 画布节点 id（部署名），便于观↔序对照 */
   canvas_id?: string | null
+  /** 托管实例 */
+  host?: string | null
+  port?: number | null
+  health_url?: string | null
+  bundle_dir?: string | null
+  /** 跨机主机 */
+  base_url?: string | null
+  role?: string | null
 }
 
 export type CollaborationSeverity = 'info' | 'warn' | 'deny' | 'error'
@@ -70,6 +78,10 @@ export interface PresenceSnapshot {
     agents_busy: number
     workers: number
     workers_online: number
+    managed?: number
+    managed_online?: number
+    hosts?: number
+    hosts_online?: number
     events: number
     edges?: number
     departments?: number

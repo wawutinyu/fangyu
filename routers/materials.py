@@ -61,6 +61,24 @@ def materials_catalog():
     }
 
 
+@router.get("/skills/{skill_id}")
+def get_skill_detail(skill_id: str):
+    """渐进披露第二层：技能全文（对应 skill_load）。"""
+    from fangyu.core.skill_pack import list_factory_skill_ids, load_skill_parsed
+
+    parsed = load_skill_parsed(skill_id)
+    if not parsed:
+        raise HTTPException(404, f"未知技能: {skill_id}")
+    return {
+        "ok": True,
+        "skill_id": parsed["id"],
+        "description": parsed["description"],
+        "when": parsed["when"],
+        "body": parsed["body"],
+        "available": list_factory_skill_ids(),
+    }
+
+
 @router.get("/draft")
 def get_draft():
     from fangyu.core.materials import default_materials, merge_materials

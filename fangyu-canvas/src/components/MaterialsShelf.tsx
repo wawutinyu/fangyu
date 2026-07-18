@@ -4,6 +4,7 @@ import {
   fetchHarnessTraces,
   fetchMaterialsCatalog,
   fetchMaterialsDraft,
+  fetchSkillDetail,
   saveMaterialsSelection,
   type HarnessTrace,
   type MaterialsCatalog,
@@ -48,7 +49,10 @@ export default function MaterialsShelf({ headerless }: MaterialsShelfProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
-  const [tab, setTab] = useState<'shelf' | 'traces'>('shelf')
+  const [tab, setTab] = useState<'shelf' | 'skills' | 'traces'>('shelf')
+  const [previewId, setPreviewId] = useState<string | null>(null)
+  const [previewBody, setPreviewBody] = useState<string | null>(null)
+  const [previewMeta, setPreviewMeta] = useState<{ description: string; when: string } | null>(null)
 
   const allToolIds = useMemo(() => {
     const ids = new Set<string>()
@@ -184,6 +188,9 @@ export default function MaterialsShelf({ headerless }: MaterialsShelfProps) {
         <button type="button" onClick={() => setTab('shelf')} style={{ fontSize: 12, fontWeight: tab === 'shelf' ? 600 : 400, border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-primary)' }}>
           货架
         </button>
+        <button type="button" onClick={() => setTab('skills')} style={{ fontSize: 12, fontWeight: tab === 'skills' ? 600 : 400, border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-primary)' }}>
+          技能目录
+        </button>
         <button type="button" onClick={() => setTab('traces')} style={{ fontSize: 12, fontWeight: tab === 'traces' ? 600 : 400, border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-primary)' }}>
           Trace
         </button>
@@ -307,6 +314,94 @@ export default function MaterialsShelf({ headerless }: MaterialsShelfProps) {
               </button>
             </div>
           </>
+        )}
+
+        {tab === 'skills' && (
+          <div style={{ display: 'flex', gap: 12, alignItems: 'stretch', minHeight: 280 }}>
+            <div style={{ flex: '0 0 200px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
+                第一层摘要 · 点击预览全文（skill_load）
+              </div>
+              {skillOptions.map(s => {
+                const on = skills.has(s.id)
+                const sel = previewId === s.id
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={async () => {
+                      setPreviewId(s.id)
+                      setPreviewBody(null)
+                      setPreviewMeta({ description: s.description || '', when: s.when || '' })
+                      try {
+                        const d = await fetchSkillDetail(s.id)
+                        setPreviewMeta({ description: d.description, when: d.when })
+                        setPreviewBody(d.body)
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : String(e))
+                      }
+                    }}
+                    style={{
+                      textAlign: 'left',
+                      padding: '8px 10px',
+                      borderRadius: 8,
+                      border: `1px solid ${sel ? 'var(--accent, #2563eb)' : 'var(--border-color)'}`,
+                      background: sel ? 'var(--bg-hover)' : 'var(--bg-secondary)',
+                      cursor: 'pointer',
+                      fontSize: 11,
+                    }}
+                  >
+                    <div style={{ fontWeight: 600 }}>
+                      {s.id}{on ? ' · active' : ''}
+                    </div>
+                    <div style={{ color: 'var(--text-muted)', marginTop: 2, lineHeight: 1.35 }}>
+                      {(s.description || '').slice(0, 72) || '（无摘要）'}
+                    </div>
+                  </button>
+                )
+              })}
+              {!skillOptions.length && (
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>暂无技能</span>
+              )}
+            </div>
+            <div style={{
+              flex: 1, border: '1px solid var(--border-color)', borderRadius: 8,
+              padding: 12, overflow: 'auto', background: 'var(--bg-secondary)', fontSize: 12,
+            }}>
+              {!previewId && (
+                <div style={{ color: 'var(--text-muted)' }}>选择左侧技能查看全文（渐进披露第二层）</div>
+              )}
+              {previewId && (
+                <>
+                  <div style={{ fontWeight: 700, marginBottom: 6 }}>{previewId}</div>
+                  {previewMeta?.description && (
+                    <div style={{ color: 'var(--text-muted)', marginBottom: 4 }}>{previewMeta.description}</div>
+                  )}
+                  {previewMeta?.when && (
+                    <div style={{ color: 'var(--text-muted)', marginBottom: 8, fontSize: 11 }}>
+                      何时：{previewMeta.when}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                    <button
+                      type="button"
+                      style={{ fontSize: 11, padding: '4px 8px', cursor: 'pointer' }}
+                      onClick={() => setSkills(toggle(skills, previewId, !skills.has(previewId)))}
+                    >
+                      {skills.has(previewId) ? '取消 active' : '设为 active'}
+                    </button>
+                  </div>
+                  <pre style={{
+                    whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 11,
+                    margin: 0, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                    lineHeight: 1.45,
+                  }}>
+                    {previewBody || '加载中…'}
+                  </pre>
+                </>
+              )}
+            </div>
+          </div>
         )}
 
         {tab === 'traces' && (

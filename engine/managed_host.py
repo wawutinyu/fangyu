@@ -247,7 +247,7 @@ def start_instance(
         from fangyu.core.collaboration import emit_event
         emit_event(
             "managed.start",
-            actor=iid,
+            actor=f"managed:{iid}",
             target=display,
             message=f"托管启动 {display} :{use_port}",
             detail={"instance_id": iid, "host": host, "port": use_port, "bundle_dir": str(root)},
@@ -343,7 +343,7 @@ def stop_instance(instance_id: str, *, timeout_sec: float = 10.0) -> dict[str, A
         from fangyu.core.collaboration import emit_event
         emit_event(
             "managed.stop",
-            actor=iid,
+            actor=f"managed:{iid}",
             target=str(inst.get("name") or iid),
             message=f"托管停止 {inst.get('name') or iid}",
             detail={"instance_id": iid, "host": host, "port": port},

@@ -18,7 +18,14 @@ const PLACE_LABEL: Record<HouseRolePlace, string> = {
 }
 
 function entityKeys(p: PresenceEntity): string[] {
-  return [p.id, p.name, p.label].filter(Boolean) as string[]
+  const keys = [p.id, p.name, p.label].filter(Boolean) as string[]
+  if (p.kind === 'managed' && p.id.startsWith('managed:')) {
+    keys.push(p.id.slice('managed:'.length))
+  }
+  if (p.kind === 'host' && p.id.startsWith('host:')) {
+    keys.push(p.id.slice('host:'.length))
+  }
+  return keys
 }
 
 function matchesKeys(value: string | null | undefined, keys: string[]): boolean {
@@ -93,6 +100,21 @@ export interface ActorDetailPanelProps {
   onClose: () => void
   onSelectPartner?: (partnerId: string) => void
   onFocusEdge?: (source: string, target: string) => void
+  onManagedStop?: (instanceId: string) => void | Promise<void>
+  managedBusy?: boolean
+}
+
+function kindLabel(kind: string): string {
+  if (kind === 'worker') return '行'
+  if (kind === 'managed') return '托管'
+  if (kind === 'host') return '主机'
+  return 'Agent'
+}
+
+function managedInstanceId(entity: PresenceEntity): string | null {
+  if (entity.kind !== 'managed') return null
+  const id = entity.id || ''
+  return id.startsWith('managed:') ? id.slice('managed:'.length) : id
 }
 
 /** 观 · 角色侧栏：状态 / 宅内位置 / 协作伙伴 / 最近往来 */
@@ -105,6 +127,8 @@ export default function ActorDetailPanel({
   onClose,
   onSelectPartner,
   onFocusEdge,
+  onManagedStop,
+  managedBusy,
 }: ActorDetailPanelProps) {
   const color = statusColor(String(entity.status))
   const placement = useMemo(
@@ -119,6 +143,7 @@ export default function ActorDetailPanel({
     () => filterActorEvents(entity, events).slice(0, 8),
     [entity, events],
   )
+  const mid = managedInstanceId(entity)
 
   return (
     <div data-testid="actor-detail-panel" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -138,7 +163,7 @@ export default function ActorDetailPanel({
             {entity.label}
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-            {entity.kind === 'worker' ? '行' : 'Agent'}
+            {kindLabel(String(entity.kind))}
             {entity.name && entity.name !== entity.label ? ` · ${entity.name}` : ''}
           </div>
         </div>
@@ -181,6 +206,33 @@ export default function ActorDetailPanel({
             {[entity.hostname, entity.os].filter(Boolean).join(' · ')}
           </Row>
         )}
+        {entity.kind === 'managed' && (
+          <>
+            {(entity.host || entity.port != null) && (
+              <Row label="地址">
+                {entity.host}:{entity.port}
+              </Row>
+            )}
+            {entity.bundle_dir && (
+              <Row label="包">
+                <span style={{ fontFamily: 'monospace', fontSize: 10 }}>{entity.bundle_dir}</span>
+              </Row>
+            )}
+            {entity.health_url && (
+              <Row label="健康">
+                <a href={entity.health_url} target="_blank" rel="noreferrer" style={{ fontSize: 10 }}>
+                  {entity.health_url}
+                </a>
+              </Row>
+            )}
+          </>
+        )}
+        {entity.kind === 'host' && (
+          <>
+            {entity.base_url && <Row label="URL">{entity.base_url}</Row>}
+            {entity.role && <Row label="角色">{entity.role}</Row>}
+          </>
+        )}
         {entity.external && (
           <Row label="来源">
             外部{entity.authorized ? ' · 已授权' : ' · 未授权'}
@@ -188,6 +240,20 @@ export default function ActorDetailPanel({
         )}
         {entity.updated_at != null && (
           <Row label="更新">{formatEventTime(entity.updated_at)}</Row>
+        )}
+        {mid && entity.online && onManagedStop && (
+          <div style={{ marginTop: 8 }}>
+            <button
+              type="button"
+              className="notion-btn"
+              data-testid="actor-managed-stop"
+              style={{ fontSize: 11 }}
+              disabled={managedBusy}
+              onClick={() => { void onManagedStop(mid) }}
+            >
+              {managedBusy ? '停止中…' : '停止托管'}
+            </button>
+          </div>
         )}
       </div>
 

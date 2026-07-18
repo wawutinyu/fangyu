@@ -31,13 +31,14 @@ import ActorDetailPanel from './ActorDetailPanel'
 import EventExplainCard from './EventExplainCard'
 import HouseCommonsScene from './HouseCommonsScene'
 import TimelineReplayBar from './TimelineReplayBar'
+import { stopManaged } from '../utils/opsApi'
 
 /** 方隅·观 — 宅子共场：序律为轨，人文协作 */
 export default function PresencePanel() {
   const [snap, setSnap] = useState<PresenceSnapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [live, setLive] = useState(false)
-  const [filter, setFilter] = useState<'all' | 'agent' | 'worker'>('all')
+  const [filter, setFilter] = useState<'all' | 'agent' | 'worker' | 'managed' | 'host'>('all')
   const [deptId, setDeptId] = useState<string | null>(null)
   const [selectedEdge, setSelectedEdge] = useState<{ source: string; target: string } | null>(null)
   /** 点宅间径：按两端宅成员筛跨宅往来 */
@@ -45,6 +46,7 @@ export default function PresencePanel() {
   const [selectedActorId, setSelectedActorId] = useState<string | null>(null)
   const [demoBusy, setDemoBusy] = useState(false)
   const [demoHint, setDemoHint] = useState<string | null>(null)
+  const [managedBusy, setManagedBusy] = useState(false)
   /** null = 实时；number = 回放帧下标（-1 起点） */
   const [replayIndex, setReplayIndex] = useState<number | null>(null)
   const [replayPlaying, setReplayPlaying] = useState(false)
@@ -400,6 +402,12 @@ export default function PresencePanel() {
           }}>
             <span>Agent {snap.summary.agents}（忙 {snap.summary.agents_busy}）</span>
             <span>行 {snap.summary.workers_online}/{snap.summary.workers}</span>
+            {(snap.summary.managed != null) && (
+              <span>托管 {snap.summary.managed_online ?? 0}/{snap.summary.managed}</span>
+            )}
+            {(snap.summary.hosts != null) && (
+              <span>主机 {snap.summary.hosts_online ?? 0}/{snap.summary.hosts}</span>
+            )}
             <span>事件 {snap.summary.events}</span>
             <span>边 {snap.summary.edges ?? snap.edges?.length ?? 0}</span>
             {(snap.summary.departments ?? snap.departments?.length) != null && (
@@ -411,8 +419,14 @@ export default function PresencePanel() {
           </div>
         )}
         {!wallMode && (
-          <div style={{ display: 'flex', gap: 4 }}>
-            {(['all', 'agent', 'worker'] as const).map(f => (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {([
+              ['all', '全部'],
+              ['agent', 'Agent'],
+              ['worker', '行'],
+              ['managed', '托管'],
+              ['host', '主机'],
+            ] as const).map(([f, label]) => (
               <button
                 key={f}
                 type="button"
@@ -424,7 +438,7 @@ export default function PresencePanel() {
                   opacity: filter === f ? 1 : 0.7,
                 }}
               >
-                {f === 'all' ? '全部' : f === 'agent' ? 'Agent' : '行'}
+                {label}
               </button>
             ))}
           </div>
@@ -748,6 +762,19 @@ export default function PresencePanel() {
                 presence={allPresence}
                 events={events}
                 onClose={clearSelection}
+                managedBusy={managedBusy}
+                onManagedStop={async (instanceId) => {
+                  setManagedBusy(true)
+                  setError(null)
+                  try {
+                    await stopManaged(instanceId)
+                    await reload()
+                    setDemoHint(`已停止托管 ${instanceId}`)
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : String(e))
+                  }
+                  setManagedBusy(false)
+                }}
                 onSelectPartner={(id) => {
                   setSelectedActorId(id)
                   setSelectedEdge(null)
@@ -938,7 +965,10 @@ function PresenceCard({
           marginLeft: 'auto', fontSize: 10, padding: '1px 6px', borderRadius: 4,
           background: 'var(--bg-primary)', color: 'var(--text-muted)',
         }}>
-          {entity.kind === 'worker' ? '行' : 'Agent'}
+          {entity.kind === 'worker' ? '行'
+            : entity.kind === 'managed' ? '托管'
+              : entity.kind === 'host' ? '主机'
+                : 'Agent'}
         </span>
       </div>
       <div style={{ fontSize: 11, color: color, fontWeight: 600 }}>
@@ -947,6 +977,16 @@ function PresenceCard({
       {entity.current_skill && (
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
           当前: {entity.current_skill}
+        </div>
+      )}
+      {entity.kind === 'managed' && entity.port != null && (
+        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
+          {entity.host}:{entity.port}
+        </div>
+      )}
+      {entity.kind === 'host' && entity.base_url && (
+        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
+          {entity.base_url}
         </div>
       )}
       {entity.department && (

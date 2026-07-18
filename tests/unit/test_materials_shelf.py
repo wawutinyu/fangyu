@@ -31,6 +31,17 @@ def test_materials_catalog(client):
     assert "mcp_internal_tools" in body
 
 
+def test_skill_progressive_detail(client):
+    r = client.get("/api/v1/materials/skills/implement-and-verify")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert body["skill_id"] == "implement-and-verify"
+    assert "反例" in body["body"] or len(body["body"]) > 40
+    missing = client.get("/api/v1/materials/skills/__no_such_skill__")
+    assert missing.status_code == 404
+
+
 def test_draft_and_selection(client, tmp_path):
     r = client.get("/api/v1/materials/draft")
     assert r.status_code == 200

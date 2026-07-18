@@ -91,7 +91,7 @@ export async function fetchHarnessTraces(opts?: {
   bundle_dir?: string
   workspace?: string
   limit?: number
-}): Promise<{ path: string | null; traces: HarnessTrace[] }> {
+}): Promise<{ path: string | null; traces: HarnessTrace[]; summary?: Record<string, unknown> }> {
   const q = new URLSearchParams()
   if (opts?.bundle_dir) q.set('bundle_dir', opts.bundle_dir)
   if (opts?.workspace) q.set('workspace', opts.workspace)
@@ -100,4 +100,17 @@ export async function fetchHarnessTraces(opts?: {
   const res = await apiFetch(`/api/v1/materials/traces${qs ? `?${qs}` : ''}`)
   if (!res.ok) return { path: null, traces: [] }
   return res.json()
+}
+
+export async function fetchSkillDetail(skillId: string): Promise<{
+  ok: boolean
+  skill_id: string
+  description: string
+  when: string
+  body: string
+}> {
+  const res = await apiFetch(`/api/v1/materials/skills/${encodeURIComponent(skillId)}`)
+  const body = await res.json()
+  if (!res.ok) throw new Error(body.detail || '加载技能失败')
+  return body
 }

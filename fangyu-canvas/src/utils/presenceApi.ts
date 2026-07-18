@@ -153,6 +153,7 @@ export function statusColor(status: string): string {
   switch (status) {
     case 'busy': return '#2563eb'
     case 'idle': return '#16a34a'
+    case 'online': return '#16a34a'
     case 'error': return '#dc2626'
     case 'unauthorized': return '#ca8a04'
     case 'offline': return '#9ca3af'
@@ -164,6 +165,7 @@ export function statusLabel(status: string): string {
   const map: Record<string, string> = {
     busy: '忙碌',
     idle: '空闲',
+    online: '在线',
     error: '错误',
     unauthorized: '未授权',
     offline: '离线',
