@@ -1,168 +1,95 @@
-# fangyu 项目评估（2026-07）
+# fangyu 项目评估（2026-07，产线地基重审）
 
-> 在完成 L1 Phase 1–4、用户手册与全量测试后的一次阶段性看法。  
-> 供团队对齐认知、排优先级，**非对外承诺**。
-
-关联：[L1 路线图](L1_ROADMAP.md) · [用户手册](USER_GUIDE.md) · [愿景与产品](VISION_AND_PRODUCT.md)
+> 按「批量产出可导出的 OpenCode / WorkBuddy 级 Agent」重审。  
+> 关联：[本机毕业](GRADUATION_EXPORTABLE_AGENT.md) · [L1 路线图](L1_ROADMAP.md) · [愿景](VISION_AND_PRODUCT.md)
 
 ---
 
 ## 一句话
 
-**fangyu 已经不是一个「画 LLM 链的 demo」，而是一个有清晰北极星的 Agent 基础设施雏形——但离「普通人开箱即用、产线级可靠」还有一段很实在的路。**
+**方向对：方隅是 Agent 产线（接生院），不是又一个聊天 Bot。**  
+**地基未过关：目前能量产的是带身份的 Flow 运行器 + 玩具 action loop，还不能量产 OpenCode harness 级导出物。**
 
 ---
 
 ## 最值钱的地方
 
-### 1. 方向选对了，而且不是空喊
+### 1. 北极星清晰且可验收
 
-产品四条主线在代码里都有对应物：
+成功标准已收束为：**搭 → 导出 → 离 Studio → 多轮真干活 → 包内受约束 → 可批量**。  
+四门（序/律/行/观）与 Bundle / A2A / 宪法在代码里都有对应物，不是空口号。
 
-| 关切 | 代码落点 |
-|------|----------|
-| Action-first | 默认 skill：`start → code → output` |
-| 带身份导出 | Agent Bundle：`agent_id`、宪法签名、`--run-bundle` |
-| 多通道通信 | A2A Message + Payload `content_type` |
-| 本厂 + 外来联邦 | `register_external` / authorize / discover |
+### 2. Bundle + A2A RPC 演示级扎实
 
-L1 成功标准——**导出后离平台仍能干活、能加密通信、能组网**——目前基本达到。
+`core/agent_bundle.py` · `engine/bundle_runtime.py` · `--run-bundle`  
+身份、信封、跨包 RPC、固定 action loop 写 workspace — 集成测可锁。
 
-### 2. 架构可组合，工程密度合理
+### 3. 宪法 + 违宪可解释是差异化
 
-前后端分离、DAG 引擎、A2A runtime、ATP 信任、Adapter 插件接口，层次清楚。  
-约 **2.3 万行**源码+测试（Git 跟踪）撑起上述能力，没有明显过度堆砌。
-
-### 3. 宪法 + 违宪 UI 是差异化
-
-OpenClaw / Cursor 类工具强在「动手」；fangyu 多了一层「社会契约」。  
-对多 Agent 协作、对外暴露能力、将来接物理设备，governance 不是装饰——**没有约束的 Agent 网络，规模一大就会失控**。
+相对纯 coding agent：governance 不是装饰。前提是 **宪法必须随包执行**（P0-1），不能只快照在 zip 里。
 
 ### 4. 测试文化在线
 
-117+ Python 单测、export↔engine parity、Bundle 加密 RPC、外部 Agent 混合编排——说明在守「说出去的话要能跑」。
+单测 / export parity / Bundle RPC — 在守「说出去的话要能跑」。
 
 ---
 
-## 诚实短板
+## 诚实短板（相对毕业线）
 
-### 1. 产品体验仍偏工程师向
+| 缺口 | 说明 |
+|------|------|
+| 真 agentic loop | action loop 是单次 DAG，不是 LLM↔工具多轮 |
+| 导出闭包 | tools / skills / MCP 默认不进包 |
+| 包内运行时 | 曾用宿主 `DATA_DIR` 执法（P0-1 修复中） |
+| Coding 手脚 | Worker 绑平台；Bundle 缺 repo 级读搜改 |
+| 工厂 | 场景实例化 ≠ `profile → N bundles` |
+| Seed 营销 | 「OpenCode」等未验证 export→真行为 |
 
-`identity.json` 手填、envelope 配置、Adapter API——对开发者合理，对零经验用户仍陡。  
-手册补操作，**不能替代交互设计**；理想路径：粘贴 URL → 一键信任 → 拖进画布。
-
-### 2. Action-first 有骨架，肌肉不够
-
-对比 OpenClaw / Cursor：文件系统、终端、浏览器、长期任务循环——要么无一等节点，要么缺「observe → plan → act → verify」模板。  
-Worker 能跑，但**「像员工一样持续干活」**的 daemon / trigger 循环仍在 roadmap。
-
-### 3. 信任与安全需产品化决策
-
-Bundle 内含私钥、`require_envelope` 与平台侧尚未完全统一、TrustRegistry 存在双实现痕迹——技术债不大，**对外发布前须拍板**（私钥交付、吊销、全链路 envelope）。
-
-### 4. 物理层目前是接口 + 模拟
-
-mqtt/opcua/plc_sim 做对了「先定协议、后接真设备」；真实现场还需真实 broker、OPC-UA client、断线重连——**不能误以为已可上产线**。
-
-### 5. 前后端心智模型仍分裂
-
-Flow 画布、Agent 画布、Chat、Settings 功能全，但用户要在 Tab 间跳；绑 skill、导 Bundle、部署 Agent **尚未合成一条流水线**。
+**上层建筑（观 polish、空画布 CTA、文案统一）不增加导出物硬度，P0 完成前降优先级。**
 
 ---
 
-## 与 OpenClaw / Cursor 的定位
+## 与 OpenCode / WorkBuddy 的关系
 
-| 维度 | fangyu 现在 | 典型 coding agent |
-|------|-------------|-------------------|
-| 可视化编排 | 强 | 弱或无 |
-| 单 Agent 动手 | 中（code/tool/http） | 强 |
-| 多 Agent + 身份 | 强（差异化） | 弱 |
-| 导出独立运行 | 强（Bundle） | 通常无 |
-| IDE 集成 / 日常开发流 | 弱 | 强 |
+| | 方隅 | OpenCode / WorkBuddy |
+|--|------|----------------------|
+| 角色 | **产线 / 平台** | **产线上造出的成品 Agent** |
+| 目标 | 批量导出那一档 harness | 终端用户直接用 |
 
-**不是 Cursor 替代品**，更接近：
-
-> **Agent 的出生证 + 协议栈 + 编排台**  
-> 造出的个体能离平台活、能组网、能受宪法约束。
-
-不必正面拼「写代码爽不爽」；守住「Agent 社会基础设施」即可。
+本机毕业 = 能用方隅造出（并导出）那一档成品，不是 Studio 自己变成那一档。
 
 ---
 
-## 阶段评分（主观）
+## 阶段评分（2026-07-18 重审）
 
 | 维度 | 分数 | 说明 |
 |------|------|------|
-| 愿景清晰度 | 9/10 | L1 文档可作北极星 |
-| 工程完成度 | 7.5/10 | 核心链路通，边角待 polish |
-| 产品可用性 | 5.5/10 | 开发者能用，大众尚早 |
-| 测试/可维护 | 8/10 | 对该体量健康 |
-| 差异化 | 8/10 | Bundle + 宪法 + 联邦，组合少见 |
+| 愿景清晰度 | 9/10 | 产线北极星已钉死 |
+| 工程完成度（平台） | 7/10 | 编排与预览可用 |
+| **导出物硬度（毕业线）** | **4/10** | 演示有，harness 级未达 |
+| 产品可用性 | 5.5/10 | 开发者能用 |
+| 测试/可维护 | 8/10 | 健康 |
+| 差异化潜力 | 8/10 | Bundle+宪法+联邦，待闭环兑现 |
 
-**整体：~7.5/10 的「有独特价值的早期产品」**——不是玩具，也还不是成熟平台。
-
----
-
-## 代码规模（Git 跟踪，约 2026-07）
-
-| 类别 | 行数 |
-|------|------|
-| Python | ~8,700 |
-| TypeScript + TSX | ~14,000 |
-| 源码合计（py+ts+tsx） | ~23,400 |
-| 含文档/配置等全部文本 | ~31,400 |
-
-核心业务（不含测试/脚本）：约 **1.7–1.8 万行**。
+**整体：~6/10「产线雏形」** — 方向对，成品未过关。旧稿 ~7.5 偏乐观于「导出后能干活」。
 
 ---
 
-## 若继续演进：杠杆最大的优先级
+## 杠杆最大的优先级（地基）
 
-1. **一条 Happy Path 打磨到丝滑**  
-   Flow 设计 Worker → 一键 Export Bundle → 本机跑起 → Chat 验证 → 跨机 A2A。全程 ≤5 步，无 JSON 手改。
+1. **P0-1** Bundle `DATA_DIR` / 宪法随包执行  
+2. **P0-3** 真 Agentic Loop  
+3. **P0-4** Coding 手脚进包  
+4. **P0-2** 导出闭包  
+5. **P0-5** 工厂 + OpenCode profile 集成测  
 
-2. **长运行 Worker 模式**  
-   常驻进程 + 等 trigger/A2A → 执行 subgraph，才真正像「长了手脚的 employee」。
-
-3. **外部 Agent onboarding UX**  
-   URL 发现 + 指纹展示 + 一键授权 + 画布信任徽章。
-
-4. **真 MQTT / OPC-UA adapter 各做一个**  
-   模拟验证插件模型后，接一个真的。
-
-5. **安全模型拍板并写进产品**  
-   私钥交付、envelope 全链路、吊销——对外发布前必须清晰。
-
----
-
-## 产品战略（2026-07 共识）
-
-**终局：** Agent 社会公共基础设施 — 开发者 + 普通人，同一底层（L0–L3 分层见 [愿景文档](VISION_AND_PRODUCT.md) §3.1）。
-
-**行业怎么覆盖：** 不做第二条垂直产品线 → **模板 + Adapter + 宪法策略包** 叠在 infra 上。
-
-**AI 怎么加：** 上层助手（Intent→Flow、Setup Copilot），降低使用 infra 的门槛 — **Phase 6，非现在**。
-
-**现阶段（靠谱的路径）：** **面向开发者**，把 Bundle / A2A / 联邦 / Adapter SDK / Happy Path 做扎实。  
-普通人体验、行业交付，等开发者闭环后再通过 AI 助手层打开。
-
-| 阶段 | 受众 | 状态 |
-|------|------|------|
-| Phase 1–4 | 开发者（infra 原型） | ✅ 已完成 |
-| **Phase 5** | **开发者（可依赖、可集成）** | **← 当前** |
-| Phase 6 | 开发者 + 普通人（AI 助手 + 模板） | 后续 |
+详见 [GRADUATION_EXPORTABLE_AGENT.md](GRADUATION_EXPORTABLE_AGENT.md)。
 
 ---
 
 ## 总结
 
-fangyu 最难得的是：**愿景、代码、测试、文档四条线对齐**。  
-没有做成「又一个 chatbot builder」，而是在搭 **Agent 社会的底层协议 + 工厂**。
+胜负手不是再加 Studio 皮肤，而是 **让导出物在包内自洽地多轮干活**。  
+愿景有用的前提：这条产线地基夯实。
 
-短板也清晰：**产品层还没追上协议层的成熟度**——技术能演示「AI 社会」，用户日常仍感觉在「配系统」。
-
-下一阶段的胜负手不是再加节点类型，而是**让一条完整故事（造 → 导出 → 组网 → 干活 → 受约束）对陌生人也不吓人**。
-
----
-
-*记录人：开发协作评估 · 版本 v1.1 · 2026-07-12（战略：infra 优先、开发者先行）*
+*版本 v2.0 · 2026-07-18（产线地基重审）*

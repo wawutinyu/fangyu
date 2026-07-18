@@ -185,6 +185,13 @@ def create_agent_bundle(
     (root / "config").mkdir(exist_ok=True)
     (root / "config" / "interfaces.json").write_text(json.dumps(interfaces, ensure_ascii=False, indent=2), encoding="utf-8")
 
+    # 包内 DATA_DIR：run-bundle 时切到这里，宪法/审计与宿主隔离
+    data_dir = root / "data"
+    data_dir.mkdir(exist_ok=True)
+    (data_dir / "constitution.json").write_text(
+        json.dumps(constitution, ensure_ascii=False, indent=2), encoding="utf-8",
+    )
+
     (root / "workspace").mkdir(exist_ok=True)
     (root / "workspace" / ".fangyu").mkdir(exist_ok=True)
 
@@ -208,6 +215,24 @@ exec py -3 -m fangyu --run-bundle "{root.as_posix()}"
         start_sh.chmod(0o755)
     except OSError:
         pass
+
+
+def activate_bundle_runtime_context(bundle_root: str | Path) -> Path:
+    """将进程 DATA_DIR 切到 bundle/data，并以包根 constitution.json 为权威副本。
+
+    返回生效的 data 目录。宿主全局 data/ 不再参与该 Bundle 的宪法/审计读写。
+    """
+    from fangyu.core.config import set_data_dir
+
+    root = Path(bundle_root).resolve()
+    data_dir = root / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    src = root / "constitution.json"
+    dst = data_dir / "constitution.json"
+    if src.is_file():
+        shutil.copy2(src, dst)
+    set_data_dir(data_dir)
+    return data_dir
 
 
 def load_agent_bundle(path: str | Path) -> dict[str, Any]:

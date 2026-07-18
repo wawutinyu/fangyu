@@ -1,10 +1,27 @@
 # L1 开发主线与技术方案
 
-> **后续开发北极星。** 画布不只造「聊天 Agent」，而是造**能干活、带身份、可加密通信、可独立导出、可授权接入**的行动体。
+> **后续开发北极星。** 画布不只造「聊天 Agent」，而是造**能干活、带身份、可加密通信、可独立导出、可授权接入**的行动体。  
+> **本机毕业：** 用平台搭出并导出 OpenCode harness / WorkBuddy 级 Agent — 见 [GRADUATION_EXPORTABLE_AGENT.md](GRADUATION_EXPORTABLE_AGENT.md)。
 
 关联文档：[愿景与产品方向](VISION_AND_PRODUCT.md)（含 **四门两包** 交付模型）
 
 **产品交付（锁定）：** 叙事 **序 / 行 / 观 / 律** 四门；安装 **studio + worker** 两包。观、律先挂序包为一等入口，协议独立，达标再拆包。
+
+**2026-07-18 优先级锁定：** **产线地基（P0）> Phase 6 UX。** P0 未完成前，场景皮肤 / 观 polish 不阻塞、也不计入毕业。
+
+---
+
+## 〇、本机毕业与地基（当前主战场）
+
+| ID | 支柱 | 状态 |
+|----|------|------|
+| P0-1 | Bundle 运行时 DATA_DIR / 宪法随包 | ✅ |
+| P0-2 | 导出 tools/skills 闭包 | ⬜ |
+| P0-3 | 真 Agentic Loop | ⬜ |
+| P0-4 | Coding 手脚进包 | ⬜ |
+| P0-5 | profile→bundle 工厂 + OpenCode 集成测 | ⬜ |
+
+验收总表见 [GRADUATION_EXPORTABLE_AGENT.md](GRADUATION_EXPORTABLE_AGENT.md)。
 
 ---
 

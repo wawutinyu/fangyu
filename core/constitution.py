@@ -4,13 +4,26 @@ from __future__ import annotations
 import hashlib
 import json
 import time
+from pathlib import Path
 from typing import Any
 
-from .config import DATA_DIR
+from .config import DATA_DIR, on_data_dir_change
 from .exceptions import ConstitutionError
 
 CONSTITUTION_FILE = DATA_DIR / "constitution.json"
 AUDIT_FILE = DATA_DIR / "audit.log"
+
+
+def refresh_data_paths(data_dir: Path | None = None) -> None:
+    """DATA_DIR 切换后刷新宪法/审计路径（Bundle 隔离）。"""
+    global CONSTITUTION_FILE, AUDIT_FILE
+    from .config import DATA_DIR as cfg_dir
+    d = Path(data_dir) if data_dir is not None else cfg_dir
+    CONSTITUTION_FILE = d / "constitution.json"
+    AUDIT_FILE = d / "audit.log"
+
+
+on_data_dir_change(refresh_data_paths)
 
 DEFAULT_CONSTITUTION: dict[str, Any] = {
     "version": "1.0",

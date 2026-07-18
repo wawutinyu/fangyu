@@ -43,10 +43,11 @@
 - **用户：** 想造 Agent 的开发者 / 集成商 / 小团队
 - **价值：** 画出来 = 跑起来 = 导出去，比纯 SaaS 更「可带走」
 - **竞争点：** export parity、Bundle、A2A、ATP、Adapter SDK、自托管
-- **成功指标：** 有人真的导出 Bundle、脱离平台跑、跨进程组网
+- **成功指标：** 能用平台 **批量导出** 达到 OpenCode harness / WorkBuddy 档的独立 Agent（见 [本机毕业](GRADUATION_EXPORTABLE_AGENT.md)）；脱离 Studio 仍能多轮干活并受包内宪法约束
 
-> **现阶段共识（2026-07）：先把面向开发者的基础设施做扎实。**  
-> CLI / API / 文档 / 测试 / Happy Path 优先于「零门槛大众 UI」。
+> **现阶段共识（2026-07-18）：产线地基优先于上层建筑。**  
+> Bundle 闭环 / 真 agent loop / 导出闭包 / 工厂 — 未夯实前，Studio UX 与场景皮肤不计入毕业。  
+> CLI / API / 文档 / 测试优先于「零门槛大众 UI」。
 
 ### 角色 B：宪法 + 社会协议（差异化、长期壁垒）
 

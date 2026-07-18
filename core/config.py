@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Callable
 
 from dotenv import load_dotenv
 
@@ -10,6 +11,27 @@ DATA_DIR: Path = Path(_data_dir_override) if _data_dir_override else PROJECT_ROO
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 load_dotenv(PROJECT_ROOT / ".env")
+
+_data_dir_listeners: list[Callable[[Path], None]] = []
+
+
+def on_data_dir_change(callback: Callable[[Path], None]) -> None:
+    """注册 DATA_DIR 变更回调（如刷新宪法路径）。"""
+    _data_dir_listeners.append(callback)
+
+
+def set_data_dir(path: str | Path) -> Path:
+    """运行时切换数据目录（Bundle 隔离用）。同步环境变量与监听者。"""
+    global DATA_DIR
+    DATA_DIR = Path(path).resolve()
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    os.environ["FANGYU_DATA_DIR"] = str(DATA_DIR)
+    for cb in list(_data_dir_listeners):
+        try:
+            cb(DATA_DIR)
+        except Exception:
+            pass
+    return DATA_DIR
 
 
 class Settings:

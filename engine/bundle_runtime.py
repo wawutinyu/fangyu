@@ -62,12 +62,13 @@ def _verify_envelope(envelope_raw: str | None, body_json: str, require: bool) ->
 
 
 def create_bundle_app(bundle_path: str) -> tuple[FastAPI, str]:
-    from fangyu.core.agent_bundle import get_public_identity
+    from fangyu.core.agent_bundle import activate_bundle_runtime_context, get_public_identity
     from fangyu.engine.bundle_daemon import daemon_status, record_task
     from fangyu.engine.executor import register_executors
     from fangyu.engine.workspace import init_bundle_workspace
     register_executors()
     bundle = load_agent_bundle(bundle_path)
+    data_dir = activate_bundle_runtime_context(bundle["root"])
     init_bundle_workspace(bundle["root"])
     trust_policy = _setup_trust_registry(bundle)
     require_envelope = bool(trust_policy.get("require_envelope", False))
@@ -96,6 +97,7 @@ def create_bundle_app(bundle_path: str) -> tuple[FastAPI, str]:
             "require_envelope": require_envelope,
             "agent_kind": bundle["manifest"].get("capabilities", {}).get("agent_kind", "worker"),
             "workspace": str((bundle["root"] / "workspace").resolve()),
+            "data_dir": str(data_dir.resolve()),
             "mqtt_triggers": get_bundle_mqtt_trigger().status() if get_bundle_mqtt_trigger() else {"started": False, "triggers": []},
             **daemon_status(),
         }
