@@ -14,14 +14,60 @@ export async function discoverExternalAgent(rpcUrl: string): Promise<{
   rpc_url: string
   card: AgentCard
   identity?: { agent_id: string; public_key: string; require_envelope?: boolean }
+  discovered_from?: string
 }> {
   const resp = await fetch('/api/v1/a2a/agents/discover', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ rpc_url: rpcUrl }),
+    body: JSON.stringify({
+      rpc_url: rpcUrl,
+      base_url: rpcUrl,
+    }),
   })
   if (!resp.ok) throw new Error(`发现失败 (${resp.status})`)
   return resp.json()
+}
+
+export async function probeRemoteFactory(baseUrl: string): Promise<{
+  ok: boolean
+  base_url: string
+  rpc_url: string
+  card?: AgentCard | null
+  hits?: Array<{ path: string; ok: boolean }>
+}> {
+  const resp = await fetch('/api/v1/a2a/factories/probe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ base_url: baseUrl }),
+  })
+  if (!resp.ok) throw new Error(`探测失败 (${resp.status})`)
+  return resp.json()
+}
+
+export async function listRemoteFactories(): Promise<Array<{
+  id: string
+  base_url: string
+  rpc_url?: string
+  label?: string
+}>> {
+  const resp = await fetch('/api/v1/a2a/factories')
+  if (!resp.ok) return []
+  const data = await resp.json()
+  return data.factories || []
+}
+
+export async function saveRemoteFactory(input: {
+  base_url: string
+  label?: string
+  rpc_url?: string
+  card_name?: string
+}): Promise<void> {
+  const resp = await fetch('/api/v1/a2a/factories', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!resp.ok) throw new Error(`保存工厂失败 (${resp.status})`)
 }
 
 export async function registerExternalAgent(node: AgentCanvasNode): Promise<void> {

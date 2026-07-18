@@ -75,13 +75,7 @@ def fetch_remote_identity(rpc_url: str) -> dict:
 
 
 def fetch_remote_card(rpc_url: str) -> dict:
-    """从 bundle /card 或 RPC get_agent_card 拉取 AgentCard。"""
-    base = rpc_url.rsplit("/rpc", 1)[0]
-    card_url = f"{base}/card"
-    try:
-        with urllib.request.urlopen(card_url, timeout=10) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except Exception:
-        body = {"jsonrpc": "2.0", "method": "a2a.get_agent_card", "params": {}, "id": "discover"}
-        result = _rpc_post(rpc_url, body)
-        return result if isinstance(result, dict) else {}
+    """从 well-known / card / RPC 拉取 AgentCard（跨厂发现）。"""
+    from fangyu.core.a2a_discovery import fetch_remote_card as _discover_card
+
+    return _discover_card(rpc_url)

@@ -35,6 +35,9 @@ export default function LawPanel() {
   const [draftPolicies, setDraftPolicies] = useState<Policy[]>([])
   const [audit, setAudit] = useState<AuditEntry[]>([])
   const [chain, setChain] = useState<{ valid?: boolean; checked?: number; reason?: string } | null>(null)
+  const [forbidAction, setForbidAction] = useState('')
+  const [forbidNode, setForbidNode] = useState('')
+  const [bundleDir, setBundleDir] = useState('')
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -168,13 +171,172 @@ export default function LawPanel() {
 
               <section style={{ marginBottom: 18 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>禁止行为</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
                   {(constitution.forbidden_actions || []).map(a => (
                     <span key={a} style={{
                       fontSize: 11, padding: '2px 8px', borderRadius: 12,
                       background: '#fff1f0', border: '1px solid #ffa39e', color: '#cf1322',
-                    }}>{a}</span>
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                    }}>
+                      {a}
+                      <button
+                        type="button"
+                        style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#cf1322', padding: 0 }}
+                        onClick={() => setConstitution({
+                          ...constitution,
+                          forbidden_actions: (constitution.forbidden_actions || []).filter(x => x !== a),
+                        })}
+                      >×</button>
+                    </span>
                   ))}
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    className="notion-input"
+                    style={{ flex: 1, fontSize: 11 }}
+                    placeholder="新增禁止行为 id"
+                    value={forbidAction}
+                    onChange={e => setForbidAction(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key !== 'Enter') return
+                      const v = forbidAction.trim()
+                      if (!v) return
+                      const cur = constitution.forbidden_actions || []
+                      if (!cur.includes(v)) {
+                        setConstitution({ ...constitution, forbidden_actions: [...cur, v] })
+                      }
+                      setForbidAction('')
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="notion-btn"
+                    style={{ fontSize: 11 }}
+                    onClick={() => {
+                      const v = forbidAction.trim()
+                      if (!v) return
+                      const cur = constitution.forbidden_actions || []
+                      if (!cur.includes(v)) {
+                        setConstitution({ ...constitution, forbidden_actions: [...cur, v] })
+                      }
+                      setForbidAction('')
+                    }}
+                  >添加</button>
+                </div>
+              </section>
+
+              <section style={{ marginBottom: 18 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>禁止节点类型</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+                  {(constitution.forbidden_node_types || []).map(a => (
+                    <span key={a} style={{
+                      fontSize: 11, padding: '2px 8px', borderRadius: 12,
+                      background: '#fff7e6', border: '1px solid #ffd591', color: '#d46b08',
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                    }}>
+                      {a}
+                      <button
+                        type="button"
+                        style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#d46b08', padding: 0 }}
+                        onClick={() => setConstitution({
+                          ...constitution,
+                          forbidden_node_types: (constitution.forbidden_node_types || []).filter(x => x !== a),
+                        })}
+                      >×</button>
+                    </span>
+                  ))}
+                  {!(constitution.forbidden_node_types || []).length && (
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>（空 = 不额外禁节点类型）</span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    className="notion-input"
+                    style={{ flex: 1, fontSize: 11 }}
+                    placeholder="如 shell / code_exec"
+                    value={forbidNode}
+                    onChange={e => setForbidNode(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="notion-btn"
+                    style={{ fontSize: 11 }}
+                    onClick={() => {
+                      const v = forbidNode.trim()
+                      if (!v) return
+                      const cur = constitution.forbidden_node_types || []
+                      if (!cur.includes(v)) {
+                        setConstitution({ ...constitution, forbidden_node_types: [...cur, v] })
+                      }
+                      setForbidNode('')
+                    }}
+                  >添加</button>
+                </div>
+              </section>
+
+              <section style={{ marginBottom: 18 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Bundle 宪法</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <input
+                    className="notion-input"
+                    style={{ flex: 1, minWidth: 160, fontSize: 11 }}
+                    placeholder="Bundle 目录绝对路径"
+                    value={bundleDir}
+                    onChange={e => setBundleDir(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="notion-btn"
+                    style={{ fontSize: 11 }}
+                    disabled={saving || !bundleDir.trim()}
+                    onClick={async () => {
+                      setSaving(true)
+                      setMsg(null)
+                      try {
+                        const res = await fetch('/api/v1/constitution/from-bundle', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ bundle_dir: bundleDir.trim() }),
+                        })
+                        const data = await res.json()
+                        if (!res.ok) throw new Error(data.detail || '加载失败')
+                        setConstitution(data.constitution)
+                        setDraftPolicies(data.constitution?.policies || [])
+                        setMsg('已从 Bundle 载入平台宪法')
+                      } catch (e) {
+                        setMsg(e instanceof Error ? e.message : String(e))
+                      } finally {
+                        setSaving(false)
+                      }
+                    }}
+                  >从 Bundle 载入</button>
+                  <button
+                    type="button"
+                    className="notion-btn"
+                    style={{ fontSize: 11 }}
+                    disabled={saving || !bundleDir.trim()}
+                    onClick={async () => {
+                      setSaving(true)
+                      setMsg(null)
+                      try {
+                        const res = await fetch('/api/v1/constitution/to-bundle', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            bundle_dir: bundleDir.trim(),
+                            constitution: { ...constitution, policies: draftPolicies },
+                          }),
+                        })
+                        const data = await res.json()
+                        if (!res.ok) throw new Error(data.detail || '写入失败')
+                        setMsg(`已写入 ${data.path}`)
+                      } catch (e) {
+                        setMsg(e instanceof Error ? e.message : String(e))
+                      } finally {
+                        setSaving(false)
+                      }
+                    }}
+                  >写入 Bundle</button>
                 </div>
               </section>
 

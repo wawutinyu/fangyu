@@ -3,7 +3,7 @@
 > 行业已收敛：**MCP（工具）· Skills（方法）· A2A（协作）· Harness（机床）· Eval（质检）**。  
 > 方隅定位是 **Agent 工厂**：批量组装可导出的公民，而不是再做一个聊天壳。
 
-关联：[工厂原料](FACTORY_MATERIALS.md) · [拓扑与 task](TOPOLOGY_AND_TASK.md) · [MCP Tasks](MCP_TASKS.md) · [浏览器](BROWSER_TOOL.md) · [认证 SSO](AUTH_SSO.md) · [出厂 Eval](FACTORY_EVAL.md) · [毕业标准](GRADUATION_EXPORTABLE_AGENT.md) · [愿景](VISION_AND_PRODUCT.md)
+关联：[工厂原料](FACTORY_MATERIALS.md) · [拓扑与 task](TOPOLOGY_AND_TASK.md) · [MCP Tasks](MCP_TASKS.md) · [浏览器](BROWSER_TOOL.md) · [认证 SSO](AUTH_SSO.md) · [出厂 Eval](FACTORY_EVAL.md) · [A2A 发现](A2A_DISCOVERY.md) · [毕业标准](GRADUATION_EXPORTABLE_AGENT.md) · [愿景](VISION_AND_PRODUCT.md)
 
 ---
 
@@ -28,7 +28,7 @@
 | Harness | 较强 | plan/build、task、ask shell、压缩/稳定性 |
 | 原料 Tools | 中上 | materials.json + coding 带；MCP 仅 `__internal__` 起头 |
 | Skills | 中 | frontmatter + skill_load；Studio 技能目录渐进预览 |
-| A2A | 中 | 有 RPC/编排；Agent Card / 任务态 / 跨厂发现未满 |
+| A2A | 中上 | RPC/编排；跨厂 probe + discovery + 工厂通讯录 |
 | Eval | 中 | `FACTORY_EVAL` + `factory_gate` 固定套件；live 仍需 Key |
 | 沙箱/观测 | 中 | 宪法/ACL/审计；Studio 观测读 harness_trace + Eval 报告 |
 
@@ -103,9 +103,10 @@
 ⑰ workbuddy live + ACL↔SSO       ✅ gate live 挂 WB · sync-sso / 运维一键入库
 ⑱ 观测 Trace + Eval 报告         ✅ monitor harness/eval · factory_eval_report.json
 ⑲ Presence↔托管 + 技能目录 UX    ✅ 观筛托管/停实例 · materials/skills 全文预览
+⑳ A2A 跨厂发现 + 律产品面        ✅ discovery/probe/factories · 律禁项/Bundle 宪法
 ```
 
-下一刀：真 IM（仍暂缓）· A2A 跨厂发现加厚 · 宪法策略产品面。
+下一刀：真 IM（仍暂缓）· 托管升级通道 · Eval 报告对比/趋势。
 
 ---
 

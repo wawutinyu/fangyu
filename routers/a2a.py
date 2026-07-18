@@ -129,7 +129,8 @@ class AuthorizeExternalRequest(BaseModel):
 
 
 class DiscoverExternalRequest(BaseModel):
-    rpc_url: str
+    rpc_url: str = ""
+    base_url: str = ""
 
 
 @router.post("/agents/register_external")
@@ -162,16 +163,134 @@ def authorize_external_agent(name: str, body: AuthorizeExternalRequest):
 
 @router.post("/agents/discover")
 def discover_external_agent(body: DiscoverExternalRequest):
+    from fangyu.core.a2a_discovery import normalize_rpc_url, probe_factory
     from fangyu.engine.a2a_remote import fetch_remote_card, fetch_remote_identity
 
-    rpc_url = body.rpc_url.rstrip("/")
-    if not rpc_url.endswith("/rpc"):
-        rpc_url = f"{rpc_url}/rpc"
+    target = (body.rpc_url or body.base_url or "").strip()
+    if not target:
+        raise HTTPException(400, "需要 rpc_url 或 base_url")
+    try:
+        rpc_url = normalize_rpc_url(target)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
     card = fetch_remote_card(rpc_url)
     if not card:
-        raise HTTPException(400, "无法从远程端点获取 AgentCard")
+        # 完整探测报告
+        probe = probe_factory(target)
+        if probe.get("card"):
+            card = probe["card"]
+        else:
+            raise HTTPException(400, "无法从远程端点获取 AgentCard")
     identity = fetch_remote_identity(rpc_url)
-    return {"success": True, "rpc_url": rpc_url, "card": card, "identity": identity or None}
+    return {
+        "success": True,
+        "rpc_url": rpc_url,
+        "card": {k: v for k, v in card.items() if not str(k).startswith("_")},
+        "identity": identity or None,
+        "discovered_from": card.get("_discovered_from"),
+    }
+
+
+class FactoryProbeBody(BaseModel):
+    base_url: str = ""
+    rpc_url: str = ""
+
+
+class FactorySaveBody(BaseModel):
+    base_url: str
+    label: str = ""
+    rpc_url: str = ""
+    card_name: str = ""
+    meta: dict = {}
+
+
+@router.get("/discovery")
+def local_discovery():
+    """本厂公开发现目录：已注册 Agent + well-known 提示。"""
+    agents = AgentRegistry.list_agents()
+    cards = []
+    for a in agents:
+        name = a.get("name") if isinstance(a, dict) else None
+        card = a.get("card") if isinstance(a, dict) else None
+        if not name:
+            continue
+        cards.append({
+            "name": name,
+            "external": bool(a.get("external")) if isinstance(a, dict) else False,
+            "authorized": a.get("authorized") if isinstance(a, dict) else None,
+            "card": card,
+        })
+    return {
+        "factory": "fangyu",
+        "rpc_url": "/api/v1/a2a/rpc",
+        "well_known": "/api/v1/a2a/well-known/agent-card",
+        "agents": cards,
+        "count": len(cards),
+    }
+
+
+@router.get("/well-known/agent-card")
+def well_known_agent_card():
+    """平台侧 Agent Card（取第一张本地卡，或最小占位）。"""
+    agents = AgentRegistry.list_agents()
+    for a in agents:
+        if isinstance(a, dict) and a.get("card") and not a.get("external"):
+            return a["card"]
+    for a in agents:
+        if isinstance(a, dict) and a.get("card"):
+            return a["card"]
+    return {
+        "name": "fangyu-platform",
+        "version": "1.0.0",
+        "skills": [{"id": "default"}],
+        "interfaces": {
+            "a2a": {"enabled": True, "url": "/api/v1/a2a/rpc"},
+        },
+        "defaultInterface": {"type": "a2a", "url": "/api/v1/a2a/rpc"},
+    }
+
+
+@router.post("/factories/probe")
+def factories_probe(body: FactoryProbeBody):
+    from fangyu.core.a2a_discovery import probe_factory
+
+    target = (body.base_url or body.rpc_url or "").strip()
+    if not target:
+        raise HTTPException(400, "需要 base_url 或 rpc_url")
+    try:
+        return probe_factory(target)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.get("/factories")
+def factories_list():
+    from fangyu.core.a2a_factories import load_factories
+    return {"factories": load_factories()}
+
+
+@router.post("/factories")
+def factories_save(body: FactorySaveBody):
+    from fangyu.core.a2a_factories import upsert_factory
+    try:
+        row = upsert_factory(
+            base_url=body.base_url,
+            label=body.label,
+            rpc_url=body.rpc_url,
+            card_name=body.card_name,
+            meta=body.meta,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"ok": True, "factory": row}
+
+
+@router.delete("/factories/{factory_id}")
+def factories_delete(factory_id: str):
+    from fangyu.core.a2a_factories import remove_factory
+    if not remove_factory(factory_id):
+        raise HTTPException(404, "工厂不存在")
+    return {"ok": True}
 
 
 @router.post("/agents/register")
