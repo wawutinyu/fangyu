@@ -8,6 +8,7 @@ import {
   fetchManagedLogs,
   initAcl,
   listManagedInstances,
+  quickStartDemo,
   startManaged,
   stopManaged,
   type AclDoc,
@@ -52,6 +53,18 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
   useEffect(() => {
     reload()
   }, [reload])
+
+  const onQuickDemo = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      await quickStartDemo()
+      await reload()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+    setLoading(false)
+  }
 
   const onStart = async () => {
     const dir = bundleDir.trim()
@@ -177,10 +190,19 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
       {tab === 'managed' && (
         <div style={{ flex: 1, overflow: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button
+              className="notion-btn primary"
+              style={{ fontSize: 12 }}
+              onClick={onQuickDemo}
+              disabled={loading}
+              title="自动创建演示 Bundle 并后台启动"
+            >
+              一键启动演示托管
+            </button>
             <input
               className="notion-input"
               style={{ flex: 2, minWidth: 180, fontSize: 12 }}
-              placeholder="Bundle 目录绝对路径"
+              placeholder="或填 Bundle 目录绝对路径"
               value={bundleDir}
               onChange={e => setBundleDir(e.target.value)}
             />
@@ -191,14 +213,14 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
               value={instanceName}
               onChange={e => setInstanceName(e.target.value)}
             />
-            <button className="notion-btn primary" style={{ fontSize: 12 }} onClick={onStart} disabled={loading}>
+            <button className="notion-btn" style={{ fontSize: 12 }} onClick={onStart} disabled={loading}>
               启动
             </button>
           </div>
 
           {instances.length === 0 && (
             <div style={{ color: 'var(--text-muted)', padding: 12, textAlign: 'center' }}>
-              暂无托管实例。填写已导出的 Bundle 路径后启动。
+              暂无托管实例。点上方「一键启动演示托管」即可，无需手填路径。
             </div>
           )}
 

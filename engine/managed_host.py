@@ -364,3 +364,15 @@ def remove_instance(instance_id: str, *, stop_first: bool = True) -> dict[str, A
 def reset_registry_for_tests() -> None:
     """测试用：清空登记（不杀外部进程）。"""
     _save_registry({"version": 1, "instances": {}})
+
+
+def quick_start_demo(*, name: str = "Studio-Demo-Host") -> dict[str, Any]:
+    """一键：在 data/managed/bundles 下创建 action Bundle 并托管启动。"""
+    from fangyu.core.agent_factory import build_from_profile
+    from fangyu.core.config import DATA_DIR
+
+    bundles_root = Path(DATA_DIR) / "managed" / "bundles"
+    bundles_root.mkdir(parents=True, exist_ok=True)
+    dest = bundles_root / f"demo_{uuid.uuid4().hex[:8]}"
+    build_from_profile("action", dest, name=name, require_envelope=False)
+    return start_instance(dest, name=name, wait=True, timeout_sec=30)

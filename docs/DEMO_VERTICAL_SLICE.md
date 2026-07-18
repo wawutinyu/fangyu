@@ -32,9 +32,8 @@ python scripts/demo_vertical_slice.py --keep
 
 `预览 | 行 | 资产 | 运维 | 更多 ▾`
 
-点 **运维** → 托管启停 / 日志 · 组织 ACL。
-
-若看不到：硬刷新页面（或重启 `./dev.sh`），确认已拉到含运维面板的最新代码。
+点 **运维** → **托管** → **一键启动演示托管**（不用填路径）。  
+再切到 **组织 ACL** → 初始化 → 启用 → 用 `operator` + `shell` 试探（应拒绝）。
 
 1. 「不是 Chat 玩具，是**能导出的 Agent 产线**。」  
 2. 「意图直接打成 **multi Bundle**，拓扑在包里，脱离 Studio 也能 `orchestrate`。」  

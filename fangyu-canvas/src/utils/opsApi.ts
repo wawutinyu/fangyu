@@ -24,6 +24,13 @@ export interface AclDoc {
   roles: Record<string, { description?: string; permissions?: string[] }>
 }
 
+export async function quickStartDemo(): Promise<ManagedInstance> {
+  const res = await apiFetch('/api/v1/managed/quick-demo', { method: 'POST' })
+  const body = await res.json()
+  if (!res.ok) throw new Error(body.detail || body.message || '一键启动失败')
+  return body
+}
+
 export async function listManagedInstances(): Promise<ManagedInstance[]> {
   const res = await apiFetch('/api/v1/managed/instances')
   if (!res.ok) return []

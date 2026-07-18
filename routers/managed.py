@@ -16,6 +16,16 @@ class StartBody(BaseModel):
     wait: bool = True
 
 
+@router.post("/quick-demo")
+def managed_quick_demo():
+    """一键创建演示 Bundle 并托管启动（无需手填路径）。"""
+    from fangyu.engine.managed_host import quick_start_demo
+    try:
+        return quick_start_demo()
+    except Exception as e:
+        raise HTTPException(500, str(e)) from e
+
+
 @router.get("/instances")
 def managed_list():
     from fangyu.engine.managed_host import list_instances
