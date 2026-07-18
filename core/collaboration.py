@@ -36,6 +36,7 @@ def reset_collaboration() -> None:
     with _lock:
         _events.clear()
         _subscribers.clear()
+    clear_demo_cast()
     try:
         from .collaboration_store import clear_events, close_connection
         clear_events()
@@ -219,6 +220,15 @@ def build_presence() -> list[dict[str, Any]]:
             status = busy.get("status") or ("idle" if not ag.get("external") or ag.get("authorized") else "offline")
             if ag.get("external") and not ag.get("authorized"):
                 status = "unauthorized"
+            meta = card.get("metadata") or {}
+            department = meta.get("department") or None
+            department_id = meta.get("department_id") or None
+            if isinstance(department, str):
+                department = department.strip() or None
+            if isinstance(department_id, str):
+                department_id = department_id.strip() or None
+            if department and not department_id:
+                department_id = f"dept-{department}"
             entities.append({
                 "id": f"agent:{name}",
                 "kind": "agent",
@@ -232,6 +242,9 @@ def build_presence() -> list[dict[str, Any]]:
                 "task_id": busy.get("task_id"),
                 "rpc_url": ag.get("rpc_url"),
                 "updated_at": busy.get("updated_at") or now,
+                "department": department,
+                "department_id": department_id,
+                "canvas_id": meta.get("canvas_id") or name,
             })
     except Exception:
         pass
@@ -271,21 +284,262 @@ def build_presence() -> list[dict[str, Any]]:
     except Exception:
         pass
 
+    # 演示剧本注入的同行者（TTL）
+    if now < _demo_until and _demo_cast:
+        seen = {e.get("id") for e in entities}
+        for d in _demo_cast:
+            if d.get("id") not in seen:
+                entities.append({**d, "updated_at": now})
+
     entities.sort(key=lambda e: (0 if e.get("online") else 1, e.get("kind", ""), e.get("name", "")))
     return entities
 
 
+_demo_cast: list[dict[str, Any]] = []
+_demo_until: float = 0.0
+_demo_departments: list[dict[str, Any]] = []
+
+_MAX_MEMBERS_PER_HOUSE = 3
+_HOUSE_ANNEX = ("", "·东厢", "·西厢", "·北厢", "·南厢")
+
+
+def clear_demo_cast() -> None:
+    global _demo_cast, _demo_until, _demo_departments
+    with _lock:
+        _demo_cast = []
+        _demo_until = 0.0
+        _demo_departments = []
+
+
+def build_departments(presence: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+    """从 Presence 推导部门；大部门拆成多宅（每宅最多 3 人）。"""
+    global _demo_departments
+    with _lock:
+        explicit = list(_demo_departments) if _demo_departments else []
+    if explicit:
+        return explicit
+
+    items = presence if presence is not None else build_presence()
+    buckets: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+    for p in items:
+        did = (p.get("department_id") or "").strip()
+        dlabel = (p.get("department") or "").strip()
+        if not did and not dlabel:
+            continue
+        if not did:
+            did = f"dept-{dlabel}"
+        if not dlabel:
+            dlabel = did
+        if did not in buckets:
+            buckets[did] = {"id": did, "label": dlabel, "members": []}
+            order.append(did)
+        buckets[did]["members"].append(p)
+
+    out: list[dict[str, Any]] = []
+    for did in order:
+        b = buckets[did]
+        members: list[dict[str, Any]] = b["members"]
+        houses: list[dict[str, Any]] = []
+        for i in range(0, len(members), _MAX_MEMBERS_PER_HOUSE):
+            chunk = members[i : i + _MAX_MEMBERS_PER_HOUSE]
+            annex_i = i // _MAX_MEMBERS_PER_HOUSE
+            suffix = _HOUSE_ANNEX[annex_i] if annex_i < len(_HOUSE_ANNEX) else f"·{annex_i + 1}"
+            if annex_i == 0:
+                h_label = b["label"]
+                h_id = f"house-{did}"
+            else:
+                h_label = f"{b['label']}{suffix}"
+                h_id = f"house-{did}-{annex_i}"
+            houses.append({
+                "id": h_id,
+                "label": h_label,
+                "member_ids": [m["id"] for m in chunk],
+            })
+        out.append({"id": b["id"], "label": b["label"], "houses": houses})
+    return out
+
+
+def run_presence_demo(*, ttl_sec: float = 180.0) -> dict[str, Any]:
+    """一键演示剧本：多部门多宅同行者 + 协作事件。"""
+    global _demo_cast, _demo_until, _demo_departments
+    now = time.time()
+
+    def _agent(
+        name: str,
+        *,
+        status: str = "idle",
+        skill: str | None = None,
+        task_id: str | None = None,
+        department: str,
+        department_id: str,
+    ) -> dict[str, Any]:
+        return {
+            "id": f"agent:{name}",
+            "kind": "agent",
+            "name": name,
+            "label": name,
+            "status": status,
+            "online": True,
+            "external": False,
+            "authorized": True,
+            "current_skill": skill,
+            "task_id": task_id,
+            "department": department,
+            "department_id": department_id,
+        }
+
+    def _worker(
+        name: str,
+        label: str,
+        *,
+        department: str,
+        department_id: str,
+        status: str = "idle",
+    ) -> dict[str, Any]:
+        return {
+            "id": f"worker:{name}",
+            "kind": "worker",
+            "name": name,
+            "label": label,
+            "status": status,
+            "online": True,
+            "external": False,
+            "authorized": True,
+            "current_skill": None,
+            "hostname": "demo-host",
+            "os": "darwin",
+            "department": department,
+            "department_id": department_id,
+        }
+
+    cast = [
+        # 感知部（1 宅）
+        _agent("检索", status="busy", skill="search", task_id="demo-search-1",
+               department="感知部", department_id="dept-sense"),
+        _agent("巡查", status="idle", department="感知部", department_id="dept-sense"),
+        # 研判部（4 人 → 正宅 + 东厢）
+        _agent("分析", status="busy", skill="analyze", task_id="demo-analyze-1",
+               department="研判部", department_id="dept-judge"),
+        _agent("汇总", status="idle", department="研判部", department_id="dept-judge"),
+        _agent("校对", status="idle", department="研判部", department_id="dept-judge"),
+        _agent("归档", status="idle", department="研判部", department_id="dept-judge"),
+        # 行署（1 宅）
+        _worker("demo-行", "演示行", department="行署", department_id="dept-ops"),
+        _worker("demo-备援", "备援行", department="行署", department_id="dept-ops"),
+    ]
+
+    # 显式多宅：研判拆两栋，便于演示「部门 ↔ 多宅」
+    departments = [
+        {
+            "id": "dept-sense",
+            "label": "感知部",
+            "houses": [{
+                "id": "house-sense",
+                "label": "感知宅",
+                "member_ids": ["agent:检索", "agent:巡查"],
+            }],
+        },
+        {
+            "id": "dept-judge",
+            "label": "研判部",
+            "houses": [
+                {
+                    "id": "house-judge",
+                    "label": "研判宅",
+                    "member_ids": ["agent:分析", "agent:汇总", "agent:校对"],
+                },
+                {
+                    "id": "house-judge-east",
+                    "label": "研判·东厢",
+                    "member_ids": ["agent:归档"],
+                },
+            ],
+        },
+        {
+            "id": "dept-ops",
+            "label": "行署",
+            "houses": [{
+                "id": "house-ops",
+                "label": "行署",
+                "member_ids": ["worker:demo-行", "worker:demo-备援"],
+            }],
+        },
+    ]
+
+    with _lock:
+        _demo_cast = cast
+        _demo_departments = departments
+        _demo_until = now + max(30.0, float(ttl_sec))
+
+    script = [
+        ("a2a.send", "检索", "分析", "把检索到的材料交给分析", "info"),
+        ("a2a.started", "分析", "检索", "分析已接单，正在整理要点", "info"),
+        ("a2a.send", "分析", "汇总", "要点已出，请汇总成答复", "info"),
+        ("a2a.started", "汇总", "分析", "汇总开始起草", "info"),
+        ("a2a.send", "汇总", "校对", "请校对口径后再交行", "info"),
+        ("worker.enqueued", "汇总", "demo-行", "请行侧执行一次本地校验", "info"),
+        ("worker.started", "demo-行", "汇总", "行已开工校验", "info"),
+        ("constitution.warn", "汇总", None, "输出偏长：律提醒截断展示（非拒绝）", "warn"),
+        ("a2a.complete", "汇总", "分析", "汇总完成，已交回共场", "info"),
+        ("worker.complete", "demo-行", "汇总", "校验通过", "info"),
+        ("a2a.send", "校对", "归档", "定稿请归档入东厢", "info"),
+    ]
+    events = []
+    for kind, actor, target, message, severity in script:
+        events.append(
+            emit_event(
+                kind,
+                actor=actor,
+                target=target,
+                message=message,
+                detail={"demo": True, "script": "presence_demo"},
+                severity=severity,
+            )
+        )
+        time.sleep(0.02)
+
+    with _lock:
+        for d in _demo_cast:
+            if d.get("name") == "检索":
+                d["status"] = "idle"
+                d["current_skill"] = None
+                d["task_id"] = None
+            elif d.get("name") == "汇总":
+                d["status"] = "busy"
+                d["current_skill"] = "summarize"
+                d["task_id"] = "demo-sum-1"
+            elif d.get("name") == "demo-行":
+                d["status"] = "busy"
+                d["current_skill"] = "verify"
+            elif d.get("name") == "归档":
+                d["status"] = "busy"
+                d["current_skill"] = "archive"
+
+    return {
+        "ok": True,
+        "cast": len(cast),
+        "events": len(events),
+        "departments": len(departments),
+        "houses": sum(len(d["houses"]) for d in departments),
+        "until": _demo_until,
+        "snapshot": snapshot(event_limit=40),
+    }
+
+
 def snapshot(*, event_limit: int = 80) -> dict[str, Any]:
-    """观门面一次拉取：presence + 事件 + 协作边。"""
+    """观门面一次拉取：presence + 事件 + 协作边 + 部门宅。"""
     presence = build_presence()
     events = list_events(limit=event_limit)
     edges = build_edges(events, limit=40)
+    departments = build_departments(presence)
     agents = [p for p in presence if p.get("kind") == "agent"]
     workers = [p for p in presence if p.get("kind") == "worker"]
     return {
         "presence": presence,
         "events": events,
         "edges": edges,
+        "departments": departments,
         "summary": {
             "agents": len(agents),
             "agents_busy": sum(1 for a in agents if a.get("status") == "busy"),
@@ -293,6 +547,7 @@ def snapshot(*, event_limit: int = 80) -> dict[str, Any]:
             "workers_online": sum(1 for w in workers if w.get("online")),
             "events": len(events),
             "edges": len(edges),
+            "departments": len(departments),
         },
         "ts": time.time(),
     }
@@ -323,3 +578,109 @@ def fanout_audit(event_type: str, details: dict | None = None) -> None:
         detail=details,
         severity=severity,
     )
+
+
+def validate_replay_pack(raw: Any) -> dict[str, Any]:
+    """校验导入/存库的回放包，返回规范化 dict；失败抛 ValueError。"""
+    if not isinstance(raw, dict):
+        raise ValueError("回放包必须是 JSON 对象")
+    fmt = raw.get("format")
+    if fmt != "fangyu.guan.replay":
+        raise ValueError("format 必须是 fangyu.guan.replay")
+    events = raw.get("events")
+    if not isinstance(events, list):
+        raise ValueError("events 必须是数组")
+    presence = raw.get("presence") if isinstance(raw.get("presence"), list) else []
+    departments = raw.get("departments") if isinstance(raw.get("departments"), list) else []
+    summary = raw.get("summary") if isinstance(raw.get("summary"), dict) else {}
+    cleaned_events: list[dict[str, Any]] = []
+    for i, ev in enumerate(events):
+        if not isinstance(ev, dict):
+            raise ValueError(f"events[{i}] 无效")
+        kind = str(ev.get("kind") or "").strip()
+        if not kind:
+            raise ValueError(f"events[{i}] 缺少 kind")
+        entry = {
+            "id": str(ev.get("id") or f"import-{i}"),
+            "ts": float(ev.get("ts") or 0),
+            "kind": kind,
+            "actor": str(ev.get("actor") or ""),
+            "target": ev.get("target"),
+            "message": str(ev.get("message") or ""),
+            "detail": ev.get("detail") if isinstance(ev.get("detail"), dict) else {},
+            "severity": str(ev.get("severity") or "info"),
+        }
+        if isinstance(ev.get("explain"), dict):
+            entry["explain"] = ev["explain"]
+        cleaned_events.append(entry)
+    return {
+        "format": "fangyu.guan.replay",
+        "version": int(raw.get("version") or 1),
+        "exported_at": str(raw.get("exported_at") or ""),
+        "summary": summary,
+        "departments": departments,
+        "presence": presence,
+        "events": cleaned_events,
+    }
+
+
+def pack_to_snapshot(pack: dict[str, Any]) -> dict[str, Any]:
+    """回放包 → 观门面 snapshot（供前端加载归档）。"""
+    events = list(pack.get("events") or [])
+    plain_events: list[dict[str, Any]] = []
+    for e in events:
+        if not isinstance(e, dict):
+            continue
+        plain_events.append({
+            "id": e.get("id"),
+            "ts": e.get("ts"),
+            "kind": e.get("kind"),
+            "actor": e.get("actor") or "",
+            "target": e.get("target"),
+            "message": e.get("message") or "",
+            "detail": e.get("detail") or {},
+            "severity": e.get("severity") or "info",
+        })
+    # 包内多为升序；快照约定最新在前
+    plain_events_asc = sorted(plain_events, key=lambda x: float(x.get("ts") or 0))
+    plain_events_desc = list(reversed(plain_events_asc))
+    edges = build_edges(plain_events_asc, limit=40)
+    presence_in = pack.get("presence") or []
+    presence: list[dict[str, Any]] = []
+    for p in presence_in:
+        if not isinstance(p, dict):
+            continue
+        presence.append({
+            "id": p.get("id") or f"agent:{p.get('name')}",
+            "kind": p.get("kind") or "agent",
+            "name": p.get("name") or "",
+            "label": p.get("label") or p.get("name") or "",
+            "status": p.get("status") or "idle",
+            "online": bool(p.get("online", True)),
+            "department": p.get("department"),
+            "department_id": p.get("department_id"),
+            "current_skill": p.get("current_skill"),
+            "task_id": p.get("task_id"),
+        })
+    departments = pack.get("departments") or []
+    summary = pack.get("summary") if isinstance(pack.get("summary"), dict) else {}
+    agents = [p for p in presence if p.get("kind") == "agent"]
+    workers = [p for p in presence if p.get("kind") == "worker"]
+    return {
+        "presence": presence,
+        "events": plain_events_desc,
+        "edges": edges,
+        "departments": departments,
+        "summary": {
+            "agents": summary.get("agents", len(agents)),
+            "agents_busy": summary.get("agents_busy", sum(1 for a in agents if a.get("status") == "busy")),
+            "workers": summary.get("workers", len(workers)),
+            "workers_online": summary.get("workers_online", sum(1 for w in workers if w.get("online"))),
+            "events": summary.get("events", len(plain_events_desc)),
+            "edges": summary.get("edges", len(edges)),
+            "departments": summary.get("departments", len(departments)),
+        },
+        "ts": time.time(),
+        "archived": True,
+        "archive_exported_at": pack.get("exported_at"),
+    }

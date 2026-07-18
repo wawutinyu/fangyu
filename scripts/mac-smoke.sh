@@ -26,16 +26,24 @@ if ! npm run test:fast -w fangyu-canvas; then
   fail=1
 fi
 
-step "optional: happy path if API up"
-if curl -sf -m 2 "http://127.0.0.1:8000/health" >/dev/null 2>&1 \
-  || curl -sf -m 2 "http://127.0.0.1:8000/docs" >/dev/null 2>&1; then
+step "optional: studio dual-preview + happy path if API up"
+if curl -sf -m 2 "http://127.0.0.1:8000/docs" >/dev/null 2>&1 \
+  || curl -sf -m 2 "http://127.0.0.1:8000/api/health" >/dev/null 2>&1; then
+  if [[ -f scripts/studio_preview_smoke.py ]]; then
+    step "studio_preview_smoke (intent + chat path + toolbar sandbox)"
+    if ! python scripts/studio_preview_smoke.py; then
+      fail=1
+    fi
+  fi
   if [[ -f scripts/happy_path_acceptance_check.py ]]; then
+    step "happy_path_acceptance_check"
     python scripts/happy_path_acceptance_check.py || fail=1
   else
     echo "(no happy_path_acceptance_check.py — skip)"
   fi
 else
-  echo "API not running on :8000 — skip happy path (start with ./dev.sh)"
+  echo "API not running on :8000 — skip studio/happy path"
+  echo "  Start in Terminal (not Cursor agent shell): ./dev.sh  or  python -m fangyu --server"
 fi
 
 echo ""

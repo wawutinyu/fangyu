@@ -11,41 +11,62 @@ from .constitution import apply_flow_governance
 
 TemplateId = Literal["action_loop", "doc_assistant", "simple_io"]
 
-OBSERVE_JS = """const goal = (input && (input.input || input.query || input.message)) || 'demo task'
-const files = (input && input.files) || []
-return { phase: 'observe', goal, files }"""
+# 意图生成必须用 Python：底部「预览」聊天与后端沙箱只跑 Python。
+# 兼容上游 result 嵌套，以及无 workspace 时的内存 files（序内预览 / 聊天）。
+_UNWRAP = """\
+src = _input if isinstance(_input, dict) else {'input': _input}
+if isinstance(src.get('result'), dict):
+    src = {**src, **src['result']}
+"""
 
-PLAN_JS = """const goal = input?.goal || input?.result?.goal || 'task'
-const files = input?.files || []
-const action = files.includes('result.txt') ? 'verify_only' : 'write_result'
-return { phase: 'plan', goal, action, files }"""
+OBSERVE_PY = _UNWRAP + """\
+goal = src.get('input') or src.get('query') or src.get('message') or src.get('goal') or 'demo task'
+if not isinstance(goal, str):
+    goal = str(goal)
+files = list(src.get('files') or [])
+result = {'phase': 'observe', 'goal': goal, 'files': files}
+"""
 
-ACT_JS = """const action = input?.action || ''
-const goal = input?.goal || ''
-let files = input?.files || []
-if (action === 'write_result') {
-  if (!files.includes('result.txt')) files = [...files, 'result.txt']
-  return { phase: 'act', acted: true, goal, files }
-}
-return { phase: 'act', acted: false, goal, files }"""
+PLAN_PY = _UNWRAP + """\
+goal = src.get('goal') or 'task'
+files = list(src.get('files') or [])
+action = 'verify_only' if 'result.txt' in files else 'write_result'
+result = {'phase': 'plan', 'goal': goal, 'action': action, 'files': files}
+"""
 
-VERIFY_JS = """const files = input?.files || []
-const ok = files.includes('result.txt')
-return { phase: 'verify', verified: ok, status: ok ? 'completed' : 'pending', files }"""
+ACT_PY = _UNWRAP + """\
+action = src.get('action') or ''
+goal = src.get('goal') or ''
+files = list(src.get('files') or [])
+if action == 'write_result':
+    if 'result.txt' not in files:
+        files = files + ['result.txt']
+    result = {'phase': 'act', 'acted': True, 'goal': goal, 'files': files}
+else:
+    result = {'phase': 'act', 'acted': False, 'goal': goal, 'files': files}
+"""
 
-PLAN_PARSE_JS = """const raw = typeof input === 'string' ? input : (input?.result || input?.input || JSON.stringify(input||{}))
-const text = String(raw)
-let action = 'write_result'
-let goal = 'task'
-if (text.includes('{')) {
-  try {
-    const chunk = text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)
-    const j = JSON.parse(chunk)
-    action = j.action || action
-    goal = j.goal || goal
-  } catch (e) {}
-}
-return { phase: 'plan', goal, action, files: [], mode: 'llm' }"""
+VERIFY_PY = _UNWRAP + """\
+files = list(src.get('files') or [])
+ok = 'result.txt' in files
+result = {'phase': 'verify', 'verified': ok, 'status': 'completed' if ok else 'pending', 'files': files}
+"""
+
+PLAN_PARSE_PY = _UNWRAP + """\
+raw = src.get('result') or src.get('input') or ''
+text = raw if isinstance(raw, str) else str(raw)
+action = 'write_result'
+goal = src.get('goal') or 'task'
+if '{' in text:
+    try:
+        chunk = text[text.index('{'): text.rindex('}') + 1]
+        j = json.loads(chunk)
+        action = j.get('action', action)
+        goal = j.get('goal', goal)
+    except Exception:
+        pass
+result = {'phase': 'plan', 'goal': goal, 'action': action, 'files': list(src.get('files') or []), 'mode': 'llm'}
+"""
 
 
 def _node(
@@ -169,7 +190,7 @@ def build_action_loop_flow(
     goal = intent.strip() or "complete task"
     nodes: list[dict[str, Any]] = [
         _node("n1", "input", "任务", x=40, config={"default_value": goal}),
-        _node("observe", "code", "observe", x=200, category="代码", config={"code": OBSERVE_JS}),
+        _node("observe", "code", "observe", x=200, category="代码", config={"code": OBSERVE_PY}),
     ]
     links: list[dict[str, Any]] = [_link("e0", "n1", "observe")]
 
@@ -194,18 +215,18 @@ def build_action_loop_flow(
             )
         )
         nodes.append(
-            _node("plan", "code", "plan_parse", x=560, category="代码", config={"code": PLAN_PARSE_JS})
+            _node("plan", "code", "plan_parse", x=560, category="代码", config={"code": PLAN_PARSE_PY})
         )
         links.extend([_link("e1", "observe", "plan_llm"), _link("e2", "plan_llm", "plan")])
         act_x, verify_x, out_x = 740, 920, 1100
     else:
-        nodes.append(_node("plan", "code", "plan", x=380, category="代码", config={"code": PLAN_JS}))
+        nodes.append(_node("plan", "code", "plan", x=380, category="代码", config={"code": PLAN_PY}))
         links.append(_link("e1", "observe", "plan"))
         act_x, verify_x, out_x = 560, 740, 920
 
     nodes.extend([
-        _node("act", "code", "act", x=act_x, category="代码", config={"code": ACT_JS}),
-        _node("verify", "code", "verify", x=verify_x, category="代码", config={"code": VERIFY_JS}),
+        _node("act", "code", "act", x=act_x, category="代码", config={"code": ACT_PY}),
+        _node("verify", "code", "verify", x=verify_x, category="代码", config={"code": VERIFY_PY}),
         _node("o", "output", "输出", x=out_x),
     ])
     links.extend([

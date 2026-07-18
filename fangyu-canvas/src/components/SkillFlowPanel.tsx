@@ -56,17 +56,14 @@ export default function SkillFlowPanel({
       return
     }
     await deployAgentsToBackend([agentNode])
-    const resp = await fetch('/api/v1/a2a/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        target_agent: agentNode.id,
-        message: {
-          role: 'user',
-          parts: [{ type: 'text', text }],
-          metadata: { skill_id: skillId },
-        },
-      }),
+    const { a2aSend } = await import('../utils/a2aSend')
+    const resp = await a2aSend({
+      target_agent: agentNode.id,
+      message: {
+        role: 'user',
+        parts: [{ type: 'text', text }],
+        metadata: { skill_id: skillId },
+      },
     })
     const task = await resp.json()
     if (task.violation) {

@@ -1,4 +1,33 @@
 export const demoFlows: Record<string, { label: string; desc?: string; category?: string; data: unknown }> = {
+  full_tour: {
+    label: '全功能画布游',
+    category: '入门',
+    desc: '离线可预览：输入→文本→分支→转换→代码→记忆→输出（不依赖外网 LLM）',
+    data: {
+      flow_id: '',
+      flow_name: '全功能画布游',
+      nodes: [
+        { id: 'n1', type: 'input', name: '任务', category: '流程控制', config: { default_value: '方隅体验：把这句话做成摘要' }, position: { x: 40, y: 200 } },
+        { id: 'n2', type: 'text-process', name: '文本处理', category: '数据操作', config: { operation: 'upper' }, position: { x: 220, y: 200 } },
+        { id: 'n3', type: 'branch', name: '是否够长', category: '流程控制', config: { mode: 'bool', expression: 'len(str(input)) > 4' }, position: { x: 420, y: 200 } },
+        { id: 'n4', type: 'transform', name: '字段映射', category: '数据操作', config: { mapping: { summary: 'result' } }, position: { x: 620, y: 120 } },
+        { id: 'n5', type: 'code', name: '组装结果', category: 'AI 能力', config: { code: "const s = (input && (input.summary || input.result || input)) || ''\nreturn { ok: true, tour: 'full_tour', text: String(s).slice(0, 80), tip: '下一步可加载「体验全部功能」场景' }" }, position: { x: 820, y: 120 } },
+        { id: 'n6', type: 'memory', name: '记一笔', category: '记忆存储', config: { operation: 'write', memory_key: 'full_tour_last', scope: 'session' }, position: { x: 1020, y: 120 } },
+        { id: 'n7', type: 'output', name: '完成', category: '流程控制', config: {}, position: { x: 1220, y: 120 } },
+        { id: 'n8', type: 'output', name: '太短', category: '流程控制', config: {}, position: { x: 620, y: 320 } },
+      ],
+      links: [
+        { id: 'e12', sourceNodeId: 'n1', targetNodeId: 'n2', linkType: 'serial', mappings: {} },
+        { id: 'e23', sourceNodeId: 'n2', targetNodeId: 'n3', linkType: 'serial', mappings: {} },
+        { id: 'e34', sourceNodeId: 'n3', targetNodeId: 'n4', linkType: 'branch', sourceHandle: 'true', mappings: {} },
+        { id: 'e38', sourceNodeId: 'n3', targetNodeId: 'n8', linkType: 'branch', sourceHandle: 'false', mappings: {} },
+        { id: 'e45', sourceNodeId: 'n4', targetNodeId: 'n5', linkType: 'serial', mappings: {} },
+        { id: 'e56', sourceNodeId: 'n5', targetNodeId: 'n6', linkType: 'serial', mappings: {} },
+        { id: 'e67', sourceNodeId: 'n6', targetNodeId: 'n7', linkType: 'serial', mappings: {} },
+      ],
+      global_meta: { session_id: '', user_id: '' },
+    },
+  },
   core: {
     label: '核心链路',
     desc: 'input → llm → json-parse → code → output',
@@ -391,9 +420,9 @@ export const demoFlows: Record<string, { label: string; desc?: string; category?
       nodes: [
         { id: 'n1', type: 'input', name: '任务', category: '流程控制', config: { default_value: 'bundle mqtt trigger demo' }, position: { x: 60, y: 220 } },
         { id: 'observe', type: 'code', name: 'observe', category: '代码', config: { code: "const goal = (input && (input.input || input.query || input.message)) || 'demo task'\nconst files = (input && input.files) || []\nreturn { phase: 'observe', goal, files }" }, position: { x: 220, y: 220 } },
-        { id: 'plan', type: 'code', name: 'plan', category: '代码', config: { code: "const goal = input?.goal || input?.result?.goal || 'task'\nconst files = input?.files || []\nconst action = files.includes('result.txt') ? 'verify_only' : 'write_result'\nreturn { phase: 'plan', goal, action, files }" }, position: { x: 400, y: 220 } },
-        { id: 'act', type: 'code', name: 'act', category: '代码', config: { code: "const action = input?.action || ''\nconst goal = input?.goal || ''\nlet files = input?.files || []\nif (action === 'write_result') {\n  if (!files.includes('result.txt')) files = [...files, 'result.txt']\n  return { phase: 'act', acted: true, goal, files }\n}\nreturn { phase: 'act', acted: false, goal, files }" }, position: { x: 580, y: 220 } },
-        { id: 'verify', type: 'code', name: 'verify', category: '代码', config: { code: "const files = input?.files || []\nconst ok = files.includes('result.txt')\nreturn { phase: 'verify', verified: ok, status: ok ? 'completed' : 'pending', files }" }, position: { x: 760, y: 220 } },
+        { id: 'plan', type: 'code', name: 'plan', category: '代码', config: { code: "const _r=(input&&input.result&&typeof input.result==='object')?input.result:null;const ctx=_r?{...input,..._r}:(input||{})\nconst goal = ctx.goal || 'task'\nconst files = ctx.files || []\nconst action = files.includes('result.txt') ? 'verify_only' : 'write_result'\nreturn { phase: 'plan', goal, action, files }" }, position: { x: 400, y: 220 } },
+        { id: 'act', type: 'code', name: 'act', category: '代码', config: { code: "const _r=(input&&input.result&&typeof input.result==='object')?input.result:null;const ctx=_r?{...input,..._r}:(input||{})\nconst action = ctx.action || ''\nconst goal = ctx.goal || ''\nlet files = ctx.files || []\nif (action === 'write_result') {\n  if (!files.includes('result.txt')) files = [...files, 'result.txt']\n  return { phase: 'act', acted: true, goal, files }\n}\nreturn { phase: 'act', acted: false, goal, files }" }, position: { x: 580, y: 220 } },
+        { id: 'verify', type: 'code', name: 'verify', category: '代码', config: { code: "const _r=(input&&input.result&&typeof input.result==='object')?input.result:null;const ctx=_r?{...input,..._r}:(input||{})\nconst files = ctx.files || []\nconst ok = files.includes('result.txt')\nreturn { phase: 'verify', verified: ok, status: ok ? 'completed' : 'pending', files }" }, position: { x: 760, y: 220 } },
         { id: 'o', type: 'output', name: '输出', category: '流程控制', config: {}, position: { x: 940, y: 220 } },
       ],
       links: [

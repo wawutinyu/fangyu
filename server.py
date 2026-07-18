@@ -44,7 +44,9 @@ async def lifespan(app: FastAPI):
     from .models.database import async_session
     from .core.asset_seed import maintain_asset_library
     from .core.worker_store import init_store
+    from .core.platform_identity import ensure_platform_identity
     init_store()
+    ensure_platform_identity()
     from .core.worker_mqtt_bridge import get_worker_mqtt_bridge
     get_worker_mqtt_bridge().start()
     async with async_session() as session:

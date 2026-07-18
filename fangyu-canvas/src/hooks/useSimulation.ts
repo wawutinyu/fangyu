@@ -9,6 +9,8 @@ import {
   scanFlowConstitution,
   warningsToViolationPayload,
 } from '../utils/constitutionWarnings'
+import { formatFlowChatOutput } from '../utils/formatFlowOutput'
+import { queuePreviewResult } from '../utils/pendingPreview'
 
 export interface ShowResultsOptions {
   constitutionWarnings?: ViolationPayload | null
@@ -82,6 +84,15 @@ export function useSimulation(
       if (mockedLlm) {
         showToast('LLM 节点使用了 mock 响应，请确认后端已启动且已配置 API Key', 'warn')
       }
+      // 先展开底部预览，再投递结果（未挂载时会写入队列，挂载后补上）
+      const chatRows = results.map(r => ({
+        type: String((nodes.find(n => n.id === r.nodeId)?.data?.originType) || ''),
+        nodeName: r.nodeName,
+        outputs: r.output,
+      }))
+      const text = formatFlowChatOutput(chatRows)
+      window.dispatchEvent(new CustomEvent('fangyu:focus-bottom-chat'))
+      queuePreviewResult(text)
     } else {
       showToast(result.error || '运行中止', 'warn')
     }

@@ -74,6 +74,16 @@ export default function BottomPanel({
   }, [focusWorkersSignal])
 
   useEffect(() => {
+    const onFocusChat = () => {
+      setActiveTab('chat')
+      setCollapsed(false)
+      setHeight(h => Math.max(h, 360))
+    }
+    window.addEventListener('fangyu:focus-bottom-chat', onFocusChat)
+    return () => window.removeEventListener('fangyu:focus-bottom-chat', onFocusChat)
+  }, [])
+
+  useEffect(() => {
     if (!moreOpen) return
     const handler = (e: MouseEvent) => {
       if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false)
@@ -225,33 +235,36 @@ export default function BottomPanel({
         </button>
       </div>
 
-      {/* tab content */}
-      {!collapsed && (
-        <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
-          {activeTab === 'chat' && <ChatInterface headerless />}
-          {activeTab === 'workers' && (
-            <WorkerPanel highlightTaskId={highlightWorkerTaskId} />
-          )}
-          {activeTab === 'assets' && (
-            <AssetLibrary
-              onLoadFlow={loadFlowToCanvas}
-              onLoadAgents={loadAgentsToCanvas}
-              agentBindMode={!!agentBindTarget}
-              onBindAgentSkill={(flow) => {
-                bindAgentSkillFlow(flow)
-                setAgentBindTarget(null)
-              }}
-            />
-          )}
-          {activeTab === 'history' && <RunHistory />}
-          {activeTab === 'trigger' && <TriggerPanel />}
-          {activeTab === 'monitor' && <MonitorPanel headerless />}
-          {activeTab === 'mcp' && <McpPanel headerless />}
-          {activeTab === 'knowledge' && <KnowledgePanel headerless />}
-          {activeTab === 'tools' && <ToolRegistry headerless />}
-          {activeTab === 'skills' && <SkillManager headerless />}
+      {/* tab content：收起时用 CSS 隐藏，避免卸载 ChatInterface 丢 AI 回复 */}
+      <div style={{
+        flex: 1, overflow: 'hidden', minHeight: 0,
+        display: collapsed ? 'none' : 'block',
+      }}>
+        <div style={{ height: '100%', display: activeTab === 'chat' ? 'block' : 'none' }}>
+          <ChatInterface headerless />
         </div>
-      )}
+        {activeTab === 'workers' && (
+          <WorkerPanel highlightTaskId={highlightWorkerTaskId} />
+        )}
+        {activeTab === 'assets' && (
+          <AssetLibrary
+            onLoadFlow={loadFlowToCanvas}
+            onLoadAgents={loadAgentsToCanvas}
+            agentBindMode={!!agentBindTarget}
+            onBindAgentSkill={(flow) => {
+              bindAgentSkillFlow(flow)
+              setAgentBindTarget(null)
+            }}
+          />
+        )}
+        {activeTab === 'history' && <RunHistory />}
+        {activeTab === 'trigger' && <TriggerPanel />}
+        {activeTab === 'monitor' && <MonitorPanel headerless />}
+        {activeTab === 'mcp' && <McpPanel headerless />}
+        {activeTab === 'knowledge' && <KnowledgePanel headerless />}
+        {activeTab === 'tools' && <ToolRegistry headerless />}
+        {activeTab === 'skills' && <SkillManager headerless />}
+      </div>
     </div>
   )
 }

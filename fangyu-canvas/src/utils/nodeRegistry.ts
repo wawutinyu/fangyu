@@ -688,7 +688,7 @@ function portsTypeCompatible(sourceType: string, targetType: string): boolean {
 /** 类型级连线规则（与 connectionRules / 拖拽校验保持一致） */
 export function canConnectTypes(sourceType: string, targetType: string): boolean {
   if (!sourceType || !targetType) return false
-  if (sourceType === targetType) return false
+  // 允许同类型串联（如 llm→llm）；终端端口规则仍由下方 NO_* 约束
   if (NO_OUTPUT_TYPES.has(sourceType) || NO_INPUT_TYPES.has(targetType)) return false
 
   const sourceMeta = getNodeMeta(sourceType)

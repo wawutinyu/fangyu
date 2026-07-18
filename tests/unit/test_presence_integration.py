@@ -69,3 +69,24 @@ def test_worker_and_a2a_appear_in_presence(client):
     api = client.get("/api/v1/presence")
     assert api.status_code == 200
     assert api.json()["summary"]["workers_online"] >= 1
+
+
+def test_presence_demo_endpoint(client):
+    r = client.post("/api/v1/presence/demo?ttl_sec=60")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert body["cast"] == 8
+    assert body["events"] == 11
+    assert body["departments"] == 3
+    assert body["houses"] == 4
+    names = {p["name"] for p in body["snapshot"]["presence"]}
+    assert "检索" in names and "分析" in names and "归档" in names
+    assert any(p.get("department") == "研判部" for p in body["snapshot"]["presence"])
+    deps = body["snapshot"]["departments"]
+    assert len(deps) == 3
+    judge = next(d for d in deps if d["id"] == "dept-judge")
+    assert len(judge["houses"]) == 2
+    kinds = {e["kind"] for e in body["snapshot"]["events"]}
+    assert "a2a.send" in kinds
+    assert body["snapshot"]["edges"]

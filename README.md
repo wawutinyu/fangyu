@@ -24,7 +24,10 @@ AI 社会的基础设施 — 可视化编排 + DAG 执行引擎 + A2A 协议 + A
 
 > **序而后行**：在序里设计并发布，在行里本机 shell / 文件 / Adapter 真干活。  
 > **观 / 律** 叙事与序、行并列，工程上先挂在序包，不急着第三安装包。  
-> **Windows 原生（推荐体验）：** `install-native.bat` / `dev-native.bat` — Tauri 窗口内嵌完整序 UI（与网页 1:1）+ API + Worker。详见 [`fangyu-worker-tauri/README.md`](fangyu-worker-tauri/README.md)。  
+> **桌面原生（Tauri，序 UI 1:1 + API + Worker）：**  
+> - **Windows：** `install-native.bat` / `dev-native.bat`  
+> - **macOS：** `./install-native.sh` / `./dev-native.sh`（需 Rust）  
+> 详见 [`fangyu-worker-tauri/README.md`](fangyu-worker-tauri/README.md)。  
 > Electron 过渡壳 `fangyu-desktop` **已退役**（见 [扔 Electron 检查清单](docs/ELECTRON_RETIREMENT.md)）。
 
 ## MQTT → 行（可选）
@@ -57,6 +60,15 @@ chmod +x dev.sh dev-worker.sh dev-clean.sh scripts/mac-smoke.sh
 
 # 一键冒烟（单元 + 画布测试；API 已启动时顺带 Happy Path）
 ./scripts/mac-smoke.sh
+
+# 方隅·行（非开发者也能点）：检查依赖 + ~/Applications/Fangyu-Worker.command
+./install-worker.sh
+
+# 方隅 macOS 原生（序窗口 + API + Worker，对齐 Windows）
+# 需 Rust：curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+./install-native.sh          # 一次：依赖检查 + ~/Applications/Fangyu.command
+./dev-native.sh              # 开发启动
+./build-native.sh            # 打 .app / .dmg
 ```
 
 精简依赖（默认不含向量大模型）：
@@ -69,8 +81,7 @@ pip install -e ".[dev]"          # 语义检索再加：pip install -e ".[vector
 npm install
 ```
 
-> 日常开发用 `./dev.sh` 即可（请在本机 Terminal 保持前台运行，勿仅依赖 IDE 后台进程）。Tauri 原生见 `./dev-native.sh`（需 Rust）。
-
+> 日常开发用 `./dev.sh` 即可（请在本机 Terminal 保持前台运行，勿仅依赖 IDE 后台进程）。完整原生窗口用 `./install-native.sh` / `./dev-native.sh`。
 ### Windows
 
 ```bat
@@ -137,7 +148,7 @@ npm run build:studio
 py scripts/worker_happy_path.py --spawn-worker
 ```
 
-画布连线契约：[docs/FLOW_CONNECTION_RULES.md](docs/FLOW_CONNECTION_RULES.md) · 过夜清单：[docs/OVERNIGHT_BACKLOG.md](docs/OVERNIGHT_BACKLOG.md)
+画布连线契约：[docs/FLOW_CONNECTION_RULES.md](docs/FLOW_CONNECTION_RULES.md) · 过夜清单：[docs/OVERNIGHT_BACKLOG.md](docs/OVERNIGHT_BACKLOG.md) · **体验包**：[docs/FULL_EXPERIENCE.md](docs/FULL_EXPERIENCE.md)
 
 ## 文档
 

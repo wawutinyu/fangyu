@@ -41,13 +41,39 @@ async def _resolve_credentials(provider_id: str, db: AsyncSession) -> tuple[str,
     return api_key, base_url
 
 
+async def _resolve_model_and_provider(model: str, db: AsyncSession) -> tuple[str, str]:
+    """空/default 模型 → 设置里的 default_model；provider 按模型名推断，fallback 用 active_provider。"""
+    rows = await db.execute(
+        select(Setting).where(Setting.key.in_(['default_model', 'active_provider']))
+    )
+    defaults = {row.key: row.value for row in rows.scalars().all()}
+    active = (defaults.get('active_provider') or 'openai').strip().lower()
+    resolved = (model or '').strip()
+    if not resolved or resolved.lower() in ('default', 'auto'):
+        resolved = (defaults.get('default_model') or '').strip() or 'deepseek-chat'
+    # 用户有时把 provider id 当成 model（如 "deepseek"）→ 换成可用模型
+    if resolved.lower() in PROVIDER_BASE_URL:
+        dm = (defaults.get('default_model') or '').strip()
+        if dm and get_provider(dm, fallback=resolved.lower()) == resolved.lower():
+            resolved = dm
+        else:
+            resolved = {
+                'deepseek': 'deepseek-chat',
+                'openai': 'gpt-4o-mini',
+                'anthropic': 'claude-3.5-haiku',
+                'moonshot': 'moonshot-v1-8k',
+            }.get(resolved.lower(), resolved)
+    provider_id = get_provider(resolved, fallback=active)
+    return resolved, provider_id
+
+
 @router.post("/chat")
 async def llm_chat(req: ChatRequest, db: AsyncSession = Depends(get_session)):
-    provider_id = get_provider(req.model)
+    model, provider_id = await _resolve_model_and_provider(req.model, db)
     api_key, base_url = await _resolve_credentials(provider_id, db)
 
     result = await chat_completion(
-        model=req.model,
+        model=model,
         messages=req.messages,
         api_key=api_key,
         base_url=base_url,
@@ -61,12 +87,12 @@ async def llm_chat(req: ChatRequest, db: AsyncSession = Depends(get_session)):
 
 @router.post("/chat/stream")
 async def llm_chat_stream(req: ChatRequest, db: AsyncSession = Depends(get_session)):
-    provider_id = get_provider(req.model)
+    model, provider_id = await _resolve_model_and_provider(req.model, db)
     api_key, base_url = await _resolve_credentials(provider_id, db)
 
     return StreamingResponse(
         chat_completion_stream(
-            model=req.model,
+            model=model,
             messages=req.messages,
             api_key=api_key,
             base_url=base_url,

@@ -29,6 +29,10 @@ class Settings:
     DEEPSEEK_API_KEY: str = os.getenv("DEEPSEEK_API_KEY", "")
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
     ALLOW_DANGEROUS_TOOLS: bool = os.getenv("ALLOW_DANGEROUS_TOOLS", "false").lower() in ("1", "true", "yes")
+    # 平台 A2A /send、/rpc 是否强制信封（默认关，避免打断旧客户端；序前端会主动签名）
+    PLATFORM_REQUIRE_ENVELOPE: bool = os.getenv(
+        "FANGYU_PLATFORM_REQUIRE_ENVELOPE", "0",
+    ).lower() in ("1", "true", "yes")
 
 
 settings = Settings()

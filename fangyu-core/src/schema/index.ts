@@ -15,5 +15,7 @@ export type {
   CollaborationSeverity,
   CollaborationEvent,
   CollaborationEdge,
+  DepartmentHouse,
+  PresenceDepartment,
   PresenceSnapshot,
 } from './presence'

@@ -12,12 +12,16 @@ def _reset_fangyu_global_state():
     from fangyu.engine.registry import register_executors, reset_registry_for_tests
     from fangyu.engine import variable as variable_mod
 
+    from fangyu.core.platform_identity import ensure_platform_identity, reset_platform_identity_for_tests
+
     reset_trust_for_tests()
     reset_embedding_for_tests()
     reset_collaboration()
     reset_registry_for_tests()
     register_executors()
     variable_mod._ephemeral.clear()
+    reset_platform_identity_for_tests()
+    ensure_platform_identity()
     yield
     reset_trust_for_tests()
     reset_embedding_for_tests()

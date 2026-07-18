@@ -349,6 +349,51 @@ export default function AgentConfigPanel() {
                 <option value="hybrid">Hybrid — 用户 + A2A</option>
               </select>
             </Field>
+            <Field label="部门（观 · 分宅）">
+              <input
+                data-testid="agent-department"
+                value={(card.metadata?.department as string) || ''}
+                onChange={e => {
+                  const department = e.target.value.trim()
+                  const prevId = (card.metadata?.department_id as string) || ''
+                  const autoId = department ? `dept-${department}` : ''
+                  // 若 id 仍是旧自动值或空，随名称同步；手动改过 id 则保留
+                  const oldAuto = card.metadata?.department
+                    ? `dept-${String(card.metadata.department)}`
+                    : ''
+                  const department_id = !prevId || prevId === oldAuto ? autoId : prevId
+                  updateCard({
+                    metadata: {
+                      ...card.metadata,
+                      department: department || undefined,
+                      department_id: department_id || undefined,
+                      canvas_id: node.id,
+                    },
+                  })
+                }}
+                placeholder="如：研判部"
+              />
+            </Field>
+            <Field label="部门 ID（可选）">
+              <input
+                data-testid="agent-department-id"
+                value={(card.metadata?.department_id as string) || ''}
+                onChange={e => {
+                  const department_id = e.target.value.trim()
+                  updateCard({
+                    metadata: {
+                      ...card.metadata,
+                      department_id: department_id || undefined,
+                      canvas_id: node.id,
+                    },
+                  })
+                }}
+                placeholder="如：dept-judge（空则按部门名生成）"
+              />
+            </Field>
+            <div style={{ fontSize: 11, color: '#888', marginTop: -4 }}>
+              部署后，方隅·观会按部门分宅；同部门多人可拆多栋宅。
+            </div>
             <Field label="名称"><input value={card.name} onChange={e => updateCard({ name: e.target.value })} /></Field>
             <Field label="描述"><textarea value={card.description || ''} onChange={e => updateCard({ description: e.target.value })} rows={2} /></Field>
             <Field label="版本"><input value={card.version} onChange={e => updateCard({ version: e.target.value })} /></Field>

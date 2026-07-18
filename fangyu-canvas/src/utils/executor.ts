@@ -97,7 +97,10 @@ export class Executor {
       })
 
       if (!resp.ok) {
-        return { success: false, error: `后端请求失败 (${resp.status})`, results: [], logs: [] }
+        const hint = resp.status === 502 || resp.status === 503
+          ? ' — API 未就绪。请在本机 Terminal 运行：python -m fangyu --server（勿用已退出的 Cursor 终端）'
+          : ''
+        return { success: false, error: `后端请求失败 (${resp.status})${hint}`, results: [], logs: [] }
       }
 
       const reader = resp.body!.getReader()

@@ -67,8 +67,9 @@ X-A2A-Envelope: {
 | 配置 | 默认值 | 位置 |
 |------|--------|------|
 | `require_envelope` | `true` | `config/interfaces.json` → `trust_policy` |
-| 平台内 A2A | 可选（逐步统一） | `AgentBus(enable_trust=True)` |
-| Bundle 对外 RPC | 强制（当 require_envelope=true） | `bundle_runtime._verify_envelope` |
+| 平台内 A2A | 可强制（`FANGYU_PLATFORM_REQUIRE_ENVELOPE=1`） | `verify_a2a_envelope` + 序 `a2aSend` 自动签 |
+| 平台身份 | `data/platform-identity.json`（gitignore） | `GET /api/v1/trust/platform` · `POST …/platform/sign` |
+| Bundle 对外 RPC | 强制（当 require_envelope=true） | `bundle_runtime._verify_envelope` → 同 `verify_a2a_envelope` |
 
 ### 3.3 验签流程
 

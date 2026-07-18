@@ -3,7 +3,7 @@ import type { WorkerInfo } from '@fangyu/core/schema'
 import { demoFlows } from '../utils/demoFlows'
 import { isDesktop, isNative, queryNativeHealth } from '../platform'
 
-const CATEGORY_ORDER = ['流程控制', 'AI 能力', '数据操作', '记忆存储', '工具集成', '其他']
+const CATEGORY_ORDER = ['入门', '流程控制', 'AI 能力', '数据操作', '记忆存储', '工具集成', '其他']
 
 const DEMO_CATEGORY_BY_ID: Record<string, string> = {
   core: 'AI 能力',
@@ -75,6 +75,9 @@ interface Props {
   onOpenAssets: () => void
   onOpenIntent?: () => void
   onOpenScenario?: () => void
+  /** 一键加载「体验全部功能」场景包 */
+  onFullExperience?: () => void
+  fullExperienceBusy?: boolean
   onOpenSetupCopilot?: () => void
   simulating?: boolean
   dispatching?: boolean
@@ -211,12 +214,23 @@ export default function TopToolbar(props: Props) {
           <>
             <Btn onClick={props.onNewFlow} title="新建画布">新建</Btn>
             <Btn onClick={props.onSaveFlow} primary title="保存 Ctrl+S">保存</Btn>
+            {props.onFullExperience && (
+              <Btn
+                onClick={props.onFullExperience}
+                primary
+                title="一键加载：Flow + Agent + 律策略 + Worker Bundle"
+                style={props.fullExperienceBusy ? { opacity: 0.6, pointerEvents: 'none' } : undefined}
+              >
+                {props.fullExperienceBusy ? '加载中…' : '体验全部'}
+              </Btn>
+            )}
             <ToolbarMenu
               label="创建"
               title="意图 / 场景 / 用例 / 资产"
               items={[
                 ...(props.onOpenIntent ? [{ label: '意图生成', hint: '自然语言 → Flow', onClick: props.onOpenIntent }] : []),
                 ...(props.onOpenScenario ? [{ label: '场景模板', hint: '一键实例化', onClick: props.onOpenScenario }] : []),
+                ...(props.onFullExperience ? [{ label: '体验全部功能', hint: '推荐新手', onClick: props.onFullExperience }] : []),
                 { label: `示例用例 (${DEMO_COUNT})`, hint: '加载演示流程', submenu: true },
                 { label: '资产库', hint: '官方模板 + 我的流程', onClick: props.onOpenAssets },
               ]}

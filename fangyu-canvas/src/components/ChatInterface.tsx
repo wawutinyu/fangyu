@@ -4,6 +4,7 @@ import { Executor } from '../utils/executor'
 import type { ExecutorLog } from '../utils/executor'
 import { convertToExportFormat } from '../utils/flowHelper'
 import { useAppSelector } from '../store/hooks'
+import { store } from '../store'
 import { deployAllAgents } from '../utils/externalAgent'
 import {
   buildPipelineFromCanvas,
@@ -13,6 +14,8 @@ import {
 } from '../utils/agentOrchestrate'
 import { ViolationPanel, formatViolationSummary, type ViolationPayload } from './ViolationPanel'
 import { warningsToViolationPayload } from '../utils/constitutionWarnings'
+import { formatFlowChatOutput } from '../utils/formatFlowOutput'
+import { takeQueuedPreviewResult } from '../utils/pendingPreview'
 
 
 interface ChatMessage {
@@ -20,6 +23,7 @@ interface ChatMessage {
   content: string
   logs?: ExecutorLog[]
   _showLogs?: boolean
+  _showDetail?: boolean
   _pendingSkill?: string
   _pendingSkillDesc?: string
   _collabSteps?: CollabStepResult[]
@@ -45,17 +49,51 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
   const [agentCollabMode, setAgentCollabMode] = useState(true)
   const [selectedSkill, setSelectedSkill] = useState('')
   const msgListRef = useRef<HTMLDivElement>(null)
+  const lastMsgRef = useRef<HTMLDivElement>(null)
   const agentNodes = useAppSelector(s => s.agent.nodes)
   const [selectedAgent, setSelectedAgent] = useState('')
 
+  const scrollToBottom = useCallback(() => {
+    setTimeout(() => {
+      lastMsgRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      if (msgListRef.current) msgListRef.current.scrollTop = msgListRef.current.scrollHeight
+    }, 50)
+  }, [])
+
+  const appendAssistant = useCallback((text: string, extra?: Partial<ChatMessage>) => {
+    if (!text) return
+    setChatMode('flow')
+    setMessages(prev => [...prev, { role: 'assistant', content: text, _showLogs: false, ...extra }])
+    scrollToBottom()
+  }, [scrollToBottom])
+
   useEffect(() => {
+    const queued = takeQueuedPreviewResult()
+    if (queued) appendAssistant(queued)
+
     const onChatMode = (e: Event) => {
       const mode = (e as CustomEvent).detail?.mode
       if (mode === 'agent' || mode === 'flow') setChatMode(mode)
     }
+    const onClearChat = () => {
+      setMessages([])
+      try { localStorage.removeItem(STORAGE_KEY) } catch { /* ignore */ }
+    }
+    const onPreviewResult = (e: Event) => {
+      const text = (e as CustomEvent).detail?.text
+      if (!text || typeof text !== 'string') return
+      takeQueuedPreviewResult() // 已收到事件，清掉队列避免重复
+      appendAssistant(text)
+    }
     window.addEventListener('fangyu:switch-chat-mode', onChatMode)
-    return () => window.removeEventListener('fangyu:switch-chat-mode', onChatMode)
-  }, [])
+    window.addEventListener('fangyu:clear-chat', onClearChat)
+    window.addEventListener('fangyu:preview-result', onPreviewResult)
+    return () => {
+      window.removeEventListener('fangyu:switch-chat-mode', onChatMode)
+      window.removeEventListener('fangyu:clear-chat', onClearChat)
+      window.removeEventListener('fangyu:preview-result', onPreviewResult)
+    }
+  }, [appendAssistant])
 
   const collabPipeline = buildPipelineFromCanvas(agentNodes)
   const canCollab = hasCollaborationPipeline(agentNodes)
@@ -65,12 +103,6 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
   }, [messages])
 
   const agents = agentNodes.filter(n => n.type === 'a2a-agent' || n.type === 'a2a-external')
-
-  const scrollToBottom = useCallback(() => {
-    setTimeout(() => {
-      if (msgListRef.current) msgListRef.current.scrollTop = msgListRef.current.scrollHeight
-    }, 50)
-  }, [])
 
   const sendToAgent = useCallback(async (text: string) => {
     try {
@@ -105,17 +137,14 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
       }
       const agent = agents.find(a => a.id === target)
       const skillId = selectedSkill || agent?.agentCard?.skills?.[0]?.id || 'default'
-      const resp = await fetch('/api/v1/a2a/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          target_agent: target,
-          message: {
-            role: 'user',
-            parts: [{ type: 'text', text }],
-            metadata: { skill_id: skillId },
-          },
-        }),
+      const { a2aSend } = await import('../utils/a2aSend')
+      const resp = await a2aSend({
+        target_agent: target,
+        message: {
+          role: 'user',
+          parts: [{ type: 'text', text }],
+          metadata: { skill_id: skillId },
+        },
       })
       const task = await resp.json()
       if (task.violation) {
@@ -142,6 +171,7 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
     if (!text || running) return
     setInputText('')
     setRunning(true)
+    window.dispatchEvent(new CustomEvent('fangyu:focus-bottom-chat'))
     const addMsg = (content: string, extra?: any) => setMessages(prev => [...prev, { role: 'assistant', content, ...(extra || {}) }])
 
     setMessages(prev => [...prev, { role: 'user', content: text, _showLogs: false }])
@@ -174,14 +204,41 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
       setRunning(false); scrollToBottom(); return
     }
 
-    const instance = getReactFlowInstance()
-    if (!instance) { setRunning(false); return }
-    const nodes = instance.getNodes(); const edges = instance.getEdges()
+    // Flow 聊天必须读 Flow 画布（Redux），不要用全局 RF：Agent 画布也在 DOM 里，易串台
+    const flowState = store.getState().flow
+    let nodes = flowState.nodes || []
+    let edges = flowState.edges || []
+    if (nodes.length === 0) {
+      const instance = getReactFlowInstance()
+      const rfNodes = instance?.getNodes() || []
+      // 仅接受带 originType 的流程原子节点，排除误读到的 Agent 节点
+      const flowLike = rfNodes.filter(n => n.data?.originType)
+      if (flowLike.length > 0) {
+        nodes = flowLike
+        edges = instance?.getEdges() || []
+      }
+    }
+    if (nodes.length === 0) {
+      const agentCount = store.getState().agent.nodes?.length || 0
+      if (agentCount > 0) {
+        addMsg(
+          'Flow 画布是空的。你现在有 Agent 协作图：请切换底部「Agent 聊天」，'
+          + '或点 创建→意图生成→应用到 Flow 画布 后再用「Flow 聊天」。',
+        )
+      } else {
+        addMsg('画布为空：请先用「创建 → 意图生成」应用到画布，或从左侧拖入节点')
+      }
+      setRunning(false)
+      scrollToBottom()
+      return
+    }
+    const hasLlm = nodes.some(n => (n.data?.originType || n.type) === 'llm')
     const flowData = convertToExportFormat(nodes, edges)
     const history = messages.slice(-10).map(m => ({ role: m.role, content: m.content }))
 
     const executor = new Executor(flowData.nodes, flowData.links)
-    executor.setExternalInputs({ query: text, message: text })
+    // input / query / message 都传：输入节点会用聊天文本覆盖 default_value
+    executor.setExternalInputs({ query: text, message: text, input: text })
     executor.setGlobalVars({ _chatHistory: history })
 
     try {
@@ -195,24 +252,31 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
         scrollToBottom()
         return
       }
+      if (!result.success && result.error) {
+        addMsg(result.error, { logs: result.logs || [], _showLogs: true })
+        setRunning(false)
+        scrollToBottom()
+        return
+      }
       const logs = result.logs || []
       const allOutputs = result.results || []
-      const lastLLM = allOutputs.find(r => r.type === 'llm' && r.outputs?.result)
-      const lastNonLLM = [...allOutputs].reverse().find(r => !['start', 'end', 'output'].includes(r.type) && r.outputs?.result)
-      const output = lastLLM?.outputs?.result as string || lastNonLLM?.outputs?.result as string || ''
+      let output = formatFlowChatOutput(allOutputs)
+      if (!hasLlm) {
+        output += '\n\n——\n当前画布没有 LLM 节点，不会调用 API Key。请再点一次「体验全部」（现已含 LLM），或加载示例「核心链路」。'
+      }
       const warnPayload = result.constitution_warnings?.length
         ? warningsToViolationPayload(result.constitution_warnings)
         : undefined
 
-      addMsg(output || '(流程执行完成，无输出)', {
+      addMsg(output, {
         logs,
-        _showLogs: logs.length > 0,
+        _showLogs: false, // 默认收起日志，避免小预览窗里只看见日志、看不见结论
         _violation: warnPayload,
         _showViolation: !!warnPayload,
       })
 
       fetch('/api/v1/search/index', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: 'user', content: text }) }).catch(() => {})
-      if (output) {
+      if (output && !output.startsWith('(') && output !== '(流程执行完成，无输出)') {
         fetch('/api/v1/search/index', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: 'assistant', content: output }) }).catch(() => {})
         const extractNodes = allOutputs.filter(r => r.type === 'extract-memory')
         if (extractNodes.length === 0) {
@@ -279,7 +343,7 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
           </div>
         )}
         {messages.map((msg, i) => (
-          <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          <div key={i} ref={i === messages.length - 1 ? lastMsgRef : undefined} style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             <div style={{ width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: msg.role === 'user' ? '#e8e8e6' : '#37352f', color: msg.role === 'user' ? '#37352f' : '#fff' }}>
               {msg.role === 'user' ? (
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -288,8 +352,36 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
               )}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 2 }}>{msg.role === 'user' ? '你' : 'AI'}</div>
-              <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text-primary)', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{msg.content}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#888', marginBottom: 4 }}>{msg.role === 'user' ? '你' : 'AI 回复'}</div>
+              {msg.role === 'assistant' && /验证通过/.test(msg.content) && (
+                <div style={{
+                  marginBottom: 6, padding: '6px 10px', borderRadius: 6,
+                  background: '#f6ffed', border: '1px solid #b7eb8f',
+                  fontSize: 12, fontWeight: 650, color: '#389e0d',
+                }}>
+                  流程运行成功
+                </div>
+              )}
+              <div style={{
+                fontSize: 14, lineHeight: 1.65, color: '#1f1f1f', fontWeight: 500,
+                wordBreak: 'break-word', whiteSpace: 'pre-wrap',
+                background: msg.role === 'assistant' ? '#f3f3f1' : 'transparent',
+                border: msg.role === 'assistant' ? '1px solid #e5e5e2' : 'none',
+                borderRadius: 8, padding: msg.role === 'assistant' ? '10px 12px' : 0,
+              }}>
+                {msg.content.length > 600 && !msg._showDetail
+                  ? `${msg.content.slice(0, 600)}…`
+                  : msg.content}
+              </div>
+              {msg.content.length > 600 && (
+                <button
+                  type="button"
+                  style={{ marginTop: 4, border: 'none', background: 'none', color: '#1677ff', fontSize: 12, cursor: 'pointer', padding: 0 }}
+                  onClick={() => setMessages(prev => prev.map((m, idx) => idx === i ? { ...m, _showDetail: !m._showDetail } : m))}
+                >
+                  {msg._showDetail ? '收起' : '展开全部'}
+                </button>
+              )}
               <ViolationPanel
                 violation={msg._violation}
                 expanded={msg._showViolation !== false}
@@ -430,3 +522,6 @@ export default function ChatInterface({ headerless }: ChatInterfaceProps) {
 function truncate(val: string, len: number) {
   if (!val) return ''; if (val.length <= len) return val; return val.slice(0, len) + '...'
 }
+
+// re-export for existing imports/tests
+export { formatFlowChatOutput } from '../utils/formatFlowOutput'

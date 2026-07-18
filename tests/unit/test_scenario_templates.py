@@ -46,6 +46,19 @@ def test_list_scenarios():
     ids = {s["id"] for s in items}
     assert "line_inspection" in ids
     assert "doc_assistant" in ids
+    assert "full_experience" in ids
+    assert items[0]["id"] == "full_experience"
+    assert items[0].get("featured") is True
+
+
+def test_instantiate_full_experience(scenario_dir):
+    result = instantiate_scenario("full_experience", apply_policies=True, create_bundle=True)
+    assert result["flow"]["template"] == "doc_assistant"
+    assert any(n.get("type") == "llm" for n in result["flow"]["flow"]["nodes"])
+    assert result["agents"]["template"] == "search_analyze_summarize"
+    assert result["bundle"] is not None
+    assert result["bundle"]["mqtt_topic"] == "fangyu/demo/+/trigger"
+    assert set(result["policy_ids"]) >= {"tpl-llm-model", "tpl-ssrf", "tpl-loop-limit", "tpl-tool-name"}
 
 
 def test_instantiate_line_inspection(scenario_dir):

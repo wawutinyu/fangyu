@@ -16,7 +16,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint src",
-    "export:seed-agents": "npx tsx scripts/exportSeedAgents.ts"
+    "export:seed-agents": "npx tsx scripts/exportSeedAgents.ts",
+    "gen:guan-pixel": "node scripts/generateGuanPixelAtlas.mjs"
   },
   "dependencies": {
     "@codemirror/lang-python": "^6.2.1",
@@ -24,6 +25,7 @@
     "@fangyu/core": "file:../fangyu-core",
     "@reduxjs/toolkit": "^2.7.1",
     "codemirror": "^6.0.2",
+    "pixi.js": "^8.19.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-redux": "^9.2.3",
@@ -37,6 +39,7 @@
     "cross-env": "^7.0.3",
     "jsdom": "^29.1.1",
     "oxlint": "^1.69.0",
+    "pngjs": "^7.0.0",
     "tsx": "^4.21.0",
     "typescript": "~6.0.2",
     "vite": "^8.1.0",

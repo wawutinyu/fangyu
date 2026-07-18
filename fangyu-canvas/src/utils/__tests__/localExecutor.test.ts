@@ -410,6 +410,42 @@ describe('runLocalFlow', () => {
     expect(outputs?.i1?.result).toBe('inner-val')
   })
 
+  it('action-loop code chain carries plan action into act/verify', async () => {
+    const nodes = [
+      makeNode('n1', 'input', '任务', { default_value: '体验闭环' }),
+      makeNode('observe', 'code', 'observe', {
+        code: "const goal = (input && (input.input || input.query || input.message)) || 'demo'\nreturn { phase: 'observe', goal, files: [] }",
+      }),
+      makeNode('plan', 'code', 'plan', {
+        code: "const goal = input?.goal || input?.result?.goal || 'task'\nconst files = input?.files || []\nconst action = files.includes('result.txt') ? 'verify_only' : 'write_result'\nreturn { phase: 'plan', goal, action, files }",
+      }),
+      makeNode('act', 'code', 'act', {
+        code: "const action = input?.action || ''\nconst goal = input?.goal || ''\nlet files = input?.files || []\nif (action === 'write_result') {\n  if (!files.includes('result.txt')) files = [...files, 'result.txt']\n  return { phase: 'act', acted: true, goal, files }\n}\nreturn { phase: 'act', acted: false, goal, files }",
+      }),
+      makeNode('verify', 'code', 'verify', {
+        code: "const files = input?.files || []\nconst ok = files.includes('result.txt')\nreturn { phase: 'verify', verified: ok, status: ok ? 'completed' : 'pending', files }",
+      }),
+      makeNode('o', 'output', '输出'),
+    ]
+    const edges: Edge[] = [
+      { id: 'e0', source: 'n1', target: 'observe', sourceHandle: 'input', targetHandle: 'input', type: 'flow-edge' },
+      { id: 'e1', source: 'observe', target: 'plan', sourceHandle: 'result', targetHandle: 'input', type: 'flow-edge' },
+      { id: 'e2', source: 'plan', target: 'act', sourceHandle: 'result', targetHandle: 'input', type: 'flow-edge' },
+      { id: 'e3', source: 'act', target: 'verify', sourceHandle: 'result', targetHandle: 'input', type: 'flow-edge' },
+      { id: 'e4', source: 'verify', target: 'o', sourceHandle: 'result', targetHandle: 'input', type: 'flow-edge' },
+    ]
+    const result = await runLocalFlow(nodes, edges, {
+      autoResolveInput: true,
+      onProgress: () => {},
+      onPending: () => {},
+    })
+    expect(result.success).toBe(true)
+    const act = result.results.find(r => r.nodeId === 'act')
+    const verify = result.results.find(r => r.nodeId === 'verify')
+    expect(act?.output?.result).toMatchObject({ acted: true, phase: 'act' })
+    expect(verify?.output?.result).toMatchObject({ verified: true, status: 'completed' })
+  })
+
   it('executes loop with inner graph count', async () => {
     const nodes = [
       makeNode('in', 'input', '输入'),

@@ -57,35 +57,8 @@ def _register_bundle(bundle: dict[str, Any]) -> str:
 
 def _verify_envelope(envelope_raw: str | None, body_json: str, require: bool) -> str | None:
     """验证 X-A2A-Envelope；require=True 时无信封直接拒绝。"""
-    if not envelope_raw:
-        if require:
-            return "A2A envelope required (trust_policy.require_envelope=true)"
-        return None
-    try:
-        from fangyu.a2a.trust.envelope import MessageEnvelope
-
-        env_data = json.loads(envelope_raw) if envelope_raw.strip().startswith("{") else {}
-        if not env_data:
-            return "Invalid envelope format"
-        env = MessageEnvelope(
-            payload=env_data.get("payload", ""),
-            sender_id=env_data.get("senderId") or env_data.get("sender_id", ""),
-            timestamp=int(env_data.get("timestamp", 0)),
-            nonce=env_data.get("nonce", ""),
-            signature=env_data.get("signature", ""),
-        )
-        if env.payload:
-            try:
-                if json.loads(env.payload) != json.loads(body_json):
-                    return "Envelope payload mismatch"
-            except json.JSONDecodeError:
-                if env.payload != body_json:
-                    return "Envelope payload mismatch"
-        if not MessageEnvelope.verify(env):
-            return "Invalid A2A envelope signature"
-    except Exception as e:
-        return f"Envelope verification failed: {e}"
-    return None
+    from fangyu.engine.trust_runtime import verify_a2a_envelope
+    return verify_a2a_envelope(envelope_raw, body_json, require)
 
 
 def create_bundle_app(bundle_path: str) -> tuple[FastAPI, str]:

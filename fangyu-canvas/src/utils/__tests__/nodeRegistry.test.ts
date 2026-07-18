@@ -16,14 +16,14 @@ describe('getCompatibleTargets', () => {
     expect(result).toContain('memory')
     expect(result).not.toContain('input')
     expect(result).not.toContain('variable-get')
-    expect(result).not.toContain('llm')
+    expect(result).toContain('llm')
     expect(result).not.toContain('condition')
     expect(result).not.toContain('memory-write')
   })
 
-  it('excludes self from results', () => {
+  it('allows same-type in results', () => {
     const result = getCompatibleTargets('branch')
-    expect(result).not.toContain('branch')
+    expect(result).toContain('branch')
   })
 
   it('excludes no-input types', () => {

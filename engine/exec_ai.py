@@ -4,7 +4,7 @@ import hashlib
 from typing import Any
 
 from .executor import register_executor, _smart_template, _resolve_path, NodeContext
-from .llm import chat_completion, PROVIDER_MAP, PROVIDER_BASE_URL
+from .llm import chat_completion, get_provider, PROVIDER_BASE_URL
 from .sandbox import run_code
 from .knowledge import search_chunks, search_knowledge_store
 from .memory import memory_write, memory_extract_facts, memory_list, memory_search
@@ -37,7 +37,7 @@ async def _exec_llm(ctx: NodeContext) -> dict[str, Any]:
     global_context = str(ctx.global_vars.get("_global_context") or "")
     if global_context and "{{" not in prompt:
         prompt = f"{global_context}\n\n{prompt}" if prompt else global_context
-    model = ctx.config.get("model", "gpt-4o")
+    model = ctx.config.get("model") or ctx.global_vars.get("default_model") or "deepseek-chat"
     user_content = prompt or ctx.inputs.get("input") or ""
     mem_scope = _resolve_mem_scope(ctx)
 
@@ -70,7 +70,8 @@ async def _exec_llm(ctx: NodeContext) -> dict[str, Any]:
     messages.extend(history)
     messages.append({"role": "user", "content": str(user_content)})
 
-    provider_id = PROVIDER_MAP.get(model, "openai")
+    active = str(ctx.global_vars.get("active_provider") or "deepseek")
+    provider_id = get_provider(str(model), fallback=active)
     from ..core.config import settings as env_settings
     db_key = ctx.global_vars.get(f"{provider_id}_api_key", "")
     env_key = getattr(env_settings, f"{provider_id.upper()}_API_KEY", "")
@@ -118,22 +119,25 @@ async def _exec_code(ctx: NodeContext) -> dict[str, Any]:
             input_data.setdefault("input", input_val)
         elif isinstance(input_val, dict):
             input_data = {**input_data, **input_val}
-    elif isinstance(input_val, str):
-        if ext.get("industrial_event") or ext.get("industrial"):
-            input_data = {**ext, "input": input_val, "message": input_val, "query": input_val}
-        elif input_val in (ext.get("query"), ext.get("message"), ext.get("input")):
-            input_data = {
-                **ext,
-                "input": input_val,
-                "message": ext.get("message", input_val),
-                "query": ext.get("query", input_val),
-            }
-        else:
-            input_data = input_val
     elif isinstance(input_val, dict):
         input_data = {**ext, **input_val}
+        # 上游 code 的 result 扁平进 _input，便于 action_loop 脚本读 action/goal
+        nested = input_val.get("result")
+        if isinstance(nested, dict):
+            input_data = {**input_data, **nested}
+    elif isinstance(input_val, str):
+        # 字符串也要包成 dict，否则 _input.get 会崩
+        input_data = {
+            **ext,
+            "input": input_val,
+            "message": ext.get("message", input_val),
+            "query": ext.get("query", input_val),
+        }
     else:
         input_data = {**ext, **ctx.inputs}
+        nested = input_data.get("result")
+        if isinstance(nested, dict):
+            input_data = {**input_data, **nested}
     from fangyu.engine.workspace import workspace_helpers
     result = await run_code(
         code=code, input_data=input_data,

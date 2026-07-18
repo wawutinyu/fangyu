@@ -18,9 +18,11 @@ function atom(id: string, originType: string): Node {
 }
 
 describe('canConnectTypes', () => {
-  it('rejects self type and terminal ports', () => {
-    expect(canConnectTypes('llm', 'llm')).toBe(false)
+  it('allows same-type chains but rejects terminal ports', () => {
+    expect(canConnectTypes('llm', 'llm')).toBe(true)
+    expect(canConnectTypes('code', 'code')).toBe(true)
     expect(canConnectTypes('output', 'llm')).toBe(false)
+    expect(canConnectTypes('output', 'output')).toBe(false)
     expect(canConnectTypes('llm', 'input')).toBe(false)
     expect(canConnectTypes('llm', 'variable-get')).toBe(false)
   })
@@ -34,9 +36,9 @@ describe('canConnectTypes', () => {
 })
 
 describe('getCompatibleTargets aligns with canConnectTypes', () => {
-  it('does not recommend legacy or self', () => {
+  it('does not recommend legacy; allows same-type llm', () => {
     const targets = getCompatibleTargets('llm')
-    expect(targets).not.toContain('llm')
+    expect(targets).toContain('llm')
     expect(targets).not.toContain('input')
     expect(targets).not.toContain('condition')
     expect(targets).toContain('branch')
@@ -74,12 +76,12 @@ describe('validateFlowConnection', () => {
     )).toBe(false)
   })
 
-  it('rejects same-type chain that picker also forbids', () => {
+  it('allows same-type llm chain', () => {
     const twoLlms = [atom('l1', 'llm'), atom('l2', 'llm')]
     expect(isValidFlowConnection(
       { source: 'l1', target: 'l2', sourceHandle: '__default', targetHandle: '__default' },
       { nodes: twoLlms, edges: [] },
-    )).toBe(false)
+    )).toBe(true)
   })
 
   it('rejects invalid handle names', () => {
@@ -194,20 +196,20 @@ describe('active palette nodes', () => {
     }
   })
 
-  it('forbids illegal pairs that used to slip through connect-existing fallback', () => {
-    // 同类型、终端端口、无输入目标
+  it('forbids illegal terminal pairs', () => {
     const illegal: Array<[string, string]> = [
-      ['llm', 'llm'],
-      ['code', 'code'],
       ['output', 'llm'],
+      ['output', 'output'],
       ['llm', 'input'],
       ['llm', 'variable-get'],
-      ['trigger', 'trigger'],
     ]
     for (const [s, t] of illegal) {
       expect(canConnectTypes(s, t)).toBe(false)
       expect(getCompatibleTargets(s)).not.toContain(t)
     }
+    // 同类型合法
+    expect(canConnectTypes('llm', 'llm')).toBe(true)
+    expect(getCompatibleTargets('llm')).toContain('llm')
   })
 
   it('every active source with outputs has at least one legal target except output', () => {

@@ -119,7 +119,9 @@ def main() -> int:
 
     print()
     if ok:
-        print("[OK] Happy Path API 验收项全绿（UI 步骤 2/4/5/8/9 仍需人手点一遍）")
+        print("[OK] Happy Path API 验收项全绿")
+        print("UI 必点: 步骤 4a 工具栏预览 + 4b 底部聊天（见 docs/HAPPY_PATH_ACCEPTANCE.md）")
+        print("脚本: python scripts/studio_preview_smoke.py")
         return 0
     print("[FAIL] 存在未通过项 — 见 docs/HAPPY_PATH_ACCEPTANCE.md")
     return 1

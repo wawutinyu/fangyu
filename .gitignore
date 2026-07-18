@@ -7,6 +7,9 @@ venv/
 *.sqlite3
 data/*.db
 data/vector/
+data/platform-identity.json
+# 场景一键实例化产物（勿提交）
+data/scenarios/
 
 # Worker 持久化
 data/workers.db

@@ -1,9 +1,15 @@
 """Intent → Flow 单元测试 — 分类、生成、宪法扫描、HTTP。"""
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from flow_test_helpers import assert_flow_ok, run_flow_sync
 from fangyu.core.intent_flow import (
     classify_intent,
     intent_to_flow,
@@ -11,7 +17,13 @@ from fangyu.core.intent_flow import (
     build_doc_assistant_flow,
     build_simple_io_flow,
 )
+from fangyu.engine.executor import register_executors
 from fangyu.server import app
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _ensure_executors():
+    register_executors()
 
 
 @pytest.fixture()
@@ -75,6 +87,40 @@ def test_intent_to_flow_scan_not_blocked():
     assert result["scan"]["blocked"] is False
     assert result["flow"]["nodes"]
     assert result["rationale"]
+    observe = next(n for n in result["flow"]["nodes"] if n["name"] == "observe")
+    assert "result =" in observe["config"]["code"]
+    assert "return {" not in observe["config"]["code"]
+
+
+def test_intent_action_loop_runs_with_chat_input():
+    """意图生成的行动闭环应能被引擎跑通，聊天文本覆盖任务默认值。"""
+    built = build_action_loop_flow("默认任务文案")
+    nodes = [
+        {
+            "id": n["id"],
+            "data": {
+                "originType": n["type"],
+                "label": n["name"],
+                "config": n.get("config") or {},
+            },
+        }
+        for n in built["nodes"]
+    ]
+    edges = [
+        {"id": lk["id"], "source": lk["sourceNodeId"], "target": lk["targetNodeId"]}
+        for lk in built["links"]
+    ]
+    result = run_flow_sync(
+        nodes,
+        edges,
+        external_inputs={"query": "聊天覆盖目标", "message": "聊天覆盖目标", "input": "聊天覆盖目标"},
+    )
+    assert result["success"] is True
+    verify = next(r for r in result["results"] if r["nodeName"] == "verify")
+    assert verify["outputs"]["result"]["verified"] is True
+    assert verify["outputs"]["result"]["status"] == "completed"
+    observe = next(r for r in result["results"] if r["nodeName"] == "observe")
+    assert observe["outputs"]["result"]["goal"] == "聊天覆盖目标"
 
 
 def test_intent_to_flow_empty_raises():

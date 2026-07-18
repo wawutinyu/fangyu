@@ -30,6 +30,15 @@ function resolveApiUrl(url: string): string {
   return `${backendBase}${path}`
 }
 
+/** 意图生成 / Worker skill 用 Python；demoFlows 部分仍用 JS return */
+export function looksLikePython(code: string): boolean {
+  const t = code.trimStart()
+  if (/^(const|let|var|function)\b/.test(t)) return false
+  if (/\bresult\s*=/.test(code) || /\b_input\b/.test(code) || /\bisinstance\s*\(/.test(code)) return true
+  if (/\breturn\s*\{/.test(code) || /\breturn\s+/.test(code)) return false
+  return false
+}
+
 function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = FETCH_TIMEOUT): Promise<Response> {
   const controller = new AbortController()
   setTimeout(() => controller.abort(), timeout)
@@ -162,10 +171,18 @@ export async function runLocalFlow(
           const tPort = edge.targetHandle
           if (!tPort || !inputPorts.has(tPort)) continue
           const mappings = (edge.data?.mappings as Record<string, string>) || {}
-          // Priority: 1) mappings 2) field matching tPort name 3) sourceHandle 4) first field
+          // Priority: 1) mappings 2) input←result（code/llm 链）3) 同名字段 4) sourceHandle 5) 首字段
           let srcField: string | undefined
           if (mappings[tPort]) {
             srcField = mappings[tPort]
+          } else if (
+            tPort === 'input'
+            && 'result' in srcOutput
+            && srcOutput.result != null
+            && typeof srcOutput.result === 'object'
+            && !Array.isArray(srcOutput.result)
+          ) {
+            srcField = 'result'
           } else if (tPort in srcOutput) {
             srcField = tPort
           } else if (edge.sourceHandle && edge.sourceHandle in srcOutput) {
@@ -175,14 +192,13 @@ export async function runLocalFlow(
           }
           if (srcField) inputData[tPort] = srcOutput[srcField]
         }
-        // After port mapping, include non-output-port upstream fields (passthrough)
+        // 透传上游其余字段。注意：不能用「当前节点」的 outputPorts 过滤，
+        // 否则会把上游 code 的 result 丢掉（两边都叫 result）。
         for (const edge of upstreamEdges) {
           const srcOutput = outputs.get(edge.source)
           if (!srcOutput) continue
           for (const [k, v] of Object.entries(srcOutput)) {
-            if (!outputPorts.has(k) && !(k in inputData)) {
-              inputData[k] = v
-            }
+            if (!(k in inputData)) inputData[k] = v
           }
         }
       }
@@ -427,9 +443,37 @@ async function simulateNode(
       )
     case 'code': {
       const code = (config.code as string) || 'return input'
+      let codeInput: Record<string, unknown> = { ...inputData }
+      const fromResult = inputData.result
+      if (fromResult != null && typeof fromResult === 'object' && !Array.isArray(fromResult)) {
+        codeInput = { ...codeInput, ...(fromResult as Record<string, unknown>) }
+      } else {
+        const fromInput = inputData.input
+        if (fromInput != null && typeof fromInput === 'object' && !Array.isArray(fromInput)) {
+          codeInput = { ...codeInput, ...(fromInput as Record<string, unknown>) }
+        }
+      }
+      // 意图生成 / 行侧 skill 是 Python；本地 JS Function 跑不了，走后端沙箱
+      if (looksLikePython(code)) {
+        try {
+          const res = await fetchWithTimeout('/api/v1/flow/execute-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code, input: codeInput, timeout: 10 }),
+          }, 15000)
+          if (!res.ok) {
+            return { error: `代码沙箱请求失败 (${res.status})`, result: null }
+          }
+          const data = await res.json() as { result?: unknown; error?: string | null }
+          if (data.error) return { error: data.error, result: data.result ?? null }
+          return { result: data.result }
+        } catch (err) {
+          return { error: `代码沙箱不可用: ${err instanceof Error ? err.message : String(err)}（请确认 API 已启动）` }
+        }
+      }
       try {
         const fn = new Function('input', code)
-        const result = fn(inputData)
+        const result = fn(codeInput)
         return { result }
       } catch (err) {
         return { error: String(err) }
@@ -454,7 +498,8 @@ async function simulateNode(
     }
     case 'llm': {
       const prompt = (config.prompt as string) || (inputData as Record<string, unknown>)?.input || ''
-      const model = (config.model as string) || 'default'
+      // 勿用 'default'：后端会把它当成未知模型并误走 OpenAI
+      const model = (config.model as string) || 'deepseek-chat'
       const systemPrompt = (config.system_prompt as string) || ''
       const inputCtx = (inputData as Record<string, unknown>)?.context as string || ''
       const userMessage = inputCtx
@@ -476,15 +521,26 @@ async function simulateNode(
           const data = await res.json()
           const content = data.result ?? data.content ?? ''
           _lastLLMOutput = content
-          return { result: content, usage: data.usage || {}, _mocked: false }
+          const mocked = typeof content === 'string' && (
+            content.startsWith('[错误:') || content.startsWith('[API 错误') || content.startsWith('[网络错误')
+          )
+          return { result: content, usage: data.usage || {}, _mocked: mocked }
         }
-      } catch { /* fallback to mock when backend unavailable */ }
-      if (/json/i.test(systemPrompt)) {
-        _lastLLMOutput = '[{"name":"可视化编排","desc":"Flow/Agent 双画布"},{"name":"DAG 执行","desc":"28 种节点引擎"},{"name":"A2A 协作","desc":"跨 Agent 加密通信"}]'
-        return { result: _lastLLMOutput, usage: {}, _mocked: true }
+        const errText = await res.text().catch(() => '')
+        return {
+          result: `[LLM 请求失败 ${res.status}] ${errText.slice(0, 200)}`,
+          usage: {},
+          _mocked: true,
+        }
+      } catch (e) {
+        /* 后端不可达时才 fallback mock */
+        if (/json/i.test(systemPrompt)) {
+          _lastLLMOutput = '[{"name":"可视化编排","desc":"Flow/Agent 双画布"},{"name":"DAG 执行","desc":"28 种节点引擎"},{"name":"A2A 协作","desc":"跨 Agent 加密通信"}]'
+          return { result: _lastLLMOutput, usage: {}, _mocked: true }
+        }
+        _lastLLMOutput = `[mock] LLM answer for: ${String(prompt).slice(0, 100)}`
+        return { result: _lastLLMOutput, usage: {}, _mocked: true, error: String(e) }
       }
-      _lastLLMOutput = `[mock] LLM answer for: ${prompt.slice(0, 100)}`
-      return { result: _lastLLMOutput, usage: {}, _mocked: true }
     }
     case 'json-parse': {
       const source = inputData.source ?? config.source ?? inputData.result ?? inputData.input ?? inputData

@@ -93,14 +93,22 @@ export default function ScenarioPanel({ open, onClose, onApply }: Props) {
           {list.map(s => (
             <div
               key={s.id}
+              data-testid={s.featured ? 'scenario-featured' : undefined}
               style={{
                 padding: 12,
-                border: '1px solid var(--border-color, #e5e7eb)',
+                border: s.featured ? '1.5px solid #111' : '1px solid var(--border-color, #e5e7eb)',
                 borderRadius: 8,
-                background: 'var(--bg-secondary, #f9fafb)',
+                background: s.featured ? '#fafafa' : 'var(--bg-secondary, #f9fafb)',
               }}
             >
-              <div style={{ fontWeight: 650, fontSize: 14 }}>{s.title}</div>
+              <div style={{ fontWeight: 650, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                {s.title}
+                {s.featured && (
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: '#111', color: '#fff' }}>
+                    推荐
+                  </span>
+                )}
+              </div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', margin: '6px 0 10px' }}>
                 {s.summary}
               </div>

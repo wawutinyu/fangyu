@@ -7,24 +7,22 @@
 ## 启动
 
 ```bash
-# 0. 首次（Windows）：依赖检查 + 桌面/开始菜单「方隅·行」快捷方式
+# 0. 首次安装
+# Windows：依赖检查 + 桌面「Fangyu-Worker」快捷方式
 install-worker.bat
+# macOS：依赖检查 + ~/Applications/Fangyu-Worker.command
+./install-worker.sh
 
 # 1. 序 API 已运行
-py -m fangyu --server
+./dev.sh                 # macOS
+# 或 py -m fangyu --server
 
-# 2. 根目录安装依赖后
-
-# 方式 A — 控制台守护进程
-npm run dev:worker
-
-# 方式 B — Windows 系统托盘（过渡，无需 Electron）
-dev-worker-tray.bat
-# 或 npm run dev:tray
-
-# 方式 C — Tauri 原生托盘壳（P1，需 Rust + MSVC）
-dev-worker-tauri.bat
-# 详见 fangyu-worker-tauri/README.md
+# 2. 启动行
+./dev-worker.sh          # macOS 控制台
+# 或双击 Fangyu-Worker.command
+npm run dev:worker       # 跨平台
+dev-worker-tray.bat      # Windows 托盘
+dev-worker-tauri.bat     # Tauri（需 Rust）
 ```
 
 退役 Electron 的门槛与勾选表：[扔 Electron 检查清单](../docs/ELECTRON_RETIREMENT.md)。

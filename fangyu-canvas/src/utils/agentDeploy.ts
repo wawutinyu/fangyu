@@ -31,7 +31,22 @@ export async function deployAgentsToBackend(agents: AgentCanvasNode[]): Promise<
       }
       return {
         name: agent.id,
-        card: { ...card, name: card.name || agent.label },
+        card: {
+          ...card,
+          name: card.name || agent.label,
+          metadata: {
+            ...card.metadata,
+            canvas_id: agent.id,
+            ...(card.metadata?.department
+              ? {
+                  department: card.metadata.department,
+                  department_id:
+                    card.metadata.department_id
+                    || `dept-${String(card.metadata.department)}`,
+                }
+              : {}),
+          },
+        },
         flow_mappings,
         trust: agent.trust,
       }

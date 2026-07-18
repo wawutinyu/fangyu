@@ -3,9 +3,14 @@
 > 面向**零编程经验**用户。按顺序阅读即可完成：安装 → 画布编排 → 导出 Agent → 独立运行 → 接入外部 Agent → 产线 Demo。
 
 **日常入口（推荐）：**
-- **Windows 原生**：`install-native.bat`（一次）→ 桌面「Fangyu」；或直接 `dev-native.bat`  
-- **仅网页序**：`dev.bat` → http://localhost:5173  
-- **仅行托盘**：`install-worker.bat`（首次）→ `dev-worker-tray.bat`  
+- **Windows 原生**：`install-native.bat`（一次）→ 桌面「Fangyu」；或直接 `dev-native.bat`
+- **macOS 原生**：`./install-native.sh`（一次）→ `~/Applications/Fangyu.command`；或 `./dev-native.sh`（需 Rust）
+- **网页序**：`./dev.sh` / `dev.bat` → http://127.0.0.1:5173
+- **仅行 Worker**：`./install-worker.sh` / `install-worker.bat`  
+- **macOS 网页序**：`./dev.sh` → http://127.0.0.1:5173  
+- **macOS 方隅·行**：`./install-worker.sh`（一次）→ 双击 `~/Applications/Fangyu-Worker.command`  
+- **仅网页序（Win）**：`dev.bat` → http://localhost:5173  
+- **仅行托盘（Win）**：`install-worker.bat`（首次）→ `dev-worker-tray.bat`  
 - **方隅·观 / 律**：原生或网页顶栏「观」「律」
 
 技术细节请参阅 [L1 路线图](L1_ROADMAP.md)、[Adapter 开发指南](ADAPTER_DEV_GUIDE.md)、[愿景·四门两包](VISION_AND_PRODUCT.md)、[扔 Electron 检查清单](ELECTRON_RETIREMENT.md)。
@@ -29,16 +34,24 @@ fangyu 是一个 **AI Agent 编排平台**。你可以把它理解成：
 
 | 项目 | 要求 |
 |------|------|
-| 操作系统 | Windows 10/11（本手册以 Windows 为例） |
+| 操作系统 | Windows 10/11 或 macOS（下面分系统写） |
 | Python | 3.10 或以上（推荐 3.12+） |
 | Node.js | 18 或以上（用于前端画布） |
-| 浏览器 | Chrome / Edge 最新版 |
+| 浏览器 | Chrome / Edge / Safari 最新版 |
 
 检查是否已安装：
 
 ```powershell
+# Windows
 py --version
 node --version
+```
+
+```bash
+# macOS
+python3 --version
+node --version
+# 可选：source scripts/mac-env.sh
 ```
 
 ---

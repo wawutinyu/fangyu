@@ -441,35 +441,67 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
           {toast.msg}
         </div>
       )}
-      {simResults && (
-        <div style={{
-          position: 'absolute', top: 50, left: '50%', transform: 'translateX(-50%)', zIndex: 100,
-          background: '#fff', borderRadius: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-          padding: 16, minWidth: 360, maxWidth: 500,
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <span style={{ fontSize: 13, fontWeight: 600 }}>模拟运行结果</span>
-            <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999', fontSize: 14 }}
-              onClick={() => { setSimResults(null); setSimConstitutionWarnings(null) }}>✕</button>
+      {simResults && createPortal(
+        <div
+          data-testid="sim-results-modal"
+          style={{
+            position: 'fixed', inset: 0, zIndex: 10050,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 16,
+          }}
+          onClick={() => { setSimResults(null); setSimConstitutionWarnings(null) }}
+        >
+          <div
+            style={{
+              background: '#fff', borderRadius: 12, boxShadow: '0 16px 48px rgba(0,0,0,0.25)',
+              padding: 20, width: 'min(520px, 94vw)', maxHeight: '80vh', overflow: 'auto',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <span style={{ fontSize: 16, fontWeight: 700 }}>模拟运行结果</span>
+              <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999', fontSize: 18 }}
+                onClick={() => { setSimResults(null); setSimConstitutionWarnings(null) }}>✕</button>
+            </div>
+            {(() => {
+              const verify = [...simResults].reverse().find(r =>
+                r.nodeName === 'verify' || (r.output?.result as { phase?: string } | undefined)?.phase === 'verify',
+              )
+              const vr = (verify?.output?.result || verify?.output) as { verified?: boolean; status?: string } | undefined
+              if (vr && (vr.verified === true || vr.status === 'completed')) {
+                return (
+                  <div style={{
+                    marginBottom: 12, padding: '10px 12px', borderRadius: 8,
+                    background: '#f6ffed', border: '1px solid #b7eb8f',
+                    fontSize: 14, fontWeight: 700, color: '#389e0d',
+                  }}>
+                    运行成功：验证通过（{vr.status || 'completed'}）
+                  </div>
+                )
+              }
+              return null
+            })()}
+            {simConstitutionWarnings && (
+              <div style={{ marginBottom: 12 }}>
+                <ViolationPanel violation={simConstitutionWarnings} expanded />
+              </div>
+            )}
+            {simResults.length === 0 ? (
+              simConstitutionWarnings && (
+                <div style={{ fontSize: 12, color: '#666' }}>流程未执行（宪法拒绝）</div>
+              )
+            ) : simResults.map((r, i) => (
+              <div key={i} style={{ marginBottom: 8, padding: 8, background: '#f8f8f6', borderRadius: 6 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#666', marginBottom: 4 }}>{r.nodeName}</div>
+                <pre style={{ margin: 0, fontSize: 11, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#333' }}>
+                  {JSON.stringify(r.output, null, 2)}
+                </pre>
+              </div>
+            ))}
           </div>
-          {simConstitutionWarnings && (
-            <div style={{ marginBottom: 12 }}>
-              <ViolationPanel violation={simConstitutionWarnings} expanded />
-            </div>
-          )}
-          {simResults.length === 0 ? (
-            simConstitutionWarnings && (
-              <div style={{ fontSize: 12, color: '#666' }}>流程未执行（宪法拒绝）</div>
-            )
-          ) : simResults.map((r, i) => (
-            <div key={i} style={{ marginBottom: 8, padding: 8, background: '#f8f8f6', borderRadius: 6 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: '#666', marginBottom: 4 }}>{r.nodeName}</div>
-              <pre style={{ margin: 0, fontSize: 11, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#333' }}>
-                {JSON.stringify(r.output, null, 2)}
-              </pre>
-            </div>
-          ))}
-        </div>
+        </div>,
+        document.body,
       )}
       {nodes.length === 0 && (
         <div style={{
@@ -596,7 +628,14 @@ function FlowCanvasInner(_: unknown, ref: React.Ref<FlowCanvasHandle>) {
 
 function InteractionPanel({ interaction, onResolve, onMinimize }: { interaction: PendingInteraction; onResolve: () => void; onMinimize: () => void }) {
   const [reason, setReason] = React.useState('')
-  const [inputValue, setInputValue] = React.useState('')
+  const defaultInput = String(interaction.config.default_value ?? '')
+  const [inputValue, setInputValue] = React.useState(defaultInput)
+
+  // 换节点 / 再次暂停时重置表单，避免沿用上一次输入
+  React.useEffect(() => {
+    setReason('')
+    setInputValue(String(interaction.config.default_value ?? ''))
+  }, [interaction.nodeId, interaction.type, interaction.config.default_value])
 
   const handleApprove = () => {
     interaction.resolve({ action: 'approved', reason, modifiedData: interaction.inputData })
@@ -607,7 +646,13 @@ function InteractionPanel({ interaction, onResolve, onMinimize }: { interaction:
     onResolve()
   }
   const handleInputSubmit = () => {
-    interaction.resolve({ value: inputValue })
+    const trimmed = inputValue.trim()
+    const value = trimmed !== '' ? inputValue : defaultInput
+    if (value === '' && !defaultInput) {
+      // 无默认值时空提交没有意义，保持面板打开并提示
+      return
+    }
+    interaction.resolve({ value })
     onResolve()
   }
   const handleBreakpointResume = () => {
@@ -694,18 +739,40 @@ function InteractionPanel({ interaction, onResolve, onMinimize }: { interaction:
         ) : (
           <>
             <div style={{ fontSize: 11, fontWeight: 600, color: '#666', marginBottom: 4 }}>请输入值</div>
+            {defaultInput ? (
+              <div style={{ fontSize: 11, color: '#9b9a97', marginBottom: 6 }}>
+                已填入默认值，可改后点「提交并继续」。工具栏「预览」会自动用默认值跑通，无需本面板。
+              </div>
+            ) : (
+              <div style={{ fontSize: 11, color: '#d46b08', marginBottom: 6 }}>
+                该节点无默认值，必须填写后提交，否则流程会停在这里。
+              </div>
+            )}
             <textarea
               className="notion-input"
-              placeholder={(interaction.config.default_value as string) || '输入...'}
+              placeholder={defaultInput || '在此输入…'}
               value={inputValue}
               onChange={e => setInputValue(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault()
+                  handleInputSubmit()
+                }
+              }}
               rows={4}
               style={{ width: '100%', marginBottom: 10, resize: 'vertical', fontSize: 12 }}
             />
-            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
+              <span style={{ fontSize: 10, color: '#bfbeba', marginRight: 'auto' }}>⌘/Ctrl+Enter 提交</span>
               <button className="notion-btn" onClick={handleInputSubmit}
-                style={{ background: '#1890ff', borderColor: '#1890ff', color: '#fff', fontSize: 12 }}>
-                提交
+                disabled={!inputValue.trim() && !defaultInput}
+                style={{
+                  background: (!inputValue.trim() && !defaultInput) ? '#d0d0ce' : '#1890ff',
+                  borderColor: (!inputValue.trim() && !defaultInput) ? '#d0d0ce' : '#1890ff',
+                  color: '#fff', fontSize: 12,
+                  cursor: (!inputValue.trim() && !defaultInput) ? 'not-allowed' : 'pointer',
+                }}>
+                提交并继续
               </button>
             </div>
           </>

@@ -141,17 +141,25 @@ async def _exec_trigger(ctx: NodeContext) -> dict[str, Any]:
 
 
 async def _exec_input(ctx: NodeContext) -> dict[str, Any]:
+    """输入节点：上游 → default_value → external（聊天预览覆盖默认值）。"""
     merged: dict[str, Any] = {}
     for k, v in ctx.inputs.items():
         if v is not None:
             merged[k] = v
-        elif ctx.config.get(k) is not None:
-            merged[k] = ctx.config[k]
-    if ctx.config.get("default_value") and "input" not in merged:
+    if "input" not in merged and ctx.config.get("default_value") is not None:
         merged["input"] = ctx.config["default_value"]
-    for k, v in ctx.external_inputs.items():
-        if v is not None and k not in merged:
+    ext = ctx.external_inputs or {}
+    for k, v in ext.items():
+        if v is not None:
             merged[k] = v
+    # 底部预览常只传 query/message，提升为 input，覆盖 default_value
+    chat = ext.get("input")
+    if chat is None:
+        chat = ext.get("query")
+    if chat is None:
+        chat = ext.get("message")
+    if chat is not None:
+        merged["input"] = chat
     return merged
 
 

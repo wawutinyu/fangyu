@@ -94,11 +94,31 @@ SCENARIOS: dict[str, dict[str, Any]] = {
         "agent_kind": "interface",
         "mqtt_topic": None,
     },
+    "full_experience": {
+        "id": "full_experience",
+        "title": "体验全部功能",
+        "summary": (
+            "序：文档问答 LLM Flow（可直接聊天）+ 三角 Agent 协作；"
+            "律：LLM/SSRF/循环/工具 全套策略；"
+            "行：Worker Bundle + MQTT 演示主题；"
+            "观：派发或 A2A 后看协作边与时间线。"
+        ),
+        "intent_flow": "用中文友好地回答用户问题，并简要介绍方隅能做什么",
+        "flow_template": "doc_assistant",
+        "use_llm_plan": False,
+        "intent_agents": "检索、分析、汇总三角协作",
+        "agent_template": "search_analyze_summarize",
+        "policy_ids": ["tpl-llm-model", "tpl-ssrf", "tpl-loop-limit", "tpl-tool-name"],
+        "bundle_name": "full-experience-demo",
+        "agent_kind": "worker",
+        "mqtt_topic": "fangyu/demo/+/trigger",
+        "featured": True,
+    },
 }
 
 
 def list_scenarios() -> list[dict[str, Any]]:
-    return [
+    items = [
         {
             "id": s["id"],
             "title": s["title"],
@@ -107,9 +127,13 @@ def list_scenarios() -> list[dict[str, Any]]:
             "flow_template": s["flow_template"],
             "agent_template": s["agent_template"],
             "agent_kind": s["agent_kind"],
+            "featured": bool(s.get("featured")),
         }
         for s in SCENARIOS.values()
     ]
+    # 推荐体验包置顶
+    items.sort(key=lambda x: (0 if x.get("featured") else 1, x["id"]))
+    return items
 
 
 def _scenario_root() -> Path:
@@ -164,6 +188,8 @@ def instantiate_scenario(
     flow_result = intent_to_flow(
         str(spec["intent_flow"]),
         template=spec["flow_template"],  # type: ignore[arg-type]
+        use_llm_plan=bool(spec.get("use_llm_plan")),
+        model="deepseek-chat",
     )
     agents_result = intent_to_agent_graph(
         str(spec["intent_agents"]),

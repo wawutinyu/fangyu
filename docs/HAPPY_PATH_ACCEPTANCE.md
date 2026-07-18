@@ -10,7 +10,8 @@
 
 > **常见坑：** pull 新代码后若 `/api/v1/presence` 等返回 404，多半是旧 API 进程仍在跑。  
 > - Windows：先 `dev-clean.bat`，再 `dev.bat` / `py -m fangyu --server`  
-> - macOS：先 `./dev-clean.sh`，再 `./dev.sh`（请在本机 Terminal 前台跑）；冒烟用 `./scripts/mac-smoke.sh`
+> - macOS：先 `./dev-clean.sh`，再 `./dev.sh`（请在本机 Terminal 前台跑）；冒烟用 `./scripts/mac-smoke.sh`  
+> - **API 必须在本机 Terminal 前台跑。** Cursor agent shell 里起的进程常会挂掉 → Studio `502 Bad Gateway`，看起来像「意图/预览坏了」。
 
 ## 步骤（建议计时）
 
@@ -19,39 +20,40 @@
 | 1 | `git clone` + `npm install` + `py -m pip install -e .`（或 `install-worker.bat`） | 无报错；桌面出现 `Fangyu-Worker.lnk` | |
 | 2 | `dev-clean.bat`（若需要）+ `dev.bat` | 打开 http://localhost:5173，标题含「方隅·序」 | |
 | 3 | `install-worker.bat` 或 `dev-worker-tray.bat` | 托盘 / Worker 在线；序顶栏出现「行 N」 | |
-| 4 | Flow 画布 → 示例 / 意图生成 → **序内预览** | 预览成功 | |
+| 4a | 创建 → **意图生成** → 应用到画布 → **工具栏「预览」** | 弹出「模拟运行结果」；act/verify 语义成功（非卡住「预览中…」） | |
+| 4b | 同一 Flow → 底部面板展开 **「预览」聊天** → 发一句 | 助手回复**可读**（含验证通过 / completed 等），**不是**「无输出」或「画布为空」 | |
 | 5 | **派发至行** | 方隅·行面板任务 `done` | |
 | 6 | `py scripts/worker_happy_path.py --spawn-worker` | 打印 OK（shell + run_flow） | |
 | 7 | 导出 Agent Bundle → `py -m fangyu bundle run …`（或 `py scripts/happy_path_demo.py`） | Bundle 常驻 / RPC 有响应 | |
 | 8 | 顶栏 **方隅·观**（或 `GET /api/v1/presence`） | 能看到 Worker Presence；派发后时间线有事件 | |
 | 9 | 顶栏 **方隅·律**（或 `GET /api/v1/constitution/audit/verify`） | 能看到宪法与审计；链验证 `valid=true` 或白话可解释 | |
 
-**API 快速复验（6/8/9）：** `py scripts/happy_path_acceptance_check.py`
+**脚本复验：**
+
+- API 观/律/路由：`py scripts/happy_path_acceptance_check.py`
+- **Studio 双预览（意图 + 底部路径 + 工具栏沙箱）：** `py scripts/studio_preview_smoke.py`  
+  （API 未起时退出码 2，不当假绿）
 
 ## 通过标准
 
-- 步骤 1–6 **必须全绿**
-- 7 按 Phase 5 Bundle 文档；若环境缺依赖可记「部分通过」并开 issue
+- 步骤 1–3、**4a + 4b**、6 **必须全绿**（4a/4b 缺一不可：工具栏预览 ≠ 底部聊天）
+- 5、7 按环境；缺 Worker 可记「部分通过」
 - 8–9 为四门两包体验验收（观/律）
 
 ## 记录
 
 | 项 | 填写 |
 |----|------|
-| 验收人 | Agent（本机自测，模拟外人视角脚本路径） |
-| 日期 | 2026-07-13 |
-| 总耗时 | ~15 min（脚本路径）；UI 点选步骤待真人补做 |
-| 卡点 / 文档缺口 | ① 旧 API 进程导致观/场景 404 → 已写入「常见坑」+ `happy_path_acceptance_check.py`；② 律 `audit/verify?limit=` 长日志误报断裂 → 已修窗口锚点 |
-| 结论 | ☑ 有条件通过 ☐ 通过 ☐ 未通过 |
+| 验收人 | |
+| 日期 | |
+| 总耗时 | |
+| 卡点 / 文档缺口 | |
+| 结论 | ☐ 通过 ☐ 有条件通过 ☐ 未通过 |
 
-### 2026-07-13 脚本项结果
+### 已知曾漏测（勿再只测工具栏）
 
-| 步骤 | 结果 |
+| 路径 | 说明 |
 |------|------|
-| 1 `install-worker.bat`（非交互） | ✅ 快捷方式已写桌面 / 开始菜单 |
-| 6 `worker_happy_path.py --spawn-worker` | ✅ shell + run_flow |
-| 7 `happy_path_demo.py` | ✅ 5 步跨 Bundle RPC |
-| 8 presence API | ✅（须用新进程；旧进程会 404） |
-| 9 constitution + audit verify | ✅（修窗口后） |
-| 2 Studio `http://localhost:5173` | ✅ HTTP 200（本机 Vite 仅监听 `::1`，用 localhost 勿用 127.0.0.1） |
-| 4/5/8/9 UI 点选 | ⬜ 待人手在 Studio 点验（API 侧观/律已绿） |
+| 意图 → **底部聊天** | 后端 Python 沙箱；与本地 JS 模拟不是同一条 |
+| 聊天文字覆盖 input 默认值 | `query`/`message` 必须盖掉 `default_value` |
+| 对象结果展示 | verify 返回对象时聊天框不能显示「无输出」 |

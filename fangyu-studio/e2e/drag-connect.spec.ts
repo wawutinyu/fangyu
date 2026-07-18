@@ -16,7 +16,7 @@ test.describe('Drag-to-connect', () => {
     await expect(inputNode.locator('.react-flow__handle-top')).toHaveCount(0)
   })
 
-  test('same-type llm→llm is not offered in + picker', async ({ page }) => {
+  test('same-type llm→llm is offered in + picker; input is not', async ({ page }) => {
     await page.goto('/')
     await page.waitForSelector('.react-flow__renderer', { timeout: 15000 })
     page.on('dialog', dialog => dialog.accept())
@@ -35,7 +35,8 @@ test.describe('Drag-to-connect', () => {
     await llmNode.locator('.port-row-add').click()
     const picker2 = page.locator('div[style*="z-index: 9999"]').filter({ has: page.locator('input[placeholder*="搜索节点"]') })
     await expect(picker2).toBeVisible({ timeout: 3000 })
-    await expect(picker2.getByText('大模型调用', { exact: true })).toHaveCount(0)
+    await expect(picker2.getByText('大模型调用', { exact: true })).toBeVisible()
     await expect(picker2.getByText('输出', { exact: true })).toBeVisible()
+    await expect(picker2.getByText('输入', { exact: true })).toHaveCount(0)
   })
 })

@@ -1,8 +1,9 @@
-//! 方隅 — Windows 原生壳（Tauri）
+//! 方隅 — 桌面原生壳（Tauri）
 //! 主窗口 = 序 UI（与 Web 1:1，同一套 fangyu-studio）
 //! 托盘 = 拉起 Worker；启动时拉起本机 API
+//! Windows / macOS 共用；配置目录见 fangyu_config_dir()
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use std::thread;
@@ -34,10 +35,33 @@ struct NativeConfig {
 }
 
 fn fangyu_config_dir() -> PathBuf {
-    let base = std::env::var_os("LOCALAPPDATA")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."));
-    base.join("Fangyu")
+    // Windows: %LOCALAPPDATA%\Fangyu
+    // macOS: ~/Library/Application Support/Fangyu
+    // Linux: ~/.config/Fangyu
+    if let Ok(raw) = std::env::var("LOCALAPPDATA") {
+        let p = PathBuf::from(raw);
+        if !p.as_os_str().is_empty() {
+            return p.join("Fangyu");
+        }
+    }
+    if cfg!(target_os = "macos") {
+        if let Some(home) = std::env::var_os("HOME") {
+            return PathBuf::from(home)
+                .join("Library")
+                .join("Application Support")
+                .join("Fangyu");
+        }
+    }
+    if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
+        let p = PathBuf::from(xdg);
+        if !p.as_os_str().is_empty() {
+            return p.join("Fangyu");
+        }
+    }
+    if let Some(home) = std::env::var_os("HOME") {
+        return PathBuf::from(home).join(".config").join("Fangyu");
+    }
+    PathBuf::from(".").join("Fangyu")
 }
 
 fn native_config_path() -> PathBuf {
@@ -68,7 +92,6 @@ fn looks_like_repo(path: &PathBuf) -> bool {
 }
 
 fn resolve_repo_root() -> PathBuf {
-    // 1) 显式环境变量
     if let Ok(raw) = std::env::var("FANGYU_REPO_ROOT") {
         let p = PathBuf::from(raw.trim());
         if looks_like_repo(&p) {
@@ -79,19 +102,14 @@ fn resolve_repo_root() -> PathBuf {
             p.display()
         );
     }
-    // 2) %LOCALAPPDATA%\\Fangyu\\native.json（安装脚本写入）
     let cfg = load_native_config();
     if let Some(raw) = cfg.repo_root.as_deref() {
         let p = PathBuf::from(raw.trim());
         if looks_like_repo(&p) {
             return p;
         }
-        eprintln!(
-            "[方隅] native.json repo_root 无效: {}",
-            p.display()
-        );
+        eprintln!("[方隅] native.json repo_root 无效: {}", p.display());
     }
-    // 3) 当前工作目录
     if let Ok(cwd) = std::env::current_dir() {
         if looks_like_repo(&cwd) {
             return cwd;
@@ -103,7 +121,6 @@ fn resolve_repo_root() -> PathBuf {
             }
         }
     }
-    // 4) 可执行文件旁（开发态 target/debug 在 monorepo 内）
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             for candidate in [
@@ -153,11 +170,19 @@ fn resolve_worker_dir(repo: &PathBuf) -> PathBuf {
     PathBuf::from("../fangyu-worker")
 }
 
-fn python_cmd() -> &'static str {
-    if cfg!(windows) {
-        "py"
+fn python_executable(repo: &Path) -> PathBuf {
+    let venv = if cfg!(windows) {
+        repo.join(".venv").join("Scripts").join("python.exe")
     } else {
-        "python3"
+        repo.join(".venv").join("bin").join("python3")
+    };
+    if venv.exists() {
+        return venv;
+    }
+    if cfg!(windows) {
+        PathBuf::from("py")
+    } else {
+        PathBuf::from("python3")
     }
 }
 
@@ -193,7 +218,7 @@ fn start_api(state: &AppState) -> Result<(), String> {
 
     let _ = std::fs::create_dir_all(&state.data_dir);
 
-    let mut cmd = Command::new(python_cmd());
+    let mut cmd = Command::new(python_executable(&state.repo_root));
     cmd.args(["-m", "fangyu", "--server"])
         .current_dir(&state.repo_root)
         .env("HOST", "127.0.0.1")
@@ -281,6 +306,14 @@ fn show_main(app: &AppHandle) {
     }
 }
 
+fn install_hint() -> &'static str {
+    if cfg!(windows) {
+        "install-native.bat"
+    } else {
+        "./install-native.sh"
+    }
+}
+
 #[tauri::command]
 fn worker_status(state: State<'_, AppState>) -> String {
     let mut slot = match state.worker.lock() {
@@ -319,7 +352,6 @@ pub fn run() {
     let data_dir = resolve_data_dir(&repo_root);
     let worker_dir = resolve_worker_dir(&repo_root);
 
-    // 若成功解析到仓库，回写 native.json，供下次 / 安装包启动
     if looks_like_repo(&repo_root) {
         let mut cfg = load_native_config();
         cfg.repo_root = Some(repo_root.display().to_string());
@@ -329,7 +361,8 @@ pub fn run() {
         save_native_config(&cfg);
     } else {
         eprintln!(
-            "[方隅] 未找到仓库根（需 fangyu-worker）。请运行 install-native.bat 或设置 FANGYU_REPO_ROOT。当前: {}",
+            "[方隅] 未找到仓库根（需 fangyu-worker）。请运行 {} 或设置 FANGYU_REPO_ROOT。当前: {}",
+            install_hint(),
             repo_root.display()
         );
     }
@@ -370,7 +403,7 @@ pub fn run() {
                 let title = if looks_like_repo(&state.repo_root) {
                     "方隅".to_string()
                 } else {
-                    "方隅（未绑定仓库 — 请运行 install-native.bat）".into()
+                    format!("方隅（未绑定仓库 — 请运行 {}）", install_hint())
                 };
                 let _ = w.set_title(&title);
                 let _ = w.show();

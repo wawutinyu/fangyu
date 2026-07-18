@@ -46,7 +46,21 @@ class OrchestrateRequest(BaseModel):
 
 
 @router.post("/send")
-def send_message(body: SendMessageRequest):
+async def send_message(request: Request):
+    """校验信封时使用原始请求体，避免 re-serialize 与前端签名不一致。"""
+    from fangyu.core.config import settings
+    from fangyu.engine.trust_runtime import verify_a2a_envelope
+
+    raw = await request.body()
+    body_json = raw.decode("utf-8")
+    envelope_raw = request.headers.get("X-A2A-Envelope") or request.headers.get("x-a2a-envelope")
+    env_err = verify_a2a_envelope(envelope_raw, body_json, settings.PLATFORM_REQUIRE_ENVELOPE)
+    if env_err:
+        raise HTTPException(403, env_err)
+    try:
+        body = SendMessageRequest.model_validate_json(body_json)
+    except Exception as e:
+        raise HTTPException(422, f"Invalid body: {e}") from e
     task = _bus.send_message(body.target_agent, body.message, body.task_id)
     return task
 
@@ -194,24 +208,19 @@ class JsonRpcRequest(BaseModel):
 
 @router.post("/rpc")
 def a2a_jsonrpc(body: JsonRpcRequest, request: Request):
-    """JSON-RPC 2.0 端点 — 供跨机器 HTTPTransport 调用。可选 X-A2A-Envelope 签名头。"""
+    """JSON-RPC 2.0 端点 — 供跨机器 HTTPTransport 调用。受 FANGYU_PLATFORM_REQUIRE_ENVELOPE 约束。"""
+    from fangyu.core.config import settings
+    from fangyu.engine.trust_runtime import verify_a2a_envelope
+
+    body_json = json.dumps(
+        {"jsonrpc": body.jsonrpc, "method": body.method, "params": body.params, "id": body.id},
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
     envelope_raw = request.headers.get("X-A2A-Envelope") or request.headers.get("x-a2a-envelope")
-    if envelope_raw:
-        try:
-            from fangyu.a2a.trust.envelope import MessageEnvelope
-            env_data = json.loads(envelope_raw) if envelope_raw.startswith("{") else {}
-            if env_data:
-                env = MessageEnvelope(
-                    payload=env_data.get("payload", ""),
-                    sender_id=env_data.get("senderId") or env_data.get("sender_id", ""),
-                    timestamp=int(env_data.get("timestamp", 0)),
-                    nonce=env_data.get("nonce", ""),
-                    signature=env_data.get("signature", ""),
-                )
-                if not MessageEnvelope.verify(env):
-                    return {"jsonrpc": "2.0", "id": body.id, "error": {"code": 403, "message": "Invalid A2A envelope signature"}}
-        except Exception as e:
-            return {"jsonrpc": "2.0", "id": body.id, "error": {"code": 403, "message": f"Envelope verification failed: {e}"}}
+    env_err = verify_a2a_envelope(envelope_raw, body_json, settings.PLATFORM_REQUIRE_ENVELOPE)
+    if env_err:
+        return {"jsonrpc": "2.0", "id": body.id, "error": {"code": 403, "message": env_err}}
 
     method = body.method
     params = body.params or {}

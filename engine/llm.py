@@ -16,9 +16,30 @@ PROVIDER_BASE_URL = {
     'moonshot': 'https://api.moonshot.cn/v1',
 }
 
+# 未知模型名时按前缀推断，避免误落到 openai 导致「明明配了 DeepSeek key 却报未配置」
+_PROVIDER_PREFIXES = (
+    ('deepseek', 'deepseek'),
+    ('claude', 'anthropic'),
+    ('anthropic', 'anthropic'),
+    ('gpt-', 'openai'),
+    ('o1', 'openai'),
+    ('o3', 'openai'),
+    ('moonshot', 'moonshot'),
+)
 
-def get_provider(model: str) -> str:
-    return PROVIDER_MAP.get(model, 'openai')
+
+def get_provider(model: str, fallback: str = 'openai') -> str:
+    name = (model or '').strip().lower()
+    if not name or name in ('default', 'auto'):
+        return fallback if fallback in PROVIDER_BASE_URL else 'openai'
+    if name in PROVIDER_MAP:
+        return PROVIDER_MAP[name]
+    if name in PROVIDER_BASE_URL:
+        return name
+    for prefix, provider in _PROVIDER_PREFIXES:
+        if name.startswith(prefix):
+            return provider
+    return fallback if fallback in PROVIDER_BASE_URL else 'openai'
 
 
 def _build_headers(api_key: str, provider_id: str) -> dict:

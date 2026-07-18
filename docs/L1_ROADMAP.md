@@ -367,6 +367,8 @@ Worker-only Agent：`user.enabled = false`，runtime 不启动 Chat UI。
 
 **验收（完整 Phase 6）：** 非开发者用户仅通过对话 + 按钮，完成「创建一个 Worker 并导出运行」（无需理解 agent_id/公钥）。
 
+> **Mac 进展（2026-07-18）：** `./install-worker.sh` → `~/Applications/Fangyu-Worker.command`，无需理解公钥；平台信封 `FANGYU_PLATFORM_REQUIRE_ENVELOPE` + 序自动签名已就绪（默认关闭强制，可开）。完整「对话建 Worker」仍待 Setup Copilot 扩到行侧。
+
 **前置条件：** Phase 5 开发者 Happy Path 全绿；否则 AI 层只会生成不可靠的配置。
 
 ---

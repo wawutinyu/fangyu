@@ -12,9 +12,10 @@
     "dev:studio": "npm run dev -w fangyu-studio",
     "dev:worker": "npm run start -w fangyu-worker",
     "dev:tray": "npm run tray -w fangyu-worker",
-    "dev:native": "npx tauri dev --manifest-path fangyu-worker-tauri/src-tauri/Cargo.toml",
+    "dev:native": "npm run tauri --prefix fangyu-worker-tauri -- dev",
     "build:studio": "npm run build -w fangyu-studio",
     "build:tauri": "npm run build:tauri -w fangyu-studio",
+    "build:native": "npm run tauri --prefix fangyu-worker-tauri -- build",
     "test": "npm run test:fast -w fangyu-canvas && npm run test -w fangyu-core",
     "test:all": "npm run test -w fangyu-canvas"
   }

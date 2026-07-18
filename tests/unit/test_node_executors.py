@@ -50,6 +50,21 @@ def test_input_output_nodes():
     )
 
 
+def test_input_chat_overrides_default():
+    """底部预览传 query/message 时应覆盖 default_value。"""
+    nodes = [
+        node("i", "input", config={"default_value": "default-goal"}),
+        node("o", "output"),
+    ]
+    result = run_flow_sync(
+        nodes,
+        [edge("i", "o")],
+        external_inputs={"query": "来自聊天", "message": "来自聊天"},
+    )
+    assert_flow_ok(result, "input", lambda o: o.get("input") == "来自聊天")
+    assert_flow_ok(result, "output", lambda o: o.get("result") == "来自聊天")
+
+
 def test_code_node():
     assert_flow_ok(
         chain_flow({"originType": "code", "config": {"code": "result = 'ok'"}}),

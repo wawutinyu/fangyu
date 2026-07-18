@@ -14,6 +14,8 @@ SAFE_BUILTINS = {
     'round': round, 'set': set, 'slice': slice, 'sorted': sorted, 'str': str,
     'sum': sum, 'tuple': tuple, 'type': type, 'zip': zip, 'True': True, 'False': False,
     'None': None, 'print': print, 'json': json,
+    # 允许 except NameError / Exception（workspace 可选时常用）
+    'NameError': NameError, 'Exception': Exception, 'ValueError': ValueError, 'TypeError': TypeError,
 }
 
 FORBIDDEN = ['__import__', 'open', 'eval', 'compile', 'globals', 'locals', 'vars', 'dir', 'getattr', 'setattr', 'delattr', 'hasattr']

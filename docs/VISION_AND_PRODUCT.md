@@ -119,9 +119,12 @@
 
 ### 观 — 规划要点（MVP 方向）
 
+**价值观：** 序与律为共同边界；轨外自由发挥；人文协作（非工位压迫、非空旷广场）。  
+**场景隐喻：** 宅子=部门；宅内私密角 + 公共厅（主）+ 宅内院（辅）；现代院壳、日光软形。
+
 1. **Presence**：Agent 卡片 — 在线 / 忙 / 等 / 违宪 ✅
 2. **此刻**：当前 skill、最近 A2A、绑定 Worker ✅（skill / task_id）
-3. **协作边**：谁在调谁（对齐 Agent 画布拓扑） ⬜ 下一迭代（时间线已有 actor→target）
+3. **宅子共场**：厅/院/角；**PixiJS + 自研像素图集**（`public/guan/pixel`，`npm run gen:guan-pixel`）✅
 4. **时间线**：A2A trace + 行任务事件 + 宪法 warn/deny ✅
 
 **API：** `GET /api/v1/presence` · `GET|POST /api/v1/presence/events`  

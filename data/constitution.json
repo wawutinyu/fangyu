@@ -18,8 +18,14 @@
       "id": "limit-loop-iterations",
       "enabled": true,
       "description": "循环节点迭代次数上限",
-      "when": { "node_type": "loop" },
-      "assert": { "field": "config.max_iterations", "op": "lte", "value": 1000 },
+      "when": {
+        "node_type": "loop"
+      },
+      "assert": {
+        "field": "config.max_iterations",
+        "op": "lte",
+        "value": 1000
+      },
       "on_fail": {
         "rule": "policy_loop_limit",
         "action": "deny",
@@ -30,8 +36,14 @@
       "id": "block-localhost-http",
       "enabled": true,
       "description": "禁止 HTTP 节点访问 localhost（防 SSRF）",
-      "when": { "node_type": "http" },
-      "assert": { "field": "config.url", "op": "not_contains", "value": "localhost" },
+      "when": {
+        "node_type": "http"
+      },
+      "assert": {
+        "field": "config.url",
+        "op": "not_contains",
+        "value": "localhost"
+      },
       "on_fail": {
         "rule": "policy_ssrf",
         "action": "deny",
@@ -42,8 +54,13 @@
       "id": "warn-missing-llm-model",
       "enabled": true,
       "description": "LLM 未配置 model 时警告（不阻断）",
-      "when": { "node_type": "llm" },
-      "assert": { "field": "config.model", "op": "nonempty" },
+      "when": {
+        "node_type": "llm"
+      },
+      "assert": {
+        "field": "config.model",
+        "op": "nonempty"
+      },
       "on_fail": {
         "rule": "policy_llm_model",
         "action": "warn",
@@ -54,12 +71,70 @@
       "id": "require-tool-name",
       "enabled": true,
       "description": "tool-call 必须指定 tool_name",
-      "when": { "node_type": "tool-call" },
-      "assert": { "field": "config.tool_name", "op": "nonempty" },
+      "when": {
+        "node_type": "tool-call"
+      },
+      "assert": {
+        "field": "config.tool_name",
+        "op": "nonempty"
+      },
       "on_fail": {
         "rule": "policy_tool_name",
         "action": "deny",
         "message": "tool-call 节点必须配置 tool_name"
+      }
+    },
+    {
+      "id": "deny-localhost-http",
+      "enabled": true,
+      "description": "禁止 HTTP 访问 localhost",
+      "when": {
+        "node_type": "http"
+      },
+      "assert": {
+        "field": "config.url",
+        "op": "not_contains",
+        "value": "localhost"
+      },
+      "on_fail": {
+        "rule": "policy_ssrf",
+        "action": "deny",
+        "message": "禁止访问 localhost: {label}"
+      }
+    },
+    {
+      "id": "deny-loop-overflow",
+      "enabled": true,
+      "description": "循环次数不得超过 100",
+      "when": {
+        "node_type": "loop"
+      },
+      "assert": {
+        "field": "config.max_iterations",
+        "op": "lte",
+        "value": 100
+      },
+      "on_fail": {
+        "rule": "policy_loop_limit",
+        "action": "deny",
+        "message": "循环次数超限: {label}"
+      }
+    },
+    {
+      "id": "deny-empty-tool-name",
+      "enabled": true,
+      "description": "tool-call 必须指定 tool_name",
+      "when": {
+        "node_type": "tool-call"
+      },
+      "assert": {
+        "field": "config.tool_name",
+        "op": "nonempty"
+      },
+      "on_fail": {
+        "rule": "policy_tool_name",
+        "action": "deny",
+        "message": "tool-call 未配置 tool_name: {label}"
       }
     }
   ]

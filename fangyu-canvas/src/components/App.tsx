@@ -15,6 +15,7 @@ import SettingsPanel from './SettingsPanel'
 import AssetLibrary from './AssetLibrary'
 import IntentPanel from './IntentPanel'
 import ScenarioPanel from './ScenarioPanel'
+import ExperienceGuide from './ExperienceGuide'
 import PresencePanel from './PresencePanel'
 import LawPanel from './LawPanel'
 import HangBoard from './HangBoard'
@@ -31,6 +32,11 @@ import { demoFlows } from '../utils/demoFlows'
 import { snapshotFlowFromCanvas, getExportFormatFromCanvas } from '../utils/flowSnapshot'
 import { fetchWorkers, pollTaskUntilDone } from '../utils/workerApi'
 import { publishAndDispatchFromCanvas } from '../utils/workerDispatch'
+import {
+  FULL_EXPERIENCE_SCENARIO_ID,
+  instantiateScenario,
+  type ScenarioInstantiateResult,
+} from '../utils/scenarioApi'
 import type { WorkerInfo } from '@fangyu/core/schema'
 
 
@@ -85,6 +91,8 @@ export default function App() {
   const [setupCopilotOpen, setSetupCopilotOpen] = useState(false)
   const [agentBindTarget, setAgentBindTarget] = useState<AgentBindTarget | null>(null)
   const [agentAssetPickerOpen, setAgentAssetPickerOpen] = useState(false)
+  const [fullExperienceBusy, setFullExperienceBusy] = useState(false)
+  const [experienceGuide, setExperienceGuide] = useState<ScenarioInstantiateResult | null>(null)
 
   const loadFlowToCanvas = useCallback((data: unknown) => {
     flowCanvasRef.current?.importFlow(data)
@@ -150,6 +158,58 @@ export default function App() {
       await flowCanvasRef.current?.runSimulation(true)
     }, 300)
   }, [])
+
+  const applyScenarioResult = useCallback((result: ScenarioInstantiateResult) => {
+    if (result.flow?.flow) {
+      flowCanvasRef.current?.importFlow(result.flow.flow)
+    }
+    if (result.agents?.graph) {
+      // 只装入 Agent 图，不立刻切到 Agent 视图——避免「体验全部」后底部仍停在 Agent 聊天、Flow 有图却输入无输出
+      store.dispatch(loadAgents({
+        nodes: result.agents.graph.nodes as import('../store/agentSlice').AgentCanvasNode[],
+        edges: result.agents.graph.edges as import('../store/agentSlice').AgentCanvasEdge[],
+      }))
+    }
+    if (result.flow?.flow) {
+      setView('flow')
+      setXuMode('flow')
+      window.dispatchEvent(new CustomEvent('fangyu:switch-chat-mode', { detail: { mode: 'flow' } }))
+    } else if (result.agents?.graph) {
+      goXuAgent()
+    }
+  }, [goXuAgent])
+
+  const handleFullExperience = useCallback(async () => {
+    setFullExperienceBusy(true)
+    try {
+      const result = await instantiateScenario(FULL_EXPERIENCE_SCENARIO_ID)
+      applyScenarioResult(result)
+      setView('flow')
+      setXuMode('flow')
+      window.dispatchEvent(new CustomEvent('fangyu:switch-chat-mode', { detail: { mode: 'flow' } }))
+      window.dispatchEvent(new CustomEvent('fangyu:clear-chat'))
+      window.dispatchEvent(new CustomEvent('fangyu:focus-bottom-chat'))
+      setExperienceGuide(result)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      // API 不可用时：装入带 LLM 的核心链路，便于对照 Key / 预览路径
+      const offline = demoFlows.core
+      if (offline) {
+        flowCanvasRef.current?.importFlow(offline.data)
+        setView('flow')
+        setXuMode('flow')
+        window.dispatchEvent(new CustomEvent('fangyu:switch-chat-mode', { detail: { mode: 'flow' } }))
+        alert(
+          `${msg}\n\n已先加载离线「核心链路」(含 LLM 节点)。\n完整包需 API：在 Terminal 运行 python -m fangyu --server 后，再点一次「体验全部」。`,
+        )
+        setTimeout(() => { void flowCanvasRef.current?.runSimulation(true) }, 300)
+      } else {
+        alert(msg)
+      }
+    } finally {
+      setFullExperienceBusy(false)
+    }
+  }, [applyScenarioResult])
 
   useEffect(() => {
     fetchSettings(store.dispatch)
@@ -316,9 +376,11 @@ export default function App() {
   }, [])
 
   const handleSimulate = useCallback(async () => {
+    // 关掉体验引导，否则 z-index 更高会挡住结果弹窗
+    setExperienceGuide(null)
     setSimulating(true)
     try {
-      await flowCanvasRef.current?.runSimulation()
+      await flowCanvasRef.current?.runSimulation(true)
     } finally {
       setSimulating(false)
     }
@@ -485,6 +547,8 @@ export default function App() {
         onLoadDemo={handleLoadDemo}
         onOpenIntent={() => setIntentPanelOpen(true)}
         onOpenScenario={() => setScenarioPanelOpen(true)}
+        onFullExperience={() => { void handleFullExperience() }}
+        fullExperienceBusy={fullExperienceBusy}
         onOpenSetupCopilot={() => setSetupCopilotOpen(true)}
         onBatchTest={() => setBatchVisible(true)}
         onOpenAssets={() => setAssetsFocusSignal(s => s + 1)}
@@ -527,7 +591,13 @@ export default function App() {
         open={intentPanelOpen}
         onClose={() => setIntentPanelOpen(false)}
         onApply={(flow) => {
+          setView('flow')
+          setXuMode('flow')
+          window.dispatchEvent(new CustomEvent('fangyu:switch-chat-mode', { detail: { mode: 'flow' } }))
           flowCanvasRef.current?.importFlow(flow)
+          setIntentPanelOpen(false)
+          // 展开底部预览，避免「应用了却不知道去哪看输出」
+          window.dispatchEvent(new CustomEvent('fangyu:focus-bottom-chat'))
         }}
         onApplyAgents={(graph) => {
           loadAgentsToCanvas(graph)
@@ -537,19 +607,27 @@ export default function App() {
         open={scenarioPanelOpen}
         onClose={() => setScenarioPanelOpen(false)}
         onApply={(result) => {
-          if (result.flow?.flow) {
-            flowCanvasRef.current?.importFlow(result.flow.flow)
-          }
-          if (result.agents?.graph) {
-            loadAgentsToCanvas({
-              nodes: result.agents.graph.nodes,
-              edges: result.agents.graph.edges,
-            })
-          } else if (result.flow?.flow) {
-            setView('flow')
-            setXuMode('flow')
+          applyScenarioResult(result)
+          if (result.scenario?.id === FULL_EXPERIENCE_SCENARIO_ID) {
+            setExperienceGuide(result)
           }
         }}
+      />
+      <ExperienceGuide
+        open={!!experienceGuide}
+        title={experienceGuide?.scenario?.title}
+        bundlePath={experienceGuide?.bundle?.path}
+        policiesApplied={experienceGuide?.policies_applied}
+        onClose={() => setExperienceGuide(null)}
+        onPreview={() => {
+          setExperienceGuide(null)
+          setView('flow')
+          setXuMode('flow')
+          void handleSimulate()
+        }}
+        onGoLaw={() => { setExperienceGuide(null); setView('law') }}
+        onGoWorker={() => { setExperienceGuide(null); setView('worker') }}
+        onGoPresence={() => { setExperienceGuide(null); setView('presence') }}
       />
       <SetupCopilotPanel
         open={setupCopilotOpen}

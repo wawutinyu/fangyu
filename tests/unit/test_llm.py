@@ -16,6 +16,10 @@ def test_get_provider_known_models():
     assert get_provider("claude-3.5-sonnet") == "anthropic"
     assert get_provider("moonshot-v1-8k") == "moonshot"
     assert get_provider("unknown-model-xyz") == "openai"
+    assert get_provider("deepseek") == "deepseek"
+    assert get_provider("deepseek-v4-flash") == "deepseek"
+    assert get_provider("default", fallback="deepseek") == "deepseek"
+    assert get_provider("", fallback="deepseek") == "deepseek"
 
 
 def test_provider_base_urls_present():
