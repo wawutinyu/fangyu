@@ -15,6 +15,7 @@ data/scenarios/
 data/workers.db
 data/worker-local.json
 data/worker-mqtt-triggers.json
+data/managed/
 
 # Node workspaces
 node_modules/
