@@ -52,37 +52,89 @@ def append_harness_trace(event: dict[str, Any]) -> Path | None:
     return path
 
 
+def tools_used_from_trace(trace: list[dict[str, Any]] | None) -> list[str]:
+    tools_used: list[str] = []
+    for t in trace or []:
+        if t.get("tool"):
+            tools_used.append(str(t["tool"]))
+        if t.get("background_inject"):
+            tools_used.append("task:bg")
+    seen: set[str] = set()
+    uniq: list[str] = []
+    for name in tools_used:
+        if name not in seen:
+            seen.add(name)
+            uniq.append(name)
+    return uniq
+
+
 def summarize_loop_result(
     *,
     goal: str,
     out: dict[str, Any],
     agent_mode: str = "build",
+    task_depth: int = 0,
+    extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     trace = out.get("trace") or []
-    tools_used = []
-    for t in trace:
-        if t.get("tool"):
-            tools_used.append(t["tool"])
-        if t.get("background_inject"):
-            tools_used.append("task:bg")
-    # 去重保序
-    seen: set[str] = set()
-    uniq = []
-    for name in tools_used:
-        if name not in seen:
-            seen.add(name)
-            uniq.append(name)
-    return {
+    row: dict[str, Any] = {
         "kind": "agent_loop",
         "goal": (goal or "")[:500],
         "agent_mode": agent_mode,
+        "task_depth": int(task_depth),
         "success": out.get("success"),
         "turns": out.get("turns"),
         "error": out.get("error"),
         "plan": out.get("plan") or [],
-        "tools_used": uniq,
+        "tools_used": tools_used_from_trace(trace),
         "result_preview": str(out.get("result") or "")[:400],
         "trace_len": len(trace),
+    }
+    if extra:
+        row.update(extra)
+    return row
+
+
+def summarize_task_child(
+    *,
+    goal: str,
+    out: dict[str, Any],
+    task_id: str,
+    subagent_type: str,
+    description: str = "",
+    parent_depth: int = 0,
+    background: bool = False,
+) -> dict[str, Any]:
+    """子 Agent 专用摘要（比裸 agent_loop 多 task 元数据）。"""
+    return summarize_loop_result(
+        goal=goal,
+        out=out,
+        agent_mode="build",
+        task_depth=parent_depth + 1,
+        extra={
+            "kind": "task_child",
+            "task_id": task_id,
+            "subagent_type": subagent_type,
+            "description": description or subagent_type,
+            "parent_depth": parent_depth,
+            "background": background,
+        },
+    )
+
+
+def summarize_task_parallel(
+    *,
+    results: list[dict[str, Any]],
+    background: bool = False,
+) -> dict[str, Any]:
+    return {
+        "kind": "task_parallel",
+        "ok": all(bool(r.get("ok")) for r in results) if results else False,
+        "count": len(results),
+        "background": background,
+        "task_ids": [r.get("task_id") for r in results],
+        "subagent_types": [r.get("subagent_type") for r in results],
+        "successes": [bool(r.get("ok")) for r in results],
     }
 
 

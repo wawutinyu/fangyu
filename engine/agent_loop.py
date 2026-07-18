@@ -134,11 +134,13 @@ async def run_agent_loop(
     task_max_turns: int | None = None,
     agent_mode: str = "build",
     shell_policy: str | None = None,
+    trace_meta: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """执行多轮工具环（含可选长任务规划 / task 子 Agent）。
 
     agent_mode: build（默认可写）| plan（只读规划主角色）
     shell_policy: allow | ask | deny（默认 ask）
+    trace_meta: 合并进 harness_trace 行（如 task_child 元数据）
     """
     from fangyu.engine.shell_policy import reset_shell_policy, set_shell_policy
 
@@ -167,15 +169,20 @@ async def run_agent_loop(
             task_max_turns=task_max_turns,
             agent_mode=mode,
         )
-        if task_depth == 0:
-            try:
-                from fangyu.engine.harness_trace import append_harness_trace, summarize_loop_result
+        try:
+            from fangyu.engine.harness_trace import append_harness_trace, summarize_loop_result
 
-                append_harness_trace(
-                    summarize_loop_result(goal=goal, out=out, agent_mode=mode),
-                )
-            except Exception:
-                pass
+            append_harness_trace(
+                summarize_loop_result(
+                    goal=goal,
+                    out=out,
+                    agent_mode=mode,
+                    task_depth=task_depth,
+                    extra=trace_meta,
+                ),
+            )
+        except Exception:
+            pass
         return out
     finally:
         reset_shell_policy(policy_token)

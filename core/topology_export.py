@@ -67,6 +67,46 @@ def load_topology(bundle_root: str | Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def normalize_pipeline_stages(topology: dict[str, Any]) -> list[list[str]]:
+    """将 stages 或 pipeline（含 {parallel:[...]}）规范为二维阶段表。
+
+    每段内多个 agent id 表示并行；段与段之间串行。
+    """
+    raw_stages = topology.get("stages")
+    if isinstance(raw_stages, list) and raw_stages:
+        out: list[list[str]] = []
+        for stage in raw_stages:
+            if isinstance(stage, str):
+                out.append([stage])
+            elif isinstance(stage, list):
+                ids = [str(x) for x in stage if str(x).strip()]
+                if ids:
+                    out.append(ids)
+            elif isinstance(stage, dict) and stage.get("parallel"):
+                ids = [str(x) for x in (stage.get("parallel") or []) if str(x).strip()]
+                if ids:
+                    out.append(ids)
+        return out
+
+    pipeline = list(topology.get("pipeline") or [])
+    out = []
+    for item in pipeline:
+        if isinstance(item, str) and item.strip():
+            out.append([item.strip()])
+        elif isinstance(item, dict):
+            if item.get("parallel"):
+                ids = [str(x) for x in (item.get("parallel") or []) if str(x).strip()]
+                if ids:
+                    out.append(ids)
+            elif item.get("id"):
+                out.append([str(item["id"])])
+        elif isinstance(item, list):
+            ids = [str(x) for x in item if str(x).strip()]
+            if ids:
+                out.append(ids)
+    return out
+
+
 def build_multi_agent_bundle(
     dest: str | Path,
     *,

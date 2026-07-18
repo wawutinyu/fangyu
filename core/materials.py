@@ -68,10 +68,11 @@ DEFAULT_MATERIALS: dict[str, Any] = {
     ],
     "skills": [
         {"id": "plan-first", "status": "embedded", "note": "agent-loop require_plan"},
-        {"id": "explore-codebase", "status": "role", "role": "explore"},
-        {"id": "research-web", "status": "role", "role": "scout"},
-        {"id": "code-review", "status": "role", "role": "review"},
+        {"id": "explore-codebase", "status": "active", "path": "skills/factory/explore-codebase.md"},
+        {"id": "research-web", "status": "active", "path": "skills/factory/research-web.md"},
+        {"id": "code-review", "status": "active", "path": "skills/factory/code-review.md"},
         {"id": "implement-and-verify", "status": "active", "path": "skills/factory/implement-and-verify.md"},
+        {"id": "office-decompose", "status": "active", "path": "skills/factory/office-decompose.md"},
     ],
     "mcp": [
         {"id": "__internal__", "tools": ["current_time"]},

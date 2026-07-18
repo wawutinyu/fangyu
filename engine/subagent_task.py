@@ -135,6 +135,7 @@ async def _run_one_child(
     max_depth: int,
     default_max_turns: int | None,
     spec: dict[str, Any],
+    background: bool = False,
 ) -> dict[str, Any]:
     if depth >= max_depth:
         return {
@@ -180,6 +181,14 @@ async def _run_one_child(
         enable_task=True,
         task_depth=depth + 1,
         max_task_depth=max_depth,
+        trace_meta={
+            "kind": "task_child",
+            "task_id": sid,
+            "subagent_type": kind,
+            "description": spec["description"] or kind,
+            "parent_depth": depth,
+            "background": background,
+        },
     )
     summary = {
         "ok": bool(out.get("success")),
@@ -190,7 +199,10 @@ async def _run_one_child(
         "turns": out.get("turns"),
         "error": out.get("error"),
         "plan": out.get("plan") or [],
-        "background": False,
+        "background": background,
+        "tools_used": [
+            t.get("tool") for t in (out.get("trace") or []) if t.get("tool")
+        ],
     }
     _SESSIONS[sid] = {
         "subagent_type": kind,
@@ -258,6 +270,14 @@ class TaskRuntime:
                     )
                     for s in specs
                 ])
+                try:
+                    from fangyu.engine.harness_trace import append_harness_trace, summarize_task_parallel
+
+                    append_harness_trace(
+                        summarize_task_parallel(results=list(results), background=False),
+                    )
+                except Exception:
+                    pass
                 return {
                     "ok": all(r.get("ok") for r in results),
                     "parallel": True,
@@ -286,6 +306,7 @@ class TaskRuntime:
                                 max_depth=runtime.max_depth,
                                 default_max_turns=runtime.default_max_turns,
                                 spec=spec,
+                                background=True,
                             )
                         except Exception as exc:  # noqa: BLE001
                             summary = {
@@ -317,6 +338,20 @@ class TaskRuntime:
                 else:
                     out["parallel"] = True
                     out["jobs"] = started
+                    try:
+                        from fangyu.engine.harness_trace import append_harness_trace
+
+                        append_harness_trace({
+                            "kind": "task_parallel",
+                            "ok": True,
+                            "count": len(started),
+                            "background": True,
+                            "task_ids": [j["task_id"] for j in started],
+                            "subagent_types": [j["subagent_type"] for j in started],
+                            "status": "running",
+                        })
+                    except Exception:
+                        pass
                 return out
 
             # 单个前台

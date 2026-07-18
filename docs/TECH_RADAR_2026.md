@@ -3,7 +3,7 @@
 > 行业已收敛：**MCP（工具）· Skills（方法）· A2A（协作）· Harness（机床）· Eval（质检）**。  
 > 方隅定位是 **Agent 工厂**：批量组装可导出的公民，而不是再做一个聊天壳。
 
-关联：[工厂原料](FACTORY_MATERIALS.md) · [毕业标准](GRADUATION_EXPORTABLE_AGENT.md) · [愿景](VISION_AND_PRODUCT.md)
+关联：[工厂原料](FACTORY_MATERIALS.md) · [拓扑与 task](TOPOLOGY_AND_TASK.md) · [毕业标准](GRADUATION_EXPORTABLE_AGENT.md) · [愿景](VISION_AND_PRODUCT.md)
 
 ---
 
@@ -58,9 +58,9 @@
 ### 接着（2～4 周）— **工厂可装配体验**
 
 5. Studio「原料货架」：勾选 tools / skills / mcp → 写入 materials.json ✅ `/api/v1/materials` + 更多·原料  
-6. 拓扑：并行边 + 与 `task` 职责说明（厂内动态 vs 导出编队）  
-7. 观测：agent-loop trace 结构化落盘 ✅ `.fangyu/harness_trace.jsonl`（顶层 loop；子会话摘要可后续加厚）  
-8. 更多技能包：`explore-codebase`、`research-web`、`office-decompose`
+6. 拓扑：并行边 + 与 `task` 职责说明 ✅ `normalize_pipeline_stages` + [TOPOLOGY_AND_TASK](TOPOLOGY_AND_TASK.md)  
+7. 观测：agent-loop trace 结构化落盘 ✅ `.fangyu/harness_trace.jsonl`（含 `task_child` / `task_parallel`）  
+8. 更多技能包：`explore-codebase`、`research-web`、`office-decompose` ✅（另含 `code-review`）
 
 ### 以后（不挡主线）
 
@@ -89,9 +89,11 @@
 ④ Agent Card 导出校验            ✅ .well-known/agent-card.json
 ⑤ Studio 原料货架 + draft/bundle ✅ routers/materials + MaterialsShelf
 ⑥ harness_trace 落盘             ✅ engine/harness_trace.py
+⑦ 技能包扩容 + task_child trace  ✅ skills/factory/* + task 元数据
+⑧ 拓扑并行段 + 职责文档          ✅ bundle_orchestrate + TOPOLOGY_AND_TASK
 ```
 
-下一刀：更多技能包 · task 子会话 trace 加厚 · 拓扑并行边说明。
+下一刀：`multi-agent-split` 技能化 · Eval 回归套件加厚 · 依赖边（depends）运行时。
 
 ---
 

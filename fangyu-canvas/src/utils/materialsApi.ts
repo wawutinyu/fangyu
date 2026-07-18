@@ -38,6 +38,12 @@ export interface HarnessTrace {
   tools_used?: string[]
   result_preview?: string
   trace_len?: number
+  task_depth?: number
+  task_id?: string
+  subagent_type?: string
+  task_ids?: string[]
+  count?: number
+  ok?: boolean
 }
 
 export async function fetchMaterialsCatalog(): Promise<MaterialsCatalog> {

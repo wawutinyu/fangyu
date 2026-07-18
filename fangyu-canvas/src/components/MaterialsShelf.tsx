@@ -326,11 +326,13 @@ export default function MaterialsShelf({ headerless }: MaterialsShelfProps) {
                   }}
                 >
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontWeight: 600, color: t.success ? '#1a7f37' : '#c0392b' }}>
-                      {t.success ? 'ok' : 'fail'}
+                    <span style={{ fontWeight: 600, color: t.success === false ? '#c0392b' : t.success ? '#1a7f37' : 'var(--text-secondary)' }}>
+                      {t.kind || 'trace'}{t.success === true ? ' · ok' : t.success === false ? ' · fail' : ''}
                     </span>
                     <span style={{ color: 'var(--text-muted)' }}>
-                      {t.agent_mode} · {t.turns} turns
+                      {[t.agent_mode, t.subagent_type, t.turns != null ? `${t.turns} turns` : null, t.task_depth != null ? `depth ${t.task_depth}` : null]
+                        .filter(Boolean)
+                        .join(' · ')}
                     </span>
                     {t.ts && (
                       <span style={{ color: 'var(--text-muted)', marginLeft: 'auto' }}>
@@ -338,7 +340,7 @@ export default function MaterialsShelf({ headerless }: MaterialsShelfProps) {
                       </span>
                     )}
                   </div>
-                  <div style={{ marginBottom: 4 }}>{t.goal || '(无 goal)'}</div>
+                  <div style={{ marginBottom: 4 }}>{t.goal || (t.task_ids ? `parallel ×${t.count}` : '(无 goal)')}</div>
                   {!!t.tools_used?.length && (
                     <div style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
                       tools: {t.tools_used.join(', ')}

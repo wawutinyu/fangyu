@@ -94,15 +94,15 @@
 | ID | 状态 | 优先级 | 说明 |
 |----|------|--------|------|
 | `plan-first` | ⚠️ 嵌在 loop | P0 | `require_plan`；应可标成可开关技能 |
-| `explore-codebase` | ⚠️ 靠 explore 角色 | P0 | 独立 skill 文档 + 触发条件 |
-| `implement-and-verify` | ❌ | **P0** | 改 → 跑测/lint → 读失败 → 再改 |
-| `code-review` | ⚠️ review 角色 | P0 | 固化检查项 |
-| `research-web` | ❌ | P0 | 依赖 webfetch/websearch |
-| `office-decompose` | ⚠️ system 提示 | P1 | 一句话 → 多交付物 |
-| `multi-agent-split` | ⚠️ intent→topology | P1 | 意图拆专家 |
+| `explore-codebase` | ✅ md | P0 | `skills/factory/explore-codebase.md` |
+| `implement-and-verify` | ✅ md | P0 | 改 → 跑测/lint → 读失败 → 再改 |
+| `code-review` | ✅ md | P0 | `skills/factory/code-review.md` |
+| `research-web` | ✅ md | P0 | `skills/factory/research-web.md` |
+| `office-decompose` | ✅ md | P1 | `skills/factory/office-decompose.md` |
+| `multi-agent-split` | ⚠️ intent→topology | P1 | 意图拆专家；见 [拓扑与 task](TOPOLOGY_AND_TASK.md) |
 | 领域包（法务/客服/数据…） | ❌ | P2 | 行业原料，后置 |
 
-**缺口本质：** 仓库几乎没有可版本化的 `skills/*.md` 原料包；Flow 里的 skill 与 harness 方法未统一成「工厂 SKU」。
+**缺口本质：** Flow 里的 skill 与 harness 方法仍需继续统一成「工厂 SKU」；已有 `skills/factory/*.md` + materials 注册。
 
 ---
 
@@ -133,12 +133,12 @@
 | 宪法 / 审计 | ✅ | P0 | 已有 |
 | 组织 ACL | ✅ 粗 | P0→P1 | 缺按命令/路径的 ask |
 | `require_plan` / `enable_task` | ✅ | P0 | flow config |
-| 拓扑 pipeline | ✅ 串行 | P1 | 并行边、依赖边 |
+| 拓扑 pipeline | ✅ 串行+并行段 | P1 | `stages` / `{parallel:[...]}`；见 [TOPOLOGY_AND_TASK](TOPOLOGY_AND_TASK.md) |
 | 托管 manage | ✅ | P1 | 升级/跨机仍弱 |
 | 人审闸（ask） | ✅ 简 | P0 | shell ask + confirm；完整 UI 审批仍待 |
 | 原料注册表（统一 ID） | ✅ | P0 | `core/materials.py` + Bundle `config/materials.json` |
 | MCP 进包声明 | ✅ 简 | P0 | materials.mcp → `mcp_*` 工具（默认 current_time） |
-| 技能包 md | ✅ 起 | P0 | `skills/factory/implement-and-verify.md` 可注入 system |
+| 技能包 md | ✅ | P0 | explore / research / review / implement / office-decompose |
 | SSO / 企业身份 | ❌ | P2 | 真 IM 同级后置 |
 
 ---
