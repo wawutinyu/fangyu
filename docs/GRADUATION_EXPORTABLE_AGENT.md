@@ -107,7 +107,8 @@ G2-E 多编排   ██████░░░░  ~55%
 3. ~~G2-B 飞书通道代码~~ ✅（真机暂缓）  
 4. ~~G2-D 托管面~~ ✅  
 5. ~~G2-C 企业权限骨架~~ ✅（Studio 授权 UX / SSO 以后）  
-6. 下一优先候选：G2-A docx/xlsx · Studio 托管/ACL 面板 · 飞书真机  
+6. ~~**可演示竖切**~~ ✅ `scripts/demo_vertical_slice.py` · [说明](DEMO_VERTICAL_SLICE.md)  
+7. 下一优先候选：Studio 托管/ACL 面板 · G2-A docx/xlsx · 飞书真机  
 
 ---
 
