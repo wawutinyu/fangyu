@@ -118,7 +118,6 @@ def get_eval_compare(
     if len(hist) < 1:
         return {"ok": False, "error": "no history", "history_count": 0}
     if i >= len(hist) or j >= len(hist):
-        from fastapi import HTTPException
         raise HTTPException(400, f"下标越界：history_count={len(hist)}")
     return {
         "ok": True,
