@@ -87,3 +87,66 @@ async def test_agent_loop_max_turns():
     assert out["turns"] == 3
     assert "max_turns" in (out["error"] or "")
     assert n["c"] == 3
+
+
+@pytest.mark.asyncio
+async def test_agent_loop_require_plan_before_tool():
+    replies = [
+        '{"action":"tool","name":"echo","args":{"text":"early"}}',
+        '{"action":"plan","steps":["echo once","finish"]}',
+        '{"action":"tool","name":"echo","args":{"text":"ok"}}',
+        '{"action":"done","result":"planned"}',
+    ]
+    idx = {"i": 0}
+    calls: list[str] = []
+
+    async def fake_llm(_messages):
+        i = idx["i"]
+        idx["i"] = i + 1
+        return replies[i]
+
+    def echo(text: str = "") -> str:
+        calls.append(text)
+        return text
+
+    out = await run_agent_loop(
+        goal="plan first",
+        tools={"echo": echo},
+        llm=fake_llm,
+        max_turns=6,
+        require_plan=True,
+    )
+    assert out["success"] is True
+    assert out["plan"] == ["echo once", "finish"]
+    assert calls == ["ok"]  # early tool blocked
+
+
+@pytest.mark.asyncio
+async def test_agent_loop_repeat_tool_warns():
+    """连续相同 tool+args 时 observation 带告警。"""
+    replies = [
+        '{"action":"tool","name":"echo","args":{"text":"x"}}',
+        '{"action":"tool","name":"echo","args":{"text":"x"}}',
+        '{"action":"tool","name":"echo","args":{"text":"x"}}',
+        '{"action":"done","result":"stopped"}',
+    ]
+    idx = {"i": 0}
+
+    async def fake_llm(messages):
+        i = idx["i"]
+        idx["i"] = i + 1
+        # 第 3 次 tool 之后的 user 消息应含重复告警
+        if i == 3:
+            joined = "\n".join(m["content"] for m in messages if m["role"] == "user")
+            assert "连续多次调用相同工具" in joined
+        return replies[i]
+
+    out = await run_agent_loop(
+        goal="repeat",
+        tools={"echo": lambda text="": text},
+        llm=fake_llm,
+        max_turns=6,
+    )
+    assert out["success"] is True
+    reps = [t.get("repeat") for t in out["trace"] if "repeat" in t]
+    assert max(reps) >= 2

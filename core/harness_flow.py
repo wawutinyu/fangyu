@@ -7,14 +7,16 @@ from typing import Any
 def get_opencode_harness_flow(
     skill_id: str = "default",
     *,
-    max_turns: int = 12,
+    max_turns: int = 24,
 ) -> dict[str, Any]:
-    """可导出的 coding harness Flow（多轮 tool-loop + workspace 手脚）。"""
+    """可导出的 coding harness：长任务 plan + 多轮工具 + 复杂仓稳定性。"""
+    from fangyu.engine.agent_loop import CODING_SYSTEM
+
     return {
         "meta": {
             "kind": "harness",
             "name": skill_id,
-            "description": "OpenCode-style agentic loop over workspace tools",
+            "description": "OpenCode harness with planning + stable multi-file tool loop",
             "profile": "opencode",
         },
         "nodes": [
@@ -32,6 +34,10 @@ def get_opencode_harness_flow(
                     "max_turns": max_turns,
                     "toolbelt": "coding",
                     "temperature": 0.2,
+                    "system": CODING_SYSTEM,
+                    "require_plan": True,
+                    "enable_task": True,
+                    "max_tokens": 4096,
                 },
             },
             {
@@ -49,13 +55,16 @@ def get_opencode_harness_flow(
 
 
 CODING_CONSTITUTION: dict[str, Any] = {
-    "version": "opencode-1.0",
+    "version": "opencode-1.1",
     "name": "fangyu coding harness 宪法",
     "enabled": True,
     "values": [
         "仅在声明工作区内读写",
         "危险系统命令拒绝执行",
         "必须为人类服务",
+        "多步任务先 plan 再执行，失败则修正计划",
+        "陌生代码库先探索再改；禁止盲目重复同一工具调用",
+        "复杂探索可委派 task 子 Agent（explore/general/review）",
     ],
     # agent-loop 内工具不走 forbidden_actions 名单；保持空以免误伤
     "forbidden_actions": [],

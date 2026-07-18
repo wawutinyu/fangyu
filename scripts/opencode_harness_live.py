@@ -78,7 +78,7 @@ def main() -> int:
             bundle,
             name="LiveHarness",
             workspace=project,
-            max_turns=10,
+            max_turns=16,
         )
     except Exception as exc:
         print(f"[FAIL] create bundle: {exc}")

@@ -16,7 +16,7 @@ from fangyu.engine.bundle_tools import coding_toolbelt, office_toolbelt
 
 PROFILES: dict[str, dict[str, Any]] = {
     "opencode": {
-        "description": "OpenCode-style coding harness（agent-loop + workspace 手脚）",
+        "description": "OpenCode coding harness（plan + task 子 Agent + 多轮手脚）",
         "default_name": "OpenCode-Harness",
         "agent_kind": "worker",
         "require_envelope": False,
@@ -68,7 +68,7 @@ def build_from_profile(
     name: str | None = None,
     a2a_port: int = 9001,
     require_envelope: bool | None = None,
-    max_turns: int = 12,
+    max_turns: int | None = None,
     workspace: str | Path | None = None,
     intent: str | None = None,
     template: str | None = None,
@@ -79,6 +79,8 @@ def build_from_profile(
         raise BundleError(f"未知 profile: {profile}；可选: {', '.join(PROFILES)}")
     meta = PROFILES[pid]
     agent_name = (name or meta["default_name"]).strip() or meta["default_name"]
+    # opencode 默认更高轮次，留给 plan + 多文件探索
+    turns = max_turns if max_turns is not None else (24 if pid == "opencode" else 12)
 
     if pid == "multi":
         from fangyu.core.topology_export import build_multi_agent_bundle
@@ -88,18 +90,18 @@ def build_from_profile(
             intent=intent or "",
             name=agent_name if name else None,
             a2a_port=a2a_port,
-            max_turns=max_turns,
+            max_turns=turns,
             workspace=workspace,
             template=template,
         )
 
     if pid == "opencode":
         skills = {
-            meta["skill_id"]: get_opencode_harness_flow(meta["skill_id"], max_turns=max_turns),
+            meta["skill_id"]: get_opencode_harness_flow(meta["skill_id"], max_turns=turns),
         }
     elif pid == "workbuddy":
         skills = {
-            meta["skill_id"]: get_workbuddy_harness_flow(meta["skill_id"], max_turns=max_turns),
+            meta["skill_id"]: get_workbuddy_harness_flow(meta["skill_id"], max_turns=turns),
         }
     else:
         skills = {meta["skill_id"]: get_action_loop_flow(meta["skill_id"], meta["skill_id"])}
@@ -124,10 +126,12 @@ def build_from_profile(
 
 def toolbelt_manifest(toolbelt: str | None) -> dict[str, Any] | None:
     if toolbelt == "coding":
+        tools = sorted(set(coding_toolbelt().keys()) | {"task"})
         return {
             "id": "coding",
-            "tools": sorted(coding_toolbelt().keys()),
+            "tools": tools,
             "scope": "bundle/workspace",
+            "subagents": ["explore", "general", "review"],
         }
     if toolbelt == "office":
         return {

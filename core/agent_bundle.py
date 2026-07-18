@@ -197,22 +197,9 @@ def create_agent_bundle(
 
     # 工具闭包清单（运行时 toolbelt 实现仍在引擎内；清单随包可审计）
     if toolbelt:
-        from fangyu.engine.bundle_tools import coding_toolbelt, office_toolbelt
+        from fangyu.core.agent_factory import toolbelt_manifest
 
-        if toolbelt == "coding":
-            tb = {
-                "id": "coding",
-                "tools": sorted(coding_toolbelt().keys()),
-                "scope": "bundle/workspace",
-            }
-        elif toolbelt == "office":
-            tb = {
-                "id": "office",
-                "tools": sorted(office_toolbelt().keys()),
-                "scope": "bundle/workspace/deliverables",
-            }
-        else:
-            tb = None
+        tb = toolbelt_manifest(toolbelt)
         if tb:
             (root / "config" / "toolbelt.json").write_text(
                 json.dumps(tb, ensure_ascii=False, indent=2), encoding="utf-8",

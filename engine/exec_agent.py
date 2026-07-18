@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .agent_loop import DEFAULT_SYSTEM, run_agent_loop
+from .agent_loop import CODING_SYSTEM, DEFAULT_SYSTEM, run_agent_loop
 from .bundle_tools import resolve_toolbelt
 from .context import NodeContext
 from .llm import chat_completion, get_provider, PROVIDER_BASE_URL
@@ -26,7 +26,7 @@ async def _default_llm_from_ctx(ctx: NodeContext, messages: list[dict[str, str]]
         api_key=str(api_key),
         base_url=str(base_url),
         temperature=float(ctx.config.get("temperature", 0.2)),
-        max_tokens=int(ctx.config.get("max_tokens", 2048)),
+        max_tokens=int(ctx.config.get("max_tokens", 4096)),
     )
     return str(result.get("result") or "")
 
@@ -43,7 +43,15 @@ async def _exec_agent_loop(ctx: NodeContext) -> dict[str, Any]:
     max_turns = int(ctx.config.get("max_turns") or 8)
     toolbelt = str(ctx.config.get("toolbelt") or "coding")
     tools = resolve_toolbelt(toolbelt)
-    system = str(ctx.config.get("system") or DEFAULT_SYSTEM)
+    # coding 默认用带规划的 CODING_SYSTEM
+    if ctx.config.get("system"):
+        system = str(ctx.config.get("system"))
+    elif toolbelt == "coding":
+        system = CODING_SYSTEM
+    else:
+        system = DEFAULT_SYSTEM
+    require_plan = bool(ctx.config.get("require_plan", toolbelt == "coding"))
+    enable_task = bool(ctx.config.get("enable_task", toolbelt == "coding"))
 
     custom = ctx.global_vars.get("_agent_loop_llm")
     if callable(custom):
@@ -53,7 +61,14 @@ async def _exec_agent_loop(ctx: NodeContext) -> dict[str, Any]:
             return await _default_llm_from_ctx(ctx, messages)
 
     out = await run_agent_loop(
-        goal=goal, tools=tools, llm=llm, max_turns=max_turns, system=system,
+        goal=goal,
+        tools=tools,
+        llm=llm,
+        max_turns=max_turns,
+        system=system,
+        require_plan=require_plan,
+        enable_task=enable_task,
+        task_max_turns=int(ctx.config.get("task_max_turns") or 8),
     )
     return {
         "result": out.get("result"),
@@ -61,6 +76,7 @@ async def _exec_agent_loop(ctx: NodeContext) -> dict[str, Any]:
         "turns": out.get("turns"),
         "trace": out.get("trace"),
         "error": out.get("error"),
+        "plan": out.get("plan"),
     }
 
 

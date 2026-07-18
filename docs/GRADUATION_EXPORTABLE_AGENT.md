@@ -13,7 +13,8 @@
 
 | 轨 | 含义 | 当前粗进度 |
 |----|------|------------|
-| **G1 · OpenCode harness** | 绑仓、多轮手脚、chat/RPC、工厂出包、live 绿 | **~75%**（差 API Key live） |
+| **G1 · OpenCode harness** | 绑仓、**长任务 plan**、多轮手脚、复杂仓稳定性、chat/RPC、工厂出包、live 绿 | **~80%** |
+
 | **G2 · WorkBuddy 全档** | 办公交付 + **IM** + **企业权限** + **托管** + **多 Agent 编排** | **~20%**（harness + 画布编排雏形） |
 
 **平台毕业 = G1 ∧ G2。** 只完成 G1 不算总毕业。
@@ -26,10 +27,13 @@
 
 1. `bundle create --profile opencode --workspace <repo>`
 2. `bundle chat` 多轮改仓；`.fangyu/chat.jsonl` 有会话
-3. 包内宪法；危险 shell 拒
-4. 工厂可批量变体
-5. `opencode_harness_live.py` 有 Key 三用例绿
-6. `opencode_graduation_c.py` 自动项绿
+3. **长任务规划**：`action=plan` 先拆步；coding 默认 `require_plan`
+4. **task 子 Agent**：`task(explore|general|review)` 委派隔离子会话（默认不可嵌套）
+5. **复杂仓稳定性**：工具输出截断、重复调用告警、上下文压缩、进度回灌；默认 `max_turns≥24`
+6. 包内宪法；危险 shell 拒
+7. 工厂可批量变体
+8. `opencode_harness_live.py` 有 Key 三用例绿
+9. `opencode_graduation_c.py` 自动项绿
 
 脚本：`scripts/opencode_graduation_c.py` · `scripts/opencode_harness_live.py`
 
