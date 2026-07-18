@@ -56,3 +56,41 @@ def test_summarize_report_includes_factories_health():
     assert row["factories_health"]["offline"] == 1
     assert row["factories_health"]["avg_score"] == 60.0
     assert "factories" not in row["factories_health"]
+
+
+def test_compare_eval_reports_health_diff():
+    from fangyu.core.factory_eval import compare_eval_reports
+
+    newer = {
+        "ts": 2.0,
+        "exit_code": 0,
+        "ok": True,
+        "stages": {"unit": {"ok": True}},
+        "factories_health": {
+            "count": 2,
+            "online": 1,
+            "offline": 1,
+            "avg_score": 55.0,
+            "min_score": 20,
+        },
+    }
+    older = {
+        "ts": 1.0,
+        "exit_code": 0,
+        "ok": True,
+        "stages": {"unit": {"ok": True}},
+        "factories_health": {
+            "count": 2,
+            "online": 2,
+            "offline": 0,
+            "avg_score": 80.0,
+            "min_score": 70,
+        },
+    }
+    cmp = compare_eval_reports(newer, older)
+    assert cmp["ok"] is True
+    assert cmp["changed"] is True
+    diff = cmp["factories_health_diff"]
+    assert diff["changed"] is True
+    assert diff["avg_score_delta"] == -25.0
+    assert diff["offline_delta"] == 1

@@ -5,6 +5,7 @@ import {
   formatEventTime,
   factoryHealthColor,
   factoryHealthLabel,
+  factoryIdFromHostEntity,
   mergePresenceEvent,
   runPresenceDemo,
   statusColor,
@@ -33,6 +34,7 @@ import {
 import PresenceAlertBell from './PresenceAlertBell'
 import PresenceAlertStrip from './PresenceAlertStrip'
 import ActorDetailPanel from './ActorDetailPanel'
+import FactoryOfflineRetestButton from './FactoryOfflineRetestButton'
 import EventExplainCard from './EventExplainCard'
 import HouseCommonsScene from './HouseCommonsScene'
 import TimelineReplayBar from './TimelineReplayBar'
@@ -883,6 +885,7 @@ export default function PresencePanel() {
                   setSelectedEdge(null)
                   setPathFilter(null)
                 }}
+                onRetestDone={() => { void reload() }}
               />
             ))}
           </div>
@@ -907,6 +910,7 @@ export default function PresencePanel() {
                 presence={allPresence}
                 events={events}
                 onClose={clearSelection}
+                onRetestDone={() => { void reload() }}
                 managedBusy={managedBusy}
                 onManagedStop={async (instanceId) => {
                   setManagedBusy(true)
@@ -1089,12 +1093,16 @@ function PresenceCard({
   entity,
   selected,
   onSelect,
+  onRetestDone,
 }: {
   entity: PresenceEntity
   selected?: boolean
   onSelect?: () => void
+  onRetestDone?: () => void
 }) {
   const color = statusColor(String(entity.status))
+  const factoryId = factoryIdFromHostEntity(entity)
+  const showRetest = Boolean(factoryId && !entity.online)
   return (
     <div
       data-testid="presence-card"
@@ -1147,6 +1155,14 @@ function PresenceCard({
             {factoryHealthLabel(entity.health.score, entity.health.grade)}
           </span>
         </div>
+      )}
+      {showRetest && factoryId && (
+        <FactoryOfflineRetestButton
+          factoryId={factoryId}
+          baseUrl={entity.base_url || undefined}
+          onDone={onRetestDone}
+          compact
+        />
       )}
       {entity.current_skill && (
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>

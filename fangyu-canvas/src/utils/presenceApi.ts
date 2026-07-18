@@ -208,6 +208,26 @@ export function factoryHealthLabel(score: number, grade?: string): string {
   return `健康 ${score}${g}`
 }
 
+/** 从 Presence 主机实体解析工厂通讯录 id */
+export function factoryIdFromHostEntity(entity: {
+  kind?: string
+  role?: string | null
+  id?: string
+  name?: string
+  factory_id?: string | null
+}): string | null {
+  if (entity.kind !== 'host') return null
+  if (entity.factory_id) return String(entity.factory_id)
+  if (entity.role && entity.role !== 'factory') return null
+  const raw = entity.id || ''
+  const tail = raw.startsWith('host:') ? raw.slice(5) : raw
+  if (tail.startsWith('factory:')) return tail.slice('factory:'.length) || null
+  const n = entity.name || ''
+  if (n.startsWith('factory:')) return n.slice('factory:'.length) || null
+  if (entity.role === 'factory' && tail) return tail
+  return null
+}
+
 export function statusLabel(status: string): string {
   const map: Record<string, string> = {
     busy: '忙碌',

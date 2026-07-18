@@ -404,6 +404,9 @@ def build_presence() -> list[dict[str, Any]]:
                 health = _resolve_host_health(h, factory_by_base)
             if health:
                 ent["health"] = health
+            fid = (h.get("meta") or {}).get("factory_id")
+            if fid:
+                ent["factory_id"] = fid
             entities.append(ent)
     except Exception:
         pass

@@ -7,6 +7,7 @@ import {
   statusLabel,
   formatEventTime,
   subscribePresenceStream,
+  factoryIdFromHostEntity,
 } from '../presenceApi'
 
 beforeEach(() => {
@@ -89,5 +90,20 @@ describe('presenceApi', () => {
     expect(onEvent).toHaveBeenCalled()
     es.close()
     expect(close).toHaveBeenCalled()
+  })
+
+  it('factoryIdFromHostEntity', () => {
+    expect(factoryIdFromHostEntity({
+      kind: 'host', role: 'factory', id: 'host:factory:east',
+    })).toBe('east')
+    expect(factoryIdFromHostEntity({
+      kind: 'host', role: 'factory', id: 'host:x', factory_id: 'fid-1',
+    })).toBe('fid-1')
+    expect(factoryIdFromHostEntity({
+      kind: 'host', role: 'studio', id: 'host:studio-1',
+    })).toBe(null)
+    expect(factoryIdFromHostEntity({
+      kind: 'agent', id: 'agent:a',
+    })).toBe(null)
   })
 })

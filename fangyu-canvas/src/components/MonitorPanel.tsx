@@ -115,19 +115,55 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
     live_skipped?: boolean
     live_tier?: string
     stages?: Record<string, { ok?: boolean; skipped?: boolean }>
+    factories_health?: {
+      count?: number
+      online?: number
+      offline?: number
+      avg_score?: number | null
+      min_score?: number | null
+    }
   }>>([])
   const [compareI, setCompareI] = useState(0)
   const [compareJ, setCompareJ] = useState(1)
   const [evalCompare, setEvalCompare] = useState<{
     ok?: boolean
-    left?: { ok?: boolean; exit_code?: number; ts?: number; stages?: Record<string, { ok?: boolean; skipped?: boolean }> }
-    right?: { ok?: boolean; exit_code?: number; ts?: number; stages?: Record<string, { ok?: boolean; skipped?: boolean }> }
+    left?: {
+      ok?: boolean
+      exit_code?: number
+      ts?: number
+      stages?: Record<string, { ok?: boolean; skipped?: boolean }>
+      factories_health?: {
+        count?: number
+        online?: number
+        offline?: number
+        avg_score?: number | null
+      }
+    }
+    right?: {
+      ok?: boolean
+      exit_code?: number
+      ts?: number
+      stages?: Record<string, { ok?: boolean; skipped?: boolean }>
+      factories_health?: {
+        count?: number
+        online?: number
+        offline?: number
+        avg_score?: number | null
+      }
+    }
     compare?: {
       changed?: boolean
       exit_changed?: boolean
       stage_diffs?: Array<{ stage: string; from: { ok?: boolean; skipped?: boolean }; to: { ok?: boolean; skipped?: boolean } }>
       current?: { ok?: boolean; exit_code?: number }
       previous?: { ok?: boolean; exit_code?: number }
+      factories_health_diff?: {
+        changed?: boolean
+        avg_score_delta?: number | null
+        offline_delta?: number | null
+        left?: { avg_score?: number | null; offline?: number; count?: number } | null
+        right?: { avg_score?: number | null; offline?: number; count?: number } | null
+      } | null
     }
   } | null>(null)
   const [evalTrend, setEvalTrend] = useState<{
@@ -564,7 +600,11 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
                       >
                         {evalHistory.map((h, idx) => (
                           <option key={idx} value={idx}>
-                            #{idx} · {h.ok ? 'ok' : 'fail'} · exit={h.exit_code} · {formatTs(h.ts)}
+                            #{idx} · {h.ok ? 'ok' : 'fail'} · exit={h.exit_code}
+                            {h.factories_health?.offline != null
+                              ? ` · 离线${h.factories_health.offline}`
+                              : ''}
+                            {' · '}{formatTs(h.ts)}
                           </option>
                         ))}
                       </select>
@@ -580,7 +620,11 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
                       >
                         {evalHistory.map((h, idx) => (
                           <option key={idx} value={idx}>
-                            #{idx} · {h.ok ? 'ok' : 'fail'} · exit={h.exit_code} · {formatTs(h.ts)}
+                            #{idx} · {h.ok ? 'ok' : 'fail'} · exit={h.exit_code}
+                            {h.factories_health?.offline != null
+                              ? ` · 离线${h.factories_health.offline}`
+                              : ''}
+                            {' · '}{formatTs(h.ts)}
                           </option>
                         ))}
                       </select>
@@ -601,6 +645,51 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
                         {' ↔ '}
                         右 exit={evalCompare.right?.exit_code} ({evalCompare.right?.ok ? 'ok' : 'fail'})
                       </div>
+                      {evalCompare.compare.factories_health_diff && (
+                        <div
+                          data-testid="eval-compare-health-diff"
+                          style={{ marginTop: 8, fontSize: 11 }}
+                        >
+                          <div style={{ fontWeight: 600, marginBottom: 2 }}>
+                            工厂健康差
+                            {evalCompare.compare.factories_health_diff.changed ? ' · 有变化' : ' · 无变化'}
+                          </div>
+                          <div style={{ color: 'var(--text-muted)' }}>
+                            左
+                            {evalCompare.compare.factories_health_diff.left?.avg_score != null
+                              ? ` 均分 ${evalCompare.compare.factories_health_diff.left.avg_score}`
+                              : ' —'}
+                            {` · 离线 ${evalCompare.compare.factories_health_diff.left?.offline ?? '—'}/${evalCompare.compare.factories_health_diff.left?.count ?? '—'}`}
+                            {' ↔ '}
+                            右
+                            {evalCompare.compare.factories_health_diff.right?.avg_score != null
+                              ? ` 均分 ${evalCompare.compare.factories_health_diff.right.avg_score}`
+                              : ' —'}
+                            {` · 离线 ${evalCompare.compare.factories_health_diff.right?.offline ?? '—'}/${evalCompare.compare.factories_health_diff.right?.count ?? '—'}`}
+                          </div>
+                          <div style={{ marginTop: 2 }}>
+                            {evalCompare.compare.factories_health_diff.avg_score_delta != null && (
+                              <span style={{
+                                marginRight: 10,
+                                color: evalCompare.compare.factories_health_diff.avg_score_delta >= 0
+                                  ? '#1a7f37' : '#c0392b',
+                              }}>
+                                Δ均分 {evalCompare.compare.factories_health_diff.avg_score_delta > 0 ? '+' : ''}
+                                {evalCompare.compare.factories_health_diff.avg_score_delta}
+                              </span>
+                            )}
+                            {evalCompare.compare.factories_health_diff.offline_delta != null && (
+                              <span style={{
+                                color: evalCompare.compare.factories_health_diff.offline_delta <= 0
+                                  ? '#1a7f37' : '#c0392b',
+                              }}>
+                                Δ离线 {evalCompare.compare.factories_health_diff.offline_delta > 0 ? '+' : ''}
+                                {evalCompare.compare.factories_health_diff.offline_delta}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
                       {(evalCompare.compare.stage_diffs || []).length > 0 ? (
                         <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
                           {(evalCompare.compare.stage_diffs || []).map(d => (
@@ -630,6 +719,12 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
                           {formatTs(side?.ts)} · exit={side?.exit_code}
+                          {side?.factories_health?.avg_score != null
+                            ? ` · 均分 ${side.factories_health.avg_score}`
+                            : ''}
+                          {side?.factories_health
+                            ? ` · 离线 ${side.factories_health.offline ?? 0}/${side.factories_health.count ?? 0}`
+                            : ''}
                         </div>
                         {Object.entries(side?.stages || {}).map(([name, st]) => (
                           <div key={name} style={{ fontSize: 11, marginBottom: 2 }}>

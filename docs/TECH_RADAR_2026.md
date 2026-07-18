@@ -121,9 +121,10 @@
 ㉟ 健康分进墙 + 试跑告警           ✅ presence health 主机色 · ping_fail 告警
 ㊱ 健康明细趋势 + 试跑复测         ✅ FactoryHealthDetail · ExternalPingRetest
 ㊲ 离线再探测 + Eval 健康摘要      ✅ FactoryOfflineRetest · factories_health
+㊳ Eval 健康差 + 墙主机再探测     ✅ factories_health_diff · PresenceCard 再探测
 ```
 
-下一刀：真 IM（仍暂缓）· Eval 对比页健康分差 · 值班墙离线主机快捷再探测。
+下一刀：真 IM（仍暂缓）· 健康回归写入观告警 · 跨厂对齐后自动再探测。
 
 ---
 

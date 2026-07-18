@@ -224,6 +224,7 @@ def compare_eval_reports(
             "previous": None,
             "stage_diffs": [],
             "exit_changed": False,
+            "factories_health_diff": None,
         }
     stage_diffs: list[dict[str, Any]] = []
     stages_a = a.get("stages") or {}
@@ -238,13 +239,79 @@ def compare_eval_reports(
                 "from": {"ok": sb.get("ok"), "skipped": sb.get("skipped")},
                 "to": {"ok": sa.get("ok"), "skipped": sa.get("skipped")},
             })
+
+    fh_diff = _factories_health_diff(a.get("factories_health"), b.get("factories_health"))
+    health_changed = bool(fh_diff and fh_diff.get("changed"))
+    changed = (
+        bool(stage_diffs)
+        or a.get("exit_code") != b.get("exit_code")
+        or a.get("ok") != b.get("ok")
+        or health_changed
+    )
     return {
         "ok": True,
-        "changed": bool(stage_diffs) or a.get("exit_code") != b.get("exit_code") or a.get("ok") != b.get("ok"),
+        "changed": changed,
         "exit_changed": a.get("exit_code") != b.get("exit_code"),
         "current": a,
         "previous": b,
         "stage_diffs": stage_diffs,
+        "factories_health_diff": fh_diff,
+    }
+
+
+def _factories_health_diff(
+    left: Any,
+    right: Any,
+) -> dict[str, Any] | None:
+    """current(left/较新) vs previous(right/对照) 的工厂健康差。"""
+    la = left if isinstance(left, dict) else None
+    rb = right if isinstance(right, dict) else None
+    if not la and not rb:
+        return None
+
+    def _num(v: Any) -> float | None:
+        if isinstance(v, (int, float)):
+            return float(v)
+        return None
+
+    left_avg = _num((la or {}).get("avg_score"))
+    right_avg = _num((rb or {}).get("avg_score"))
+    left_off = _num((la or {}).get("offline"))
+    right_off = _num((rb or {}).get("offline"))
+
+    avg_delta = None
+    if left_avg is not None and right_avg is not None:
+        avg_delta = round(left_avg - right_avg, 1)
+    offline_delta = None
+    if left_off is not None and right_off is not None:
+        offline_delta = int(left_off - right_off)
+
+    changed = False
+    if offline_delta is not None and offline_delta != 0:
+        changed = True
+    if avg_delta is not None and abs(avg_delta) >= 1.0:
+        changed = True
+    if (la is None) != (rb is None):
+        changed = True
+
+    return {
+        "changed": changed,
+        "avg_score_delta": avg_delta,
+        "offline_delta": offline_delta,
+        "left": {
+            "count": (la or {}).get("count"),
+            "online": (la or {}).get("online"),
+            "offline": (la or {}).get("offline"),
+            "avg_score": (la or {}).get("avg_score"),
+            "min_score": (la or {}).get("min_score"),
+        } if la else None,
+        "right": {
+            "count": (rb or {}).get("count"),
+            "online": (rb or {}).get("online"),
+            "offline": (rb or {}).get("offline"),
+            "avg_score": (rb or {}).get("avg_score"),
+            "min_score": (rb or {}).get("min_score"),
+        } if rb else None,
     }
 
 

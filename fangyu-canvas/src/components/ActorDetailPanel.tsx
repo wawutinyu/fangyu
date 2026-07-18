@@ -6,12 +6,14 @@ import type {
 } from '@fangyu/core/schema'
 import {
   formatEventTime,
+  factoryIdFromHostEntity,
   statusColor,
   statusLabel,
 } from '../utils/presenceApi'
 import type { HouseRolePlace, HouseSettlement } from '../utils/houseSettlement'
 import FactoryHealthDetail from './FactoryHealthDetail'
 import ExternalPingRetestButton from './ExternalPingRetestButton'
+import FactoryOfflineRetestButton from './FactoryOfflineRetestButton'
 
 const PLACE_LABEL: Record<HouseRolePlace, string> = {
   nook: '私密角',
@@ -104,6 +106,7 @@ export interface ActorDetailPanelProps {
   onFocusEdge?: (source: string, target: string) => void
   onManagedStop?: (instanceId: string) => void | Promise<void>
   managedBusy?: boolean
+  onRetestDone?: () => void
 }
 
 function kindLabel(kind: string): string {
@@ -131,6 +134,7 @@ export default function ActorDetailPanel({
   onFocusEdge,
   onManagedStop,
   managedBusy,
+  onRetestDone,
 }: ActorDetailPanelProps) {
   const color = statusColor(String(entity.status))
   const placement = useMemo(
@@ -238,6 +242,19 @@ export default function ActorDetailPanel({
                 <FactoryHealthDetail health={entity.health} />
               </Row>
             )}
+            {(() => {
+              const fid = factoryIdFromHostEntity(entity)
+              if (!fid || entity.online) return null
+              return (
+                <div style={{ marginTop: 8 }}>
+                  <FactoryOfflineRetestButton
+                    factoryId={fid}
+                    baseUrl={entity.base_url || undefined}
+                    onDone={onRetestDone}
+                  />
+                </div>
+              )
+            })()}
           </>
         )}
         {entity.external && (
