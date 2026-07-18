@@ -1,7 +1,7 @@
 """G2-C 组织 ACL API。"""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/v1/acl", tags=["组织ACL"])
@@ -98,6 +98,56 @@ def acl_check(body: CheckBody):
         return {"allowed": True, "principal_id": body.principal_id}
     except ACLError as e:
         return {"allowed": False, "rule": e.rule, "message": str(e), "context": e.context}
+
+
+class SyncSsoBody(BaseModel):
+    roles: list[str] = ["operator"]
+    name: str = ""
+    update_existing: bool = False
+
+
+@router.post("/sync-sso")
+def acl_sync_sso(request: Request, body: SyncSsoBody | None = None):
+    """把当前 Bearer / 旁路主体写入组织 ACL（ACL↔SSO 产品路径）。"""
+    from fangyu.core.org_acl import ensure_sso_member, load_acl
+
+    principal = getattr(request.state, "principal_id", None)
+    payload = getattr(request.state, "auth_payload", None) or {}
+    if not principal:
+        raise HTTPException(401, "需要已认证主体（Bearer 或开发旁路）")
+    roles = (body.roles if body else None) or ["operator"]
+    name = (body.name if body else "") or ""
+    if not name and isinstance(payload, dict):
+        name = str(payload.get("name") or "").strip()
+    update = bool(body.update_existing) if body else False
+    try:
+        out = ensure_sso_member(
+            principal,
+            name=name,
+            roles=roles,
+            update_existing=update,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    # 若 ACL 尚未启用，提示可一键启用（不强制改）
+    acl = load_acl()
+    out["hint"] = (
+        None
+        if acl.get("enabled")
+        else "主体已入库，但组织 ACL 仍关闭；可在运维面板启用。"
+    )
+    return out
+
+
+@router.get("/me")
+def acl_me(request: Request):
+    """当前认证主体的 ACL 成员状态。"""
+    from fangyu.core.org_acl import principal_acl_status
+
+    principal = getattr(request.state, "principal_id", None)
+    if not principal:
+        raise HTTPException(401, "需要已认证主体")
+    return principal_acl_status(principal)
 
 
 @router.post("/bundle-bind")

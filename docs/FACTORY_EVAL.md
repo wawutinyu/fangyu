@@ -25,7 +25,7 @@ python scripts/factory_gate.py --unit-only
 | MCP | Tasks · 无状态 HTTP · Presence | `test_mcp_tasks` · `test_mcp_http_presence` |
 | 身份 | SSO JWT · JWKS · OIDC 授权码 | `test_browser_sso` |
 | 导出 | Agent Card · well-known · materials | gate `stage_card` |
-| Live | OpenCode / task harness | `opencode_harness_live` · `task_harness_live`（需 Key） |
+| Live | OpenCode / task / **WorkBuddy** harness | `opencode_harness_live` · `task_harness_live` · `workbuddy_harness_live`（需 Key） |
 
 ## 门禁 card 额外断言
 

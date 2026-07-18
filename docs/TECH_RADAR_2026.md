@@ -100,9 +100,10 @@
 ⑭ 浏览器原料 + SSO JWT           ✅ browser_* + /api/v1/auth
 ⑮ playwright 深度 + OIDC JWKS    ✅ wait/scroll/press/screenshot + RS256
 ⑯ Eval 回归 + OIDC 登录页        ✅ FACTORY_EVAL + oidc/start·callback + 运维 SSO
+⑰ workbuddy live + ACL↔SSO       ✅ gate live 挂 WB · sync-sso / 运维一键入库
 ```
 
-下一刀：真 IM（仍暂缓）· workbuddy live 挂进 gate · ACL↔SSO 产品路径打通。
+下一刀：真 IM（仍暂缓）· 观测面板读 harness_trace · Eval 平台化（报告产物）。
 
 ---
 

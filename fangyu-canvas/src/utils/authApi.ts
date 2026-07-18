@@ -25,6 +25,12 @@ export interface AuthMe {
   name?: string
   roles?: string[]
   sso_enabled?: boolean
+  acl?: {
+    enabled?: boolean
+    require_principal?: boolean
+    is_member?: boolean
+    roles?: string[]
+  }
 }
 
 export function getStoredAccessToken(): string | null {

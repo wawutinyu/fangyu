@@ -23,6 +23,7 @@ import {
   quickStartDemo,
   startManaged,
   stopManaged,
+  syncSsoToAcl,
   type AclDoc,
   type ApprovalItem,
   type ManagedInstance,
@@ -124,10 +125,22 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
     }
   }
 
-  const onLogout = () => {
-    setStoredAccessToken(null)
-    setAuthMe(null)
-    setAuthNote('已清除本地 Bearer')
+  const onSyncSsoAcl = async () => {
+    setLoading(true)
+    setError(null)
+    setAuthNote(null)
+    try {
+      const out = await syncSsoToAcl({ roles: [memberRole || 'operator'] })
+      const base = out.created
+        ? `已将 ${out.member_id} 加入 ACL`
+        : `${out.member_id} 已在 ACL 中`
+      setAuthNote(out.hint ? `${base} · ${out.hint}` : base)
+      await reload()
+      await reloadAuth()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+    setLoading(false)
   }
 
   const onQuickDemo = async () => {
@@ -407,6 +420,7 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
 
       {tab === 'acl' && (
         <div style={{ flex: 1, overflow: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {authNote && <div style={{ color: '#1a7f37' }}>{authNote}</div>}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <span>
               组织：{acl?.org_name || '未初始化'}
@@ -420,6 +434,31 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
             </button>
             <button className="notion-btn" style={{ fontSize: 12 }} onClick={onToggleAcl} disabled={loading || !acl}>
               {acl?.enabled ? '关闭 ACL' : '启用 ACL'}
+            </button>
+          </div>
+
+          <div style={{
+            padding: 8, background: 'var(--bg-secondary)', borderRadius: 6,
+            display: 'flex', flexDirection: 'column', gap: 6,
+          }}>
+            <div>
+              SSO 主体：{' '}
+              <code>{authMe?.principal_id || '（未登录）'}</code>
+              {authMe?.acl?.is_member
+                ? ` · 已在 ACL（${(authMe.acl.roles || []).join(',') || '—'}）`
+                : authMe?.principal_id
+                  ? ' · 尚未入库'
+                  : ''}
+            </div>
+            <button
+              className="notion-btn primary"
+              style={{ fontSize: 12, alignSelf: 'flex-start' }}
+              type="button"
+              onClick={() => void onSyncSsoAcl()}
+              disabled={loading || !authMe?.principal_id}
+              title="把当前 Bearer 主体写入组织成员"
+            >
+              将当前 SSO 主体加入 ACL
             </button>
           </div>
 

@@ -118,4 +118,13 @@ def auth_me(request: Request):
         "name": (payload or {}).get("name") if isinstance(payload, dict) else principal,
         "roles": (payload or {}).get("roles") if isinstance(payload, dict) else [],
         "sso_enabled": load_sso_config().get("enabled"),
+        "acl": _acl_status_for(principal),
     }
+
+
+def _acl_status_for(principal: str | None) -> dict:
+    try:
+        from fangyu.core.org_acl import principal_acl_status
+        return principal_acl_status(principal)
+    except Exception:
+        return {"enabled": False, "is_member": False}

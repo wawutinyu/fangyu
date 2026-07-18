@@ -368,3 +368,58 @@ def enable_acl(enabled: bool = True, *, require_principal: bool | None = None) -
     if require_principal is not None:
         doc["require_principal"] = require_principal
     return save_acl(doc)
+
+
+def principal_acl_status(principal_id: str | None) -> dict[str, Any]:
+    """SSO / Bearer 主体在组织 ACL 中的状态（产品路径查询）。"""
+    doc = load_acl()
+    pid = (principal_id or "").strip()
+    member = (doc.get("members") or {}).get(pid) if pid else None
+    return {
+        "enabled": bool(doc.get("enabled")),
+        "require_principal": bool(doc.get("require_principal")),
+        "principal_id": pid or None,
+        "is_member": bool(member),
+        "roles": list((member or {}).get("roles") or []) if member else [],
+        "name": (member or {}).get("name") if member else None,
+    }
+
+
+def ensure_sso_member(
+    principal_id: str,
+    *,
+    name: str = "",
+    roles: list[str] | None = None,
+    update_existing: bool = False,
+) -> dict[str, Any]:
+    """把 SSO 主体写入组织 ACL（已存在则默认保留角色）。"""
+    pid = (principal_id or "").strip()
+    if not pid:
+        raise ValueError("principal_id 不能为空")
+    doc = load_acl(force=True)
+    members = dict(doc.get("members") or {})
+    existing = members.get(pid)
+    if existing and not update_existing:
+        return {
+            "ok": True,
+            "created": False,
+            "member_id": pid,
+            "member": existing,
+            "acl": doc,
+            "status": principal_acl_status(pid),
+        }
+    role_list = list(roles or (existing or {}).get("roles") or ["operator"])
+    members[pid] = {
+        "name": (name or "").strip() or (existing or {}).get("name") or pid,
+        "roles": role_list,
+    }
+    doc["members"] = members
+    saved = save_acl(doc)
+    return {
+        "ok": True,
+        "created": existing is None,
+        "member_id": pid,
+        "member": members[pid],
+        "acl": saved,
+        "status": principal_acl_status(pid),
+    }

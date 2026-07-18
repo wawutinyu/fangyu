@@ -129,6 +129,31 @@ export async function checkAcl(input: {
   return res.json()
 }
 
+export async function syncSsoToAcl(input?: {
+  roles?: string[]
+  name?: string
+  update_existing?: boolean
+}): Promise<{
+  ok: boolean
+  created: boolean
+  member_id: string
+  hint?: string | null
+  status?: { is_member?: boolean; roles?: string[] }
+}> {
+  const res = await apiFetch('/api/v1/acl/sync-sso', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      roles: input?.roles || ['operator'],
+      name: input?.name || '',
+      update_existing: !!input?.update_existing,
+    }),
+  })
+  const body = await res.json()
+  if (!res.ok) throw new Error(body.detail || '同步 SSO→ACL 失败')
+  return body
+}
+
 /** 人审 — shell ask */
 export interface ApprovalItem {
   id: string

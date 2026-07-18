@@ -53,3 +53,12 @@ curl -s -X POST http://127.0.0.1:8000/api/v1/auth/oidc/callback \
 | API 携带 IdP access_token（若为 RS256 JWT） | 同样走 JWKS，`aud` 须匹配配置 `audience` |
 
 JWKS 默认缓存约 1 小时；改配置会清缓存。Studio 把 Bearer 存 `localStorage.fangyu_access_token`，`apiFetch` 自动带上。
+
+## ACL ↔ SSO 产品路径
+
+1. OIDC / 本地签发拿到 Bearer（运维 → SSO）。
+2. `GET /api/v1/auth/me` 返回 `acl.is_member`。
+3. `POST /api/v1/acl/sync-sso`（或运维 → 组织 ACL「将当前 SSO 主体加入 ACL」）写入成员，默认角色 `operator`。
+4. 启用组织 ACL（`require_principal`）后，中间件注入的 principal 即走成员权限。
+
+`GET /api/v1/acl/me` 可单独查当前主体成员状态。

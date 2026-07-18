@@ -47,6 +47,8 @@ UNIT_SUITE = [
     "tests/unit/test_mcp_http_presence.py",
     "tests/unit/test_browser_sso.py",
     "tests/unit/test_factory_eval_suite.py",
+    "tests/unit/test_org_acl.py",
+    "tests/unit/test_acl_sso_bridge.py",
     "tests/integration/test_opencode_factory.py",
     "tests/unit/test_factory_gate.py",
 ]
@@ -207,6 +209,7 @@ def stage_live() -> tuple[bool, bool]:
     scripts = [
         "scripts/opencode_harness_live.py",
         "scripts/task_harness_live.py",
+        "scripts/workbuddy_harness_live.py",
     ]
     ok = True
     for rel in scripts:
