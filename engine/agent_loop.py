@@ -33,6 +33,8 @@ CODING_SYSTEM = (
     '2) 工具: {"action":"tool","name":"<name>","args":{...}}\n'
     "   仓内: read/write/list/glob/grep/search/apply_patch/shell\n"
     "   外网: websearch / webfetch；不确定问人: question\n"
+    "   shell：只读命令可直接跑；写文件/安装等须 args.confirm=true（ask 策略）\n"
+    "   MCP：mcp_current_time 等（若工具表中有）\n"
     '3) 委派子 Agent:\n'
     '   单个: {"action":"tool","name":"task","args":{"subagent_type":"explore|general|review|scout","prompt":"...","description":"短描述"}}\n'
     '   并行: {"action":"tool","name":"task","args":{"tasks":[{"subagent_type":"explore","prompt":"..."},{"subagent_type":"scout","prompt":"..."}]}}\n'
@@ -42,9 +44,20 @@ CODING_SYSTEM = (
     "稳定性要求：\n"
     "- 陌生代码库可先 task explore，或自行 glob/grep/read，再改文件；禁止臆造路径。\n"
     "- 外部资料用 scout 或 websearch/webfetch；引用带来源。\n"
-    "- 一次改动尽量小而可验证；失败则根据工具错误调整，不要盲目重复同一调用。\n"
-    "- 多文件任务按 plan 推进；完成前用 list/search 或 shell 做最小验证（若允许）。\n"
+    "- 改完尽量验证（测试/最小命令）；失败则根据错误调整。\n"
+    "- 一次改动尽量小而可验证；不要盲目重复同一调用。\n"
     "- 危险命令不要执行；只在工作区内读写。\n"
+    "可用工具会在用户消息中列出。"
+)
+
+PLAN_SYSTEM = (
+    "你是方隅 Plan 主角色：只读分析与规划，不直接改仓库。\n"
+    "每轮只输出一个 JSON 对象，不要 Markdown 围栏。\n"
+    '1) 可用 plan 列出步骤\n'
+    '2) 只用只读工具: read/list/glob/grep/search/webfetch/websearch/question，以及只读 task（explore/review/scout）\n'
+    '3) 禁止 write / apply_patch / shell / general 子 Agent\n'
+    '4) 结束: {"action":"done","result":"<完整实施计划，含文件路径与验证建议>"}\n'
+    "目标是产出可交给 Build 执行的计划，而不是自己改代码。\n"
     "可用工具会在用户消息中列出。"
 )
 
@@ -118,19 +131,78 @@ async def run_agent_loop(
     task_depth: int = 0,
     max_task_depth: int = 1,
     task_max_turns: int | None = None,
+    agent_mode: str = "build",
+    shell_policy: str | None = None,
 ) -> dict[str, Any]:
     """执行多轮工具环（含可选长任务规划 / task 子 Agent）。
 
-    Returns:
-      success, result, turns, trace, error, plan
+    agent_mode: build（默认可写）| plan（只读规划主角色）
+    shell_policy: allow | ask | deny（默认 ask）
     """
+    from fangyu.engine.shell_policy import reset_shell_policy, set_shell_policy
+
     if max_turns < 1:
         return {
             "success": False, "result": None, "turns": 0,
             "trace": [], "error": "max_turns < 1", "plan": [],
         }
 
+    mode = (agent_mode or "build").strip().lower()
+    if mode not in ("build", "plan"):
+        mode = "build"
+
+    policy_token = set_shell_policy(shell_policy or "ask")
+    try:
+        return await _run_agent_loop_body(
+            goal=goal,
+            tools=tools,
+            llm=llm,
+            max_turns=max_turns,
+            system=system,
+            require_plan=require_plan,
+            enable_task=enable_task,
+            task_depth=task_depth,
+            max_task_depth=max_task_depth,
+            task_max_turns=task_max_turns,
+            agent_mode=mode,
+        )
+    finally:
+        reset_shell_policy(policy_token)
+
+
+async def _run_agent_loop_body(
+    *,
+    goal: str,
+    tools: dict[str, ToolFn],
+    llm: LlmFn,
+    max_turns: int,
+    system: str,
+    require_plan: bool,
+    enable_task: bool,
+    task_depth: int,
+    max_task_depth: int,
+    task_max_turns: int | None,
+    agent_mode: str,
+) -> dict[str, Any]:
     tools = dict(tools)
+
+    if agent_mode == "plan":
+        from fangyu.core.materials import role_tool_ids
+        from fangyu.engine.bundle_tools import builtin_tool_impls
+
+        allowed = set(role_tool_ids("plan")) | {"task"}
+        impls = builtin_tool_impls()
+        # 保留已解析的 mcp_* 只读工具
+        filtered = {
+            k: v for k, v in tools.items()
+            if k in allowed or k.startswith("mcp_")
+        }
+        if not filtered:
+            filtered = {k: impls[k] for k in role_tool_ids("plan") if k in impls}
+        tools = filtered
+        if system == DEFAULT_SYSTEM or system == CODING_SYSTEM:
+            system = PLAN_SYSTEM
+
     task_runtime = None
     if enable_task and task_depth < max_task_depth and "task" not in tools:
         from fangyu.engine.subagent_task import TaskRuntime
@@ -143,23 +215,50 @@ async def run_agent_loop(
         )
         tools["task"] = task_runtime.make_tool()
 
+    # plan 模式：限制 task 只能派只读子角色
+    if agent_mode == "plan" and "task" in tools:
+        _orig_task = tools["task"]
+
+        async def _plan_safe_task(**kwargs):
+            kind = str(kwargs.get("subagent_type") or "explore").lower()
+            if kind == "general":
+                return {
+                    "ok": False,
+                    "error": "plan 模式禁止 general 子 Agent（会改文件）。请用 explore/review/scout。",
+                }
+            tasks = kwargs.get("tasks")
+            if isinstance(tasks, list):
+                for item in tasks:
+                    if isinstance(item, dict) and str(item.get("subagent_type") or "").lower() == "general":
+                        return {
+                            "ok": False,
+                            "error": "plan 模式禁止 tasks 中含 general。",
+                        }
+            return await _orig_task(**kwargs)
+
+        _plan_safe_task.__name__ = "task"
+        tools["task"] = _plan_safe_task
+
     tool_names = sorted(tools.keys())
     catalog = ", ".join(tool_names) if tool_names else "(无)"
     plan_hint = ""
-    if require_plan:
+    if require_plan and agent_mode != "plan":
         plan_hint = "\n本任务要求：在调用任何 tool 之前，先输出 action=plan。"
     task_hint = ""
     if "task" in tools:
         task_hint = (
-            "\n可用 task 委派 explore/general/review；"
+            "\n可用 task 委派 explore/general/review/scout；"
             "可用 tasks[] 并行；background=true 后台回灌；默认不可嵌套 task。"
         )
+        if agent_mode == "plan":
+            task_hint = "\nplan 模式仅可 task 委派 explore/review/scout（只读）。"
+    mode_hint = f"\n当前 agent_mode={agent_mode}。"
 
     messages: list[dict[str, str]] = [
         {"role": "system", "content": system},
         {
             "role": "user",
-            "content": f"目标：{goal}\n可用工具：{catalog}{plan_hint}{task_hint}\n请开始。",
+            "content": f"目标：{goal}\n可用工具：{catalog}{plan_hint}{task_hint}{mode_hint}\n请开始。",
         },
     ]
     trace: list[dict[str, Any]] = []

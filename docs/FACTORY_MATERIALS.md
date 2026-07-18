@@ -118,7 +118,7 @@
 | `general` 子角色 | ✅ task | P0 | 全 coding（不可嵌套 task） |
 | `review` 子角色 | ✅ task | P0 | 只读审查 |
 | `scout` 子角色 | ✅ task | P0 | web + 只读仓 |
-| `plan` 主角色（只读规划） | ❌ | **P0** | 禁写/限 shell，与 Build 切换 |
+| `plan` 主角色（只读规划） | ✅ | P0 | `agent_mode=plan` + PLAN_SYSTEM |
 | `scout` 外研 | ✅ | P0 | 见上 |
 | 自定义角色包 | 部分 | P1 | markdown/JSON 定义 → 工厂登记 |
 
@@ -135,8 +135,10 @@
 | `require_plan` / `enable_task` | ✅ | P0 | flow config |
 | 拓扑 pipeline | ✅ 串行 | P1 | 并行边、依赖边 |
 | 托管 manage | ✅ | P1 | 升级/跨机仍弱 |
-| 人审闸（ask） | ❌ | **P0** | 危险操作停问 |
+| 人审闸（ask） | ✅ 简 | P0 | shell ask + confirm；完整 UI 审批仍待 |
 | 原料注册表（统一 ID） | ✅ | P0 | `core/materials.py` + Bundle `config/materials.json` |
+| MCP 进包声明 | ✅ 简 | P0 | materials.mcp → `mcp_*` 工具（默认 current_time） |
+| 技能包 md | ✅ 起 | P0 | `skills/factory/implement-and-verify.md` 可注入 system |
 | SSO / 企业身份 | ❌ | P2 | 真 IM 同级后置 |
 
 ---
@@ -171,12 +173,17 @@
 2. ~~**`config/materials.json` + 注册表加载**~~（`core/materials.py`，出包写入）  
 3. ~~**`webfetch` / `websearch` / `glob` / `grep` / `question`** 进 coding 产线~~；**`scout` 角色**已挂 task  
 
-### 第二刀（继续夯实）
+### 第二刀（继续夯实）— ✅ 本批
 4. ~~`glob` + `grep`~~ ✅  
-5. ~~`question`~~ ✅（落盘；完整人审 ask 闸仍待）  
-6. 角色：`plan`（只读主角色）仍待；~~`scout`~~ ✅  
-7. MCP 依赖可进 Bundle 声明并在 harness 调用  
-8. 技能包 md：`implement-and-verify` 等  
+5. ~~`question`~~ ✅；~~shell ask 闸~~ ✅（`confirm=true`）  
+6. ~~角色：`plan` 主角色~~ ✅（`agent_mode=plan`）；~~`scout`~~ ✅  
+7. ~~MCP 依赖可进 Bundle 声明~~ ✅（materials.mcp → mcp_*）  
+8. ~~技能包 md：`implement-and-verify`~~ ✅  
+
+### 第三刀（下一轮）
+9. Studio「原料货架」UI  
+10. 更细命令级 allowlist / 真·人机审批流  
+11. 更多技能包与 MCP `tools: "*"` 展开  
 
 ### 明确后置
 - 真 IM、平级 Teams、LSP、snapshot、行业包  

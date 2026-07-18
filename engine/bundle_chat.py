@@ -28,6 +28,8 @@ async def _run_default_skill(
     global_vars: dict[str, Any] = {
         "_agent_name": (bundle.get("agent_card") or {}).get("name") or "agent",
         "_skill_id": skill_id,
+        "_bundle_root": str(bundle.get("root") or ""),
+        "bundle_root": str(bundle.get("root") or ""),
     }
     if llm is not None:
         global_vars["_agent_loop_llm"] = llm

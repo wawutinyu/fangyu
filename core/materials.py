@@ -55,14 +55,30 @@ DEFAULT_MATERIALS: dict[str, Any] = {
                 "webfetch", "websearch",
             ],
         },
+        {
+            "id": "plan",
+            "description": "只读规划主角色（禁写/禁 shell）",
+            "mode": "primary",
+            "tools": [
+                "read", "list", "glob", "grep", "search",
+                "webfetch", "websearch", "question",
+            ],
+        },
     ],
     "skills": [
         {"id": "plan-first", "status": "embedded", "note": "agent-loop require_plan"},
         {"id": "explore-codebase", "status": "role", "role": "explore"},
         {"id": "research-web", "status": "role", "role": "scout"},
         {"id": "code-review", "status": "role", "role": "review"},
-        {"id": "implement-and-verify", "status": "planned"},
+        {"id": "implement-and-verify", "status": "active", "path": "skills/factory/implement-and-verify.md"},
     ],
+    "mcp": [
+        {"id": "__internal__", "tools": ["current_time"]},
+    ],
+    "policies": {
+        "shell": "ask",
+        "default_agent_mode": "build",
+    },
 }
 
 

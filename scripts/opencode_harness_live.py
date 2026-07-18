@@ -125,7 +125,7 @@ def main() -> int:
         bundle,
         (
             "用 shell 工具执行：echo live-case-3 > live_shell.txt"
-            "（cwd 已是 workspace）。然后 done。"
+            "（须传 confirm=true，因 ask 策略）。然后 done。"
         ),
         workspace=project,
     )

@@ -232,13 +232,35 @@ _SHELL_DENY = re.compile(
 )
 
 
-def tool_shell(command: str = "", timeout_sec: float = 30) -> dict[str, Any]:
-    """在 workspace 根目录执行 shell（基础拒绝列表；完整策略见 Worker）。"""
+def tool_shell(
+    command: str = "",
+    timeout_sec: float = 30,
+    confirm: bool = False,
+) -> dict[str, Any]:
+    """在 workspace 根目录执行 shell。
+
+    策略（contextvar shell_policy）：
+      - deny: 一律拒绝
+      - ask: 非只读命令需 confirm=true，否则返回 needs_approval
+      - allow: 仅受危险命令黑名单约束
+    """
+    from fangyu.engine.shell_policy import get_shell_policy, shell_needs_confirm
+
     cmd = (command or "").strip()
     if not cmd:
         raise ValueError("empty command")
+    policy = get_shell_policy()
+    if policy == "deny":
+        raise PermissionError("shell 策略为 deny，禁止执行")
     if _SHELL_DENY.search(cmd):
         raise PermissionError(f"命令被策略拒绝: {cmd[:80]}")
+    if shell_needs_confirm(cmd) and not confirm:
+        return {
+            "status": "needs_approval",
+            "command": cmd,
+            "policy": "ask",
+            "hint": "非只读 shell。若确需执行，再次调用并传 confirm=true。",
+        }
     ws = _ws()
     proc = subprocess.run(
         cmd,
@@ -252,6 +274,7 @@ def tool_shell(command: str = "", timeout_sec: float = 30) -> dict[str, Any]:
         "exit_code": proc.returncode,
         "stdout": (proc.stdout or "")[:8000],
         "stderr": (proc.stderr or "")[:4000],
+        "confirmed": bool(confirm),
     }
 
 
@@ -301,31 +324,78 @@ def resolve_toolbelt(
     *,
     materials: dict[str, Any] | None = None,
     include_runtime: bool = False,
+    bundle_root: str | Path | None = None,
 ) -> dict[str, Any]:
-    """按原料注册表解析 toolbelt；未知带回退 coding/office 经典表。"""
-    from fangyu.core.materials import tool_ids_for_belt
+    """按原料注册表解析 toolbelt；可合并 materials.mcp 声明的工具。"""
+    from fangyu.core.materials import load_materials, tool_ids_for_belt
 
     tb = (toolbelt or "coding").strip().lower()
     if materials is None:
-        try:
-            from fangyu.core.materials import default_materials
-            materials = default_materials()
-        except Exception:
-            materials = None
+        materials = load_materials(bundle_root) if bundle_root else None
+        if materials is None:
+            try:
+                from fangyu.core.materials import default_materials
+                materials = default_materials()
+            except Exception:
+                materials = None
+    out: dict[str, Any] = {}
     if materials:
         ids = tool_ids_for_belt(tb, materials)
         impls = builtin_tool_impls()
-        out: dict[str, Any] = {}
         for tid in ids:
             if tid == "task" and not include_runtime:
-                continue  # task 由 agent_loop runtime 注入
+                continue
             if tid in impls:
                 out[tid] = impls[tid]
+        # MCP 声明 → mcp_<tool> 可调用包装
+        for mcp_tool_name, fn in _mcp_tools_from_materials(materials).items():
+            out[mcp_tool_name] = fn
         if out:
             return out
     if tb == "office":
         return office_toolbelt()
     return coding_toolbelt()
+
+
+def _mcp_tools_from_materials(materials: dict[str, Any]) -> dict[str, Any]:
+    """materials.mcp: [{id, tools: [name,...]}] → 异步/同步可调用工具。"""
+    servers = materials.get("mcp") or []
+    if not isinstance(servers, list):
+        return {}
+    out: dict[str, Any] = {}
+    for srv in servers:
+        if not isinstance(srv, dict):
+            continue
+        sid = str(srv.get("id") or "").strip() or "__internal__"
+        names = srv.get("tools") or []
+        if names == "*":
+            names = ["current_time"]  # 最小默认；完整列表运行时再扩
+        if not isinstance(names, list):
+            continue
+        for raw in names:
+            tname = str(raw).strip()
+            if not tname:
+                continue
+            key = f"mcp_{tname}" if sid == "__internal__" else f"mcp_{sid}_{tname}"
+            out[key] = _make_mcp_callable(sid, tname)
+    return out
+
+
+def _make_mcp_callable(server: str, tool_name: str):
+    async def _call(**kwargs: Any) -> Any:
+        if server == "__internal__":
+            from fangyu.engine.mcp import call_internal_tool, _init_internal_tools
+            await _init_internal_tools()
+            return await call_internal_tool(tool_name, kwargs or {})
+        from fangyu.engine.mcp import get_external_server
+        conn = get_external_server(server)
+        if not conn:
+            raise ValueError(f"MCP server 未连接: {server}")
+        return await conn.call_tool(tool_name, kwargs or {})
+
+    _call.__name__ = f"mcp_{tool_name}"
+    _call.__doc__ = f"MCP {server}/{tool_name}"
+    return _call
 
 
 def _normalize_deliverable_rel(path: str, kind: str) -> str:
