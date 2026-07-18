@@ -61,6 +61,7 @@ def stage_unit() -> bool:
         "tests/unit/test_skills_topology_trace.py",
         "tests/unit/test_g2_workbuddy_multi.py",
         "tests/unit/test_approvals.py",
+        "tests/unit/test_mcp_tasks.py",
         "tests/integration/test_opencode_factory.py",
         "tests/unit/test_factory_gate.py",
     ]

@@ -76,6 +76,8 @@ DEFAULT_MATERIALS: dict[str, Any] = {
         {"id": "multi-agent-split", "status": "active", "path": "skills/factory/multi-agent-split.md"},
         {"id": "customer-support", "status": "active", "path": "skills/factory/customer-support.md"},
         {"id": "data-brief", "status": "active", "path": "skills/factory/data-brief.md"},
+        {"id": "legal-review", "status": "active", "path": "skills/factory/legal-review.md"},
+        {"id": "compliance-check", "status": "active", "path": "skills/factory/compliance-check.md"},
     ],
     "mcp": [
         {"id": "__internal__", "tools": ["current_time"]},

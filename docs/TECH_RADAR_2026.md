@@ -3,7 +3,7 @@
 > 行业已收敛：**MCP（工具）· Skills（方法）· A2A（协作）· Harness（机床）· Eval（质检）**。  
 > 方隅定位是 **Agent 工厂**：批量组装可导出的公民，而不是再做一个聊天壳。
 
-关联：[工厂原料](FACTORY_MATERIALS.md) · [拓扑与 task](TOPOLOGY_AND_TASK.md) · [毕业标准](GRADUATION_EXPORTABLE_AGENT.md) · [愿景](VISION_AND_PRODUCT.md)
+关联：[工厂原料](FACTORY_MATERIALS.md) · [拓扑与 task](TOPOLOGY_AND_TASK.md) · [MCP Tasks](MCP_TASKS.md) · [毕业标准](GRADUATION_EXPORTABLE_AGENT.md) · [愿景](VISION_AND_PRODUCT.md)
 
 ---
 
@@ -64,10 +64,10 @@
 
 ### 以后（不挡主线）
 
-9. 真 IM、平级 Teams、Computer-use / 浏览器、SSO  
-10. MCP Tasks 扩展、无状态 HTTP 部署跟进上游 spec  
-11. 云托管升级与跨机 Presence
-12. 领域技能包 · 完整人审 UI
+9. 真 IM、平级 Teams、Computer-use / 浏览器、SSO（**真 IM 仍暂缓**）  
+10. MCP Tasks 扩展 ✅ 最小子集 [MCP_TASKS](MCP_TASKS.md)；无状态 HTTP 部署继续跟进上游  
+11. 云托管升级与跨机 Presence  
+12. 领域技能包 · 人审 UI ✅ legal/compliance + 运维人审
 
 ---
 
@@ -95,9 +95,10 @@
 ⑨ multi-agent-split + depends    ✅ 技能 + 边波次调度
 ⑩ factory_gate Eval 加厚         ✅ 更多单测 + multi/skills card 检
 ⑪ 领域技能 + 人审 UI             ✅ customer/data-brief + 运维·人审
+⑫ 法务/合规技能 + MCP Tasks      ✅ legal/compliance + SEP-2663 最小子集
 ```
 
-下一刀：真 IM（仍暂缓）· 法务等领域包 · MCP Tasks / 无状态部署跟进。
+下一刀：真 IM（仍暂缓）· 无状态 MCP HTTP 部署加厚 · 云托管/Presence。
 
 ---
 
