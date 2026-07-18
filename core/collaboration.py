@@ -219,15 +219,21 @@ def _resolve_host_health(
     h: dict[str, Any],
     factory_by_base: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
-    """从 remote_host.meta.health 或通讯录匹配解析工厂健康分。"""
+    """从 remote_host.meta.health 或通讯录匹配解析工厂健康分（含 factors / history）。"""
     meta = h.get("meta") or {}
     raw = meta.get("health")
     if isinstance(raw, dict) and raw.get("score") is not None:
         try:
-            return {
+            out: dict[str, Any] = {
                 "score": int(raw["score"]),
                 "grade": raw.get("grade"),
             }
+            if isinstance(raw.get("factors"), dict):
+                out["factors"] = raw["factors"]
+            hist = raw.get("history") or meta.get("health_history")
+            if isinstance(hist, list) and hist:
+                out["history"] = hist[-12:]
+            return out
         except (TypeError, ValueError):
             pass
     if h.get("role") != "factory" and not meta.get("factory_id"):
@@ -248,7 +254,15 @@ def _resolve_host_health(
     if not row:
         return None
     hth = compute_factory_health(row)
-    return {"score": hth["score"], "grade": hth.get("grade")}
+    out = {
+        "score": hth["score"],
+        "grade": hth.get("grade"),
+        "factors": hth.get("factors"),
+    }
+    hist = (row.get("meta") or {}).get("health_history") if isinstance(row.get("meta"), dict) else None
+    if isinstance(hist, list) and hist:
+        out["history"] = hist[-12:]
+    return out
 
 
 def build_presence() -> list[dict[str, Any]]:

@@ -119,9 +119,10 @@
 ㉝ 试跑 ping + 告警铃铛 SSE        ✅ wizard 试跑 · Presence SSE 刷新 alerts
 ㉞ 试跑写观 + 工厂健康分           ✅ external.ping · factories health score
 ㉟ 健康分进墙 + 试跑告警           ✅ presence health 主机色 · ping_fail 告警
+㊱ 健康明细趋势 + 试跑复测         ✅ FactoryHealthDetail · ExternalPingRetest
 ```
 
-下一刀：真 IM（仍暂缓）· 值班墙健康趋势/明细 · 跨厂试跑一键复测。
+下一刀：真 IM（仍暂缓）· 工厂离线一键再探测 · 健康分写入 Eval 报告摘要。
 
 ---
 

@@ -1,8 +1,9 @@
-/** 观 · 告警铃铛 — 工厂离线 / Eval 红 */
+/** 观 · 告警铃铛 — 工厂离线 / Eval 红 / 试跑失败 */
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useMonitorAlerts } from '../hooks/useMonitorAlerts'
 import type { MonitorAlert } from '../utils/monitorApi'
+import ExternalPingRetestButton from './ExternalPingRetestButton'
 
 interface Props {
   wallMode?: boolean
@@ -60,7 +61,7 @@ export default function PresenceAlertBell({ wallMode, pollMs = 45000 }: Props) {
         type="button"
         className="notion-btn"
         data-testid="presence-alert-bell"
-        title={sseLive ? '观测告警（SSE 实时）' : '观测告警：工厂离线 / Eval'}
+        title={sseLive ? '观测告警（SSE 实时）' : '观测告警：工厂离线 / Eval / 试跑'}
         onClick={openPopover}
         style={{
           fontSize: wallMode ? 13 : 11,
@@ -123,6 +124,7 @@ export default function PresenceAlertBell({ wallMode, pollMs = 45000 }: Props) {
               共 {meta?.count ?? 0}
               {meta?.offline_factories ? ` · 离线 ${meta.offline_factories}` : ''}
               {meta?.eval_fail ? ` · Eval ${meta.eval_fail}` : ''}
+              {meta?.ping_fail ? ` · 试跑 ${meta.ping_fail}` : ''}
             </span>
             <button type="button" className="notion-btn" style={{ fontSize: 10 }} onClick={() => void reload()}>
               刷新
@@ -137,17 +139,20 @@ export default function PresenceAlertBell({ wallMode, pollMs = 45000 }: Props) {
             const color = sev === 'error' || sev === 'deny' ? '#c0392b'
               : sev === 'warn' ? '#d48806' : '#1890ff'
             return (
-              <button
+              <div
                 key={a.id}
-                type="button"
                 data-testid="presence-alert-item"
+                role="button"
+                tabIndex={0}
                 onClick={() => focusAlert(a)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') focusAlert(a) }}
                 style={{
                   display: 'block', width: '100%', textAlign: 'left',
                   marginTop: 6, padding: '8px 10px', borderRadius: 6,
                   border: wallMode ? '1px solid #2a3540' : '1px solid var(--border-light)',
                   borderLeft: `3px solid ${color}`,
                   background: 'transparent', color: 'inherit', cursor: 'pointer', fontSize: 12,
+                  boxSizing: 'border-box',
                 }}
               >
                 <div style={{ fontWeight: 600 }}>{a.title || a.kind}</div>
@@ -157,7 +162,16 @@ export default function PresenceAlertBell({ wallMode, pollMs = 45000 }: Props) {
                 <div style={{ color: muted, marginTop: 4, fontSize: 10 }}>
                   {a.kind} · {formatTs(a.ts)}
                 </div>
-              </button>
+                {a.kind === 'external.ping' && (
+                  <ExternalPingRetestButton
+                    target={a.target}
+                    detail={a.detail}
+                    source="PresenceAlertBell"
+                    onDone={() => { void reload() }}
+                    compact
+                  />
+                )}
+              </div>
             )
           })}
         </div>,

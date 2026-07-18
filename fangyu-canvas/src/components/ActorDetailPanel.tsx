@@ -5,13 +5,13 @@ import type {
   PresenceEntity,
 } from '@fangyu/core/schema'
 import {
-  factoryHealthColor,
-  factoryHealthLabel,
   formatEventTime,
   statusColor,
   statusLabel,
 } from '../utils/presenceApi'
 import type { HouseRolePlace, HouseSettlement } from '../utils/houseSettlement'
+import FactoryHealthDetail from './FactoryHealthDetail'
+import ExternalPingRetestButton from './ExternalPingRetestButton'
 
 const PLACE_LABEL: Record<HouseRolePlace, string> = {
   nook: '私密角',
@@ -235,19 +235,7 @@ export default function ActorDetailPanel({
             {entity.role && <Row label="角色">{entity.role}</Row>}
             {entity.role === 'factory' && entity.health?.score != null && (
               <Row label="健康">
-                <span
-                  data-testid="actor-health-badge"
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 600,
-                    padding: '1px 6px',
-                    borderRadius: 4,
-                    color: '#fff',
-                    background: factoryHealthColor(entity.health.score),
-                  }}
-                >
-                  {factoryHealthLabel(entity.health.score, entity.health.grade)}
-                </span>
+                <FactoryHealthDetail health={entity.health} />
               </Row>
             )}
           </>
@@ -256,6 +244,15 @@ export default function ActorDetailPanel({
           <Row label="来源">
             外部{entity.authorized ? ' · 已授权' : ' · 未授权'}
           </Row>
+        )}
+        {entity.external && entity.kind === 'agent' && entity.authorized && (
+          <div style={{ marginTop: 8 }}>
+            <ExternalPingRetestButton
+              target={entity.name || entity.id}
+              detail={{ agent: entity.name || entity.id }}
+              source="ActorDetailPanel"
+            />
+          </div>
         )}
         {entity.updated_at != null && (
           <Row label="更新">{formatEventTime(entity.updated_at)}</Row>

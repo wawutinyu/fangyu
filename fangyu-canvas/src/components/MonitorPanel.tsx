@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../platform'
+import ExternalPingRetestButton from './ExternalPingRetestButton'
 
 interface LogEntry {
   id: number
@@ -62,6 +63,7 @@ interface MonitorAlert {
   factory_id?: string
   base_url?: string
   source?: string
+  target?: string
   detail?: Record<string, unknown>
 }
 
@@ -666,6 +668,15 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
                     去观
                   </button>
                 </div>
+                {a.kind === 'external.ping' && (
+                  <ExternalPingRetestButton
+                    target={a.target}
+                    detail={a.detail}
+                    source="MonitorPanel"
+                    onDone={() => { void fetchAlerts() }}
+                    compact
+                  />
+                )}
                 {a.message && (
                   <div style={{ color: 'var(--text-muted)', wordBreak: 'break-word' }}>{a.message}</div>
                 )}

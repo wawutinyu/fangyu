@@ -32,6 +32,7 @@ async function emitPingPresence(
   node: AgentCanvasNode,
   result: PingResult,
   skill: string,
+  source: string,
 ): Promise<void> {
   const ok = result.ok
   await emitPresenceEvent({
@@ -48,7 +49,7 @@ async function emitPingPresence(
       excerpt: result.excerpt,
       error: result.error,
       rpc_url: node.externalConfig?.rpcUrl,
-      source: 'ExternalAgentAuthWizard',
+      source,
     },
   })
 }
@@ -59,6 +60,7 @@ export async function pingExternalAgent(
   text = 'ping from 方隅授权向导',
   skillId?: string,
   emitPresence = true,
+  source = 'ExternalAgentAuthWizard',
 ): Promise<PingResult> {
   const skill = skillId
     || node.externalConfig?.allowedSkills?.[0]
@@ -107,7 +109,7 @@ export async function pingExternalAgent(
     }
   }
   if (emitPresence) {
-    void emitPingPresence(node, result, resolvedSkill)
+    void emitPingPresence(node, result, resolvedSkill, source)
   }
   return result
 }

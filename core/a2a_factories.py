@@ -143,7 +143,17 @@ def heartbeat_factories(
             if was_online is True or fails >= 1:
                 meta.setdefault("offline_since", now)
                 meta["alert"] = "offline"
+
+        health = compute_factory_health(
+            {**row, "meta": meta},
+            now=now,
+            ttl_sec=ttl_sec,
+        )
+        hist = list(meta.get("health_history") or [])
+        hist.append({"ts": now, "score": health["score"]})
+        meta["health_history"] = hist[-12:]
         row["meta"] = meta
+        health_payload = {**health, "history": meta["health_history"]}
         if ok:
             online_n += 1
 
@@ -153,7 +163,6 @@ def heartbeat_factories(
                 from fangyu.core.remote_hosts import upsert_remote_host
 
                 host_id = f"factory:{fid or base}"
-                health = compute_factory_health(row, now=now, ttl_sec=ttl_sec)
                 if ok:
                     host = upsert_remote_host(
                         host_id=host_id,
@@ -163,7 +172,7 @@ def heartbeat_factories(
                         meta={
                             "factory_id": fid,
                             "source": "a2a_factories",
-                            "health": health,
+                            "health": health_payload,
                         },
                         ttl_sec=ttl_sec,
                     )
@@ -279,6 +288,8 @@ def align_factories_and_presence(
             online = bool(row.get("online"))
             host_id = f"factory:{fid or base}"
             health = compute_factory_health(row, now=now, ttl_sec=120.0)
+            hist = list((row.get("meta") or {}).get("health_history") or [])
+            health_payload = {**health, "history": hist[-12:]} if hist else health
             if online or row.get("last_probe_ok"):
                 host = upsert_remote_host(
                     host_id=host_id,
@@ -288,7 +299,7 @@ def align_factories_and_presence(
                     meta={
                         "factory_id": fid,
                         "source": "a2a_factories_align",
-                        "health": health,
+                        "health": health_payload,
                     },
                     ttl_sec=120.0,
                 )
@@ -309,7 +320,7 @@ def align_factories_and_presence(
                         "factory_id": fid,
                         "source": "a2a_factories_align",
                         "online": False,
-                        "health": health,
+                        "health": health_payload,
                     },
                     ttl_sec=30.0,
                 )
@@ -414,7 +425,11 @@ def enrich_factory_row(
     ttl_sec: float = 120.0,
 ) -> dict[str, Any]:
     out = dict(row)
-    out["health"] = compute_factory_health(out, now=now, ttl_sec=ttl_sec)
+    health = compute_factory_health(out, now=now, ttl_sec=ttl_sec)
+    hist = (out.get("meta") or {}).get("health_history") if isinstance(out.get("meta"), dict) else None
+    if isinstance(hist, list) and hist:
+        health = {**health, "history": hist[-12:]}
+    out["health"] = health
     return out
 
 

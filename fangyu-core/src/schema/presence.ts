@@ -31,7 +31,12 @@ export interface PresenceEntity {
   base_url?: string | null
   role?: string | null
   /** 工厂健康分（通讯录/心跳同步） */
-  health?: { score: number; grade?: string } | null
+  health?: {
+    score: number
+    grade?: string
+    factors?: Record<string, unknown>
+    history?: Array<{ ts: number; score: number }>
+  } | null
 }
 
 export type CollaborationSeverity = 'info' | 'warn' | 'deny' | 'error'

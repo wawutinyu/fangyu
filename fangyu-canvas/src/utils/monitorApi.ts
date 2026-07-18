@@ -11,6 +11,9 @@ export interface MonitorAlert {
   factory_id?: string
   base_url?: string
   source?: string
+  actor?: string
+  target?: string
+  detail?: Record<string, unknown>
 }
 
 export interface MonitorAlertsResponse {
