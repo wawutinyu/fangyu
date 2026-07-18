@@ -45,6 +45,9 @@ worker-local.json
 Thumbs.db
 *.log
 
+# Browser screenshots (local computer-use)
+.fangyu/screenshots/
+
 # Build
 build/
 .eggs/

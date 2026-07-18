@@ -2,17 +2,21 @@
 
 默认 **static** 引擎（httpx + HTML 快照），不强制装浏览器驱动。
 
-| 工具 | 作用 |
-|------|------|
-| `browser_open` | 打开 URL，返回 title/text/links |
-| `browser_snapshot` | 当前页快照 |
-| `browser_click` | `link_index` 跟随链接（static）；或 playwright `selector` |
-| `browser_type` | 仅 playwright |
+| 工具 | 引擎 | 作用 |
+|------|------|------|
+| `browser_open` | 双 | 打开 URL；`engine=static\|playwright` 可强制 |
+| `browser_snapshot` | 双 | 当前页快照（pw 会重读 DOM） |
+| `browser_click` | 双 | `link_index` 跟链接；pw 可用 `selector` |
+| `browser_type` | pw | 向选择器填文本 |
+| `browser_wait` | pw | 等选择器 / 纯超时 |
+| `browser_scroll` | pw | 滚动或 `scroll_into_view` |
+| `browser_press` | pw | 键盘按键（Enter / Escape…） |
+| `browser_screenshot` | pw | 截图 → `.fangyu/screenshots/` |
 
 可选升级：
 
 ```bash
-pip install playwright
+pip install 'fangyu[browser]'
 playwright install chromium
 ```
 

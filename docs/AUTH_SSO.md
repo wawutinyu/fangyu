@@ -26,6 +26,17 @@ Authorization: Bearer <access_token>
 `enabled=true` 时：非法 Bearer 直接 401。  
 `enabled=false` 时：可用 `X-Fangyu-Principal` 旁路注入 ACL 主体（仅开发）。
 
-## OIDC 预留
+## OIDC / JWKS（企业）
 
-`oidc.authorization_endpoint` / `token_endpoint` / `client_id` 写入配置即可对接企业登录页；校验路径当前以本地 HS256 JWT 为主，后续可接 JWKS。
+1. 把 IdP 的 `issuer` / `audience` 写入 `sso.json`（须与 token 声明一致）。
+2. 配置 `oidc.jwks_uri`（公开 JWKS 端点）。
+3. 可选：`authorization_endpoint` / `token_endpoint` / `client_id` 给前端登录页用。
+
+校验规则：
+
+| `alg` | 路径 |
+|-------|------|
+| `HS256` | 本地 `shared_secret`（开发签发） |
+| `RS256` | 拉取并缓存 `oidc.jwks_uri`，按 `kid` 验签 |
+
+JWKS 默认缓存约 1 小时；改配置会清缓存。当前仅支持 **RS256**（常见企业 IdP）。

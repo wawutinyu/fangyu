@@ -64,7 +64,7 @@
 
 ### 以后（不挡主线）
 
-9. 真 IM、平级 Teams（**真 IM 仍暂缓**）；Computer-use / 浏览器 ✅ [BROWSER_TOOL](BROWSER_TOOL.md)；SSO ✅ [AUTH_SSO](AUTH_SSO.md)  
+9. 真 IM、平级 Teams（**真 IM 仍暂缓**）；Computer-use / 浏览器 ✅ wait/scroll/press/screenshot；SSO ✅ OIDC JWKS RS256  
 10. MCP Tasks 扩展 ✅；无状态 HTTP ✅ `POST /mcp/v1/messages`  
 11. 云托管升级与跨机 Presence ✅ 托管进观 + `/presence/hosts/heartbeat`  
 12. 领域技能包 · 人审 UI ✅ legal/compliance + 运维人审
@@ -98,9 +98,10 @@
 ⑫ 法务/合规技能 + MCP Tasks      ✅ legal/compliance + SEP-2663 最小子集
 ⑬ 无状态 MCP HTTP + 跨机 Presence ✅ /mcp/v1/messages + hosts heartbeat
 ⑭ 浏览器原料 + SSO JWT           ✅ browser_* + /api/v1/auth
+⑮ playwright 深度 + OIDC JWKS    ✅ wait/scroll/press/screenshot + RS256
 ```
 
-下一刀：真 IM（仍暂缓）· playwright 深度 Computer-use · 企业 OIDC JWKS。
+下一刀：真 IM（仍暂缓）· Eval 回归加厚 · 企业 OIDC 登录页对接（前端）。
 
 ---
 

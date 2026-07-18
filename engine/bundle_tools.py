@@ -310,8 +310,12 @@ def coding_toolbelt() -> dict[str, Any]:
     from fangyu.engine.browser_tool import (
         tool_browser_click,
         tool_browser_open,
+        tool_browser_press,
+        tool_browser_screenshot,
+        tool_browser_scroll,
         tool_browser_snapshot,
         tool_browser_type,
+        tool_browser_wait,
     )
 
     return {
@@ -329,6 +333,10 @@ def coding_toolbelt() -> dict[str, Any]:
         "browser_snapshot": tool_browser_snapshot,
         "browser_click": tool_browser_click,
         "browser_type": tool_browser_type,
+        "browser_wait": tool_browser_wait,
+        "browser_scroll": tool_browser_scroll,
+        "browser_press": tool_browser_press,
+        "browser_screenshot": tool_browser_screenshot,
         "question": tool_question,
         "skill_load": tool_skill_load,
     }

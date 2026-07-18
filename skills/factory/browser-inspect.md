@@ -13,7 +13,7 @@ when: 需要看真实页面结构、点链接跟进、或 webfetch 不够用时
 1. `browser_open(url)` 打开页面，记下 `session_id` 与 `links[]`。
 2. `browser_snapshot` 复核标题与正文要点。
 3. 需要跟进时 `browser_click(link_index=N)`（不要臆造选择器）。
-4. 复杂表单/真实点击：环境需 playwright；否则保持 static 或改用 webfetch。
+4. 复杂交互（表单 / 等待 / 滚动 / 截图）：环境需 playwright；用 `browser_type` / `wait` / `scroll` / `press` / `screenshot`。
 5. 结论带来源 URL；敏感操作勿自动提交。
 
 ## 反例
@@ -21,3 +21,4 @@ when: 需要看真实页面结构、点链接跟进、或 webfetch 不够用时
 - 不看 links 就瞎猜 selector
 - 把 static 引擎当成已渲染 SPA 完整 DOM
 - 对非 http(s) 地址强行打开
+- 无 playwright 却依赖 wait/screenshot
