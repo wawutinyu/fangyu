@@ -39,6 +39,21 @@ def test_skill_frontmatter_and_progressive_disclosure():
     loaded = tool_skill_load("implement-and-verify")
     assert loaded["ok"] is True
     assert "反例" in loaded["body"]
+    split = load_skill_parsed("multi-agent-split")
+    assert split and ("拓扑" in split["body"] or "topology" in split["body"].lower())
+
+
+def test_depends_stages_in_exported_multi(tmp_path):
+    from fangyu.core.topology_export import load_topology, normalize_pipeline_stages
+
+    root = build_from_profile("multi", tmp_path / "m", intent="搜索分析汇总本周竞品")
+    topo = load_topology(root)
+    assert any(
+        (e.get("type") or e.get("label")) == "depends"
+        for e in (topo.get("edges") or [])
+    )
+    stages = normalize_pipeline_stages(topo)
+    assert len(stages) >= 2
 
 
 def test_mcp_star_expand():

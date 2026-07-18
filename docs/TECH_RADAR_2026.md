@@ -58,15 +58,16 @@
 ### 接着（2～4 周）— **工厂可装配体验**
 
 5. Studio「原料货架」：勾选 tools / skills / mcp → 写入 materials.json ✅ `/api/v1/materials` + 更多·原料  
-6. 拓扑：并行边 + 与 `task` 职责说明 ✅ `normalize_pipeline_stages` + [TOPOLOGY_AND_TASK](TOPOLOGY_AND_TASK.md)  
+6. 拓扑：并行边 + depends 波次 + 与 `task` 职责说明 ✅ [TOPOLOGY_AND_TASK](TOPOLOGY_AND_TASK.md)  
 7. 观测：agent-loop trace 结构化落盘 ✅ `.fangyu/harness_trace.jsonl`（含 `task_child` / `task_parallel`）  
-8. 更多技能包：`explore-codebase`、`research-web`、`office-decompose` ✅（另含 `code-review`）
+8. 更多技能包：explore / research / office / review / **multi-agent-split** ✅  
 
 ### 以后（不挡主线）
 
 9. 真 IM、平级 Teams、Computer-use / 浏览器、SSO  
 10. MCP Tasks 扩展、无状态 HTTP 部署跟进上游 spec  
 11. 云托管升级与跨机 Presence
+12. 领域技能包 · 完整人审 UI
 
 ---
 
@@ -91,9 +92,11 @@
 ⑥ harness_trace 落盘             ✅ engine/harness_trace.py
 ⑦ 技能包扩容 + task_child trace  ✅ skills/factory/* + task 元数据
 ⑧ 拓扑并行段 + 职责文档          ✅ bundle_orchestrate + TOPOLOGY_AND_TASK
+⑨ multi-agent-split + depends    ✅ 技能 + 边波次调度
+⑩ factory_gate Eval 加厚         ✅ 更多单测 + multi/skills card 检
 ```
 
-下一刀：`multi-agent-split` 技能化 · Eval 回归套件加厚 · 依赖边（depends）运行时。
+下一刀：领域技能包 · 完整人审 UI · 真 IM（仍暂缓）。
 
 ---
 

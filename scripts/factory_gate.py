@@ -53,10 +53,13 @@ def stage_unit() -> bool:
     print("==> stage: unit")
     tests = [
         "tests/unit/test_materials.py",
+        "tests/unit/test_materials_shelf.py",
         "tests/unit/test_plan_shell_skills.py",
         "tests/unit/test_subagent_task.py",
         "tests/unit/test_agent_loop.py",
         "tests/unit/test_bundle_tools.py",
+        "tests/unit/test_skills_topology_trace.py",
+        "tests/unit/test_g2_workbuddy_multi.py",
         "tests/integration/test_opencode_factory.py",
         "tests/unit/test_factory_gate.py",
     ]
@@ -74,6 +77,8 @@ def stage_card() -> bool:
     from fangyu.core.agent_card import validate_agent_card
     from fangyu.core.agent_factory import build_from_profile
     from fangyu.core.materials import load_materials
+    from fangyu.core.skill_pack import list_factory_skill_ids, load_skill_parsed
+    from fangyu.core.topology_export import load_topology, normalize_pipeline_stages
 
     tmp = Path(tempfile.mkdtemp(prefix="fangyu-gate-"))
     try:
@@ -95,7 +100,38 @@ def stage_card() -> bool:
 
         tb = json.loads((root / "config" / "toolbelt.json").read_text(encoding="utf-8"))
         ok_tb = _ok("toolbelt has webfetch+task", "webfetch" in tb.get("tools", []) and "task" in tb.get("tools", []))
-        return ok_card and ok_mat and ok_well and ok_tb
+
+        skill_ids = list_factory_skill_ids()
+        required_skills = {
+            "implement-and-verify",
+            "explore-codebase",
+            "research-web",
+            "office-decompose",
+            "multi-agent-split",
+        }
+        missing = sorted(required_skills - set(skill_ids))
+        ok_skills = _ok("factory skill packs", not missing, ",".join(missing) or f"n={len(skill_ids)}")
+        for sid in required_skills:
+            if sid in skill_ids and not load_skill_parsed(sid):
+                ok_skills = _ok(f"skill parse {sid}", False) and ok_skills
+
+        multi = build_from_profile(
+            "multi", tmp / "multi", intent="搜索分析汇总竞品报告", name="Gate-Multi",
+        )
+        topo = load_topology(multi)
+        stages = normalize_pipeline_stages(topo)
+        ok_topo = _ok(
+            "multi topology depends schedule",
+            len(stages) >= 2 and all(isinstance(s, list) and s for s in stages),
+            f"stages={stages}",
+        )
+        has_dep = any(
+            (e.get("type") or e.get("label")) == "depends"
+            for e in (topo.get("edges") or [])
+        )
+        ok_dep = _ok("topology has depends edges", has_dep)
+
+        return ok_card and ok_mat and ok_well and ok_tb and ok_skills and ok_topo and ok_dep
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

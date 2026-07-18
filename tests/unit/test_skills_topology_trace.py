@@ -1,4 +1,4 @@
-"""技能包扩容、task_child trace、拓扑并行段。"""
+"""技能包扩容、task_child trace、拓扑 depends / 并行。"""
 from __future__ import annotations
 
 import json
@@ -8,7 +8,11 @@ import pytest
 
 from fangyu.core.materials import default_materials
 from fangyu.core.skill_pack import list_factory_skill_ids, load_skill_parsed
-from fangyu.core.topology_export import normalize_pipeline_stages, write_topology
+from fangyu.core.topology_export import (
+    normalize_pipeline_stages,
+    stages_from_depends_edges,
+    write_topology,
+)
 from fangyu.engine.bundle_orchestrate import run_topology
 from fangyu.engine.harness_trace import read_traces
 
@@ -21,6 +25,7 @@ def test_factory_skill_packs_registered():
         "office-decompose",
         "code-review",
         "implement-and-verify",
+        "multi-agent-split",
     ):
         assert sid in ids
         parsed = load_skill_parsed(sid)
@@ -35,10 +40,12 @@ def test_factory_skill_packs_registered():
     assert "explore-codebase" in active
     assert "research-web" in active
     assert "office-decompose" in active
+    assert "multi-agent-split" in active
 
 
 def test_normalize_pipeline_stages_parallel():
     stages = normalize_pipeline_stages({
+        "schedule": "pipeline",
         "pipeline": [
             "a",
             {"parallel": ["b", "c"]},
@@ -52,6 +59,31 @@ def test_normalize_pipeline_stages_parallel():
         "pipeline": ["ignored"],
     })
     assert stages2 == [["scout"], ["w", "x"], ["pub"]]
+
+
+def test_stages_from_depends_diamond():
+    stages = stages_from_depends_edges(
+        [
+            {"source": "scout", "target": "writer", "type": "depends"},
+            {"source": "scout", "target": "analyst", "type": "depends"},
+            {"source": "writer", "target": "publisher", "type": "depends"},
+            {"source": "analyst", "target": "publisher", "type": "depends"},
+        ],
+        ["scout", "writer", "analyst", "publisher"],
+    )
+    assert stages == [["scout"], ["analyst", "writer"], ["publisher"]]
+
+    stages2 = normalize_pipeline_stages({
+        "agents": [
+            {"id": "scout"},
+            {"id": "writer", "depends_on": ["scout"]},
+            {"id": "analyst", "depends_on": ["scout"]},
+            {"id": "publisher", "depends_on": ["writer", "analyst"]},
+        ],
+        "pipeline": ["scout", "writer", "analyst", "publisher"],
+        "edges": [],
+    })
+    assert stages2 == [["scout"], ["analyst", "writer"], ["publisher"]]
 
 
 @pytest.mark.asyncio
@@ -101,21 +133,27 @@ async def test_task_child_trace(tmp_path, monkeypatch):
     assert child.get("task_depth") == 1
 
 
-def test_orchestrate_parallel_stage(tmp_path):
+def test_orchestrate_parallel_via_depends(tmp_path):
     from fangyu.core import config as config_mod
     from fangyu.core.agent_factory import build_from_profile
 
     prev = Path(config_mod.DATA_DIR)
     try:
         dest = tmp_path / "orch-par"
-        root = build_from_profile("multi", dest, intent="双人协作写周报")
+        # 三角模板保证 ≥3 角色，可造 scout∥ 扇出
+        root = build_from_profile("multi", dest, intent="搜索分析汇总竞品报告")
         topo = json.loads((root / "config" / "topology.json").read_text(encoding="utf-8"))
         agents = topo["agents"]
-        if len(agents) < 2:
-            pytest.skip("需要至少 2 个拓扑角色")
-        a0, a1 = agents[0]["id"], agents[1]["id"]
-        tail = [agents[2]["id"]] if len(agents) > 2 else []
-        topo["pipeline"] = [{"parallel": [a0, a1]}, *tail]
+        if len(agents) < 3:
+            pytest.skip("需要至少 3 个拓扑角色")
+        scout, a, b = agents[0]["id"], agents[1]["id"], agents[2]["id"]
+        # scout 先；a∥b 并行（均 depends on scout）
+        topo["edges"] = [
+            {"source": scout, "target": a, "type": "depends"},
+            {"source": scout, "target": b, "type": "depends"},
+        ]
+        topo["pipeline"] = [scout, a, b]
+        topo.pop("stages", None)
         write_topology(root, topo)
 
         calls = {"n": 0}
@@ -136,8 +174,8 @@ def test_orchestrate_parallel_stage(tmp_path):
 
         out = run_topology(root, "并行起草", llm=fake_llm, max_turns=4)
         assert out["success"] is True
+        assert out["topology"]["stages"] == [[scout], sorted([a, b])]
         parallel_steps = [s for s in out["steps"] if s.get("parallel_group")]
-        assert len(parallel_steps) >= 2
-        assert out["topology"]["stages"][0] == [a0, a1]
+        assert len(parallel_steps) == 2
     finally:
         config_mod.set_data_dir(prev)

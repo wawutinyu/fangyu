@@ -73,6 +73,7 @@ DEFAULT_MATERIALS: dict[str, Any] = {
         {"id": "code-review", "status": "active", "path": "skills/factory/code-review.md"},
         {"id": "implement-and-verify", "status": "active", "path": "skills/factory/implement-and-verify.md"},
         {"id": "office-decompose", "status": "active", "path": "skills/factory/office-decompose.md"},
+        {"id": "multi-agent-split", "status": "active", "path": "skills/factory/multi-agent-split.md"},
     ],
     "mcp": [
         {"id": "__internal__", "tools": ["current_time"]},

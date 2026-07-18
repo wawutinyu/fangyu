@@ -60,9 +60,16 @@
 
 若同时存在 `stages` 与 `pipeline`，**优先 `stages`**。
 
-### edges（声明用）
+### edges（运行时）
 
-`edges` 可描述画布依赖（含 `parallel` / `depends` 标签），供 Studio 与导出对齐；**运行时以 `stages` / `pipeline` 为准**。依赖边（A 必须先于 B）请落成 stages 顺序，而不是只画边不改 pipeline。
+`edges` 中 agent↔agent 的 **`type: depends`**（或 `handoff` / `agents[].depends_on`）会参与调度：
+
+- **优先级**：显式 `stages` > depends 波次 > `pipeline`（含 `{parallel:[...]}`）
+- **波次**：入度为 0 的节点同波并行；`source` 先于 `target`
+- **`schedule: "pipeline"`**：强制忽略边，只走 pipeline 写法
+- 画布路由边（router→agent）不参与；导出时若无 agent 间 depends，会按 pipeline 自动补串行 depends
+
+详见 `normalize_pipeline_stages` / `stages_from_depends_edges`。
 
 ## 3. task 并行速查
 
