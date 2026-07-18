@@ -58,6 +58,7 @@ python -m fangyu bundle peer-probe --instance <managed_id> --save
 | 运维 · 工厂 → **拉入画布** | 写入 `a2a-external` 并打开 **授权向导**（勾选技能） |
 | 画布「待授权」 | 同授权向导 |
 | Setup Copilot | URL 发现 → 继续授权向导 |
+| 授权后校验 | 向导第 4 步：本厂注册 + 对端探测 |
 
 ```bash
 # 可执行演示（临时端口）

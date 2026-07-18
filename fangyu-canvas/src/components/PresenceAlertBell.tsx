@@ -1,7 +1,8 @@
 /** 观 · 告警铃铛 — 工厂离线 / Eval 红 */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { fetchMonitorAlerts, type MonitorAlert, type MonitorAlertsResponse } from '../utils/monitorApi'
+import { useMonitorAlerts } from '../hooks/useMonitorAlerts'
+import type { MonitorAlert } from '../utils/monitorApi'
 
 interface Props {
   wallMode?: boolean
@@ -14,30 +15,10 @@ function formatTs(ts?: number) {
 }
 
 export default function PresenceAlertBell({ wallMode, pollMs = 45000 }: Props) {
-  const [meta, setMeta] = useState<MonitorAlertsResponse | null>(null)
+  const { meta, alerts, badge, error, reload } = useMonitorAlerts(pollMs)
   const [open, setOpen] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const btnRef = useRef<HTMLButtonElement | null>(null)
   const [pos, setPos] = useState<{ top: number; right: number }>({ top: 48, right: 16 })
-
-  const reload = useCallback(async () => {
-    try {
-      const body = await fetchMonitorAlerts(24)
-      setMeta(body)
-      setError(null)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    }
-  }, [])
-
-  useEffect(() => {
-    void reload()
-    const t = window.setInterval(() => { void reload() }, pollMs)
-    return () => clearInterval(t)
-  }, [reload, pollMs])
-
-  const badge = (meta?.offline_factories ?? 0) + (meta?.eval_fail ?? 0)
-  const alerts = meta?.alerts || []
 
   const openPopover = () => {
     const el = btnRef.current

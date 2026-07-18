@@ -29,6 +29,7 @@ import {
   readReplayPackFromFile,
 } from '../utils/presenceExport'
 import PresenceAlertBell from './PresenceAlertBell'
+import PresenceAlertStrip from './PresenceAlertStrip'
 import ActorDetailPanel from './ActorDetailPanel'
 import EventExplainCard from './EventExplainCard'
 import HouseCommonsScene from './HouseCommonsScene'
@@ -654,6 +655,8 @@ export default function PresencePanel() {
           </button>
         )}
       </div>
+
+      {wallMode && <PresenceAlertStrip />}
 
       {demoHint && (
         <div style={{ padding: '6px 16px', fontSize: 11, color: 'var(--text-muted)', background: 'var(--bg-secondary)' }}>

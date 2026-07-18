@@ -1,4 +1,4 @@
-/** 外部 Agent 授权向导 — 审阅 Card / 勾选技能 / 确认接入 */
+/** 外部 Agent 授权向导 — 审阅 Card / 勾选技能 / 确认接入 / 部署校验 */
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { AgentCanvasNode } from '../store/agentSlice'
@@ -6,12 +6,16 @@ import {
   completeExternalAuth,
   discoverExternalAgent,
 } from '../utils/externalAgent'
+import {
+  verifyExternalAgentDeploy,
+  type VerifyResult,
+} from '../utils/verifyExternalAgent'
 
 interface Props {
   open: boolean
   node: AgentCanvasNode | null
   onClose: () => void
-  onAuthorized?: (node: AgentCanvasNode) => void
+  onAuthorized?: (node: AgentCanvasNode, verify?: VerifyResult) => void
 }
 
 function skillIdsFromNode(node: AgentCanvasNode): string[] {
@@ -26,13 +30,15 @@ function skillIdsFromNode(node: AgentCanvasNode): string[] {
 }
 
 export default function ExternalAgentAuthWizard({ open, node, onClose, onAuthorized }: Props) {
-  const [step, setStep] = useState<0 | 1 | 2>(0)
+  const [step, setStep] = useState<0 | 1 | 2 | 3>(0)
   const [selected, setSelected] = useState<string[]>([])
   const [confirmed, setConfirmed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [localNode, setLocalNode] = useState<AgentCanvasNode | null>(null)
+  const [authorizedNode, setAuthorizedNode] = useState<AgentCanvasNode | null>(null)
+  const [verify, setVerify] = useState<VerifyResult | null>(null)
 
   useEffect(() => {
     if (!open || !node) return
@@ -41,6 +47,8 @@ export default function ExternalAgentAuthWizard({ open, node, onClose, onAuthori
     setConfirmed(false)
     setError(null)
     setStep(0)
+    setAuthorizedNode(null)
+    setVerify(null)
   }, [open, node])
 
   const skills = useMemo(() => {
@@ -95,6 +103,25 @@ export default function ExternalAgentAuthWizard({ open, node, onClose, onAuthori
     }
   }, [localNode])
 
+  const runVerify = useCallback(async (target: AgentCanvasNode) => {
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await verifyExternalAgentDeploy(target)
+      setVerify(result)
+      return result
+    } catch (e) {
+      const fail: VerifyResult = {
+        ok: false,
+        steps: [{ id: 'error', label: '校验异常', ok: false, detail: e instanceof Error ? e.message : String(e) }],
+      }
+      setVerify(fail)
+      return fail
+    } finally {
+      setBusy(false)
+    }
+  }, [])
+
   const submit = useCallback(async () => {
     if (!localNode || !confirmed || selected.length === 0) return
     setBusy(true)
@@ -110,15 +137,23 @@ export default function ExternalAgentAuthWizard({ open, node, onClose, onAuthori
           allowedSkills: selected,
         },
       }
-      await completeExternalAuth(next, selected)
-      onAuthorized?.(next)
-      onClose()
+      const done = await completeExternalAuth(next, selected)
+      setAuthorizedNode(done)
+      setStep(3)
+      setBusy(false)
+      await runVerify(done)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
-    } finally {
       setBusy(false)
     }
-  }, [localNode, confirmed, selected, onAuthorized, onClose])
+  }, [localNode, confirmed, selected, runVerify])
+
+  const finish = useCallback(() => {
+    const n = authorizedNode || localNode
+    if (!n) return
+    onAuthorized?.(n, verify || undefined)
+    onClose()
+  }, [authorizedNode, localNode, verify, onAuthorized, onClose])
 
   if (!open || !localNode) return null
 
@@ -131,7 +166,7 @@ export default function ExternalAgentAuthWizard({ open, node, onClose, onAuthori
         position: 'fixed', inset: 0, zIndex: 10065,
         background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      onClick={e => { if (e.target === e.currentTarget && step !== 3) onClose() }}
     >
       <div style={{
         width: 520, maxWidth: '92vw', maxHeight: '85vh', overflow: 'auto',
@@ -142,20 +177,22 @@ export default function ExternalAgentAuthWizard({ open, node, onClose, onAuthori
           <div>
             <div style={{ fontSize: 16, fontWeight: 700 }}>外部 Agent 授权</div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              审阅 → 勾选技能 → 确认接入（默认拒绝裸 *）
+              审阅 → 技能 → 确认 → 部署校验
             </div>
           </div>
           <button type="button" onClick={onClose} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 18 }}>×</button>
         </div>
 
-        <div style={{ display: 'flex', gap: 6, marginBottom: 14, fontSize: 11 }}>
-          {(['审阅', '技能', '确认'] as const).map((label, i) => (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 14, fontSize: 11, flexWrap: 'wrap' }}>
+          {(['审阅', '技能', '确认', '校验'] as const).map((label, i) => (
             <button
               key={label}
               type="button"
               className="notion-btn"
               style={{ fontWeight: step === i ? 600 : 400, opacity: step === i ? 1 : 0.7 }}
-              onClick={() => setStep(i as 0 | 1 | 2)}
+              onClick={() => {
+                if (i < 3 || authorizedNode) setStep(i as 0 | 1 | 2 | 3)
+              }}
             >
               {i + 1}. {label}
             </button>
@@ -269,6 +306,61 @@ export default function ExternalAgentAuthWizard({ open, node, onClose, onAuthori
                 {busy ? '接入中…' : '注册并授权'}
               </button>
             </div>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div data-testid="external-auth-verify" style={{ fontSize: 12, lineHeight: 1.55 }}>
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>
+              部署校验
+              {verify && (
+                <span style={{ marginLeft: 8, color: verify.ok ? '#1a7f37' : '#c0392b', fontWeight: 400 }}>
+                  {verify.ok ? '通过' : '未完全通过'}
+                </span>
+              )}
+              {!verify && busy && <span style={{ marginLeft: 8, color: 'var(--text-muted)', fontWeight: 400 }}>校验中…</span>}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {(verify?.steps || []).map(s => (
+                <div
+                  key={s.id}
+                  data-testid={`external-auth-verify-${s.id}`}
+                  style={{
+                    padding: '8px 10px', borderRadius: 6,
+                    border: '1px solid var(--border-light)',
+                    borderLeft: `3px solid ${s.ok ? '#52c41a' : '#dc2626'}`,
+                  }}
+                >
+                  <strong>{s.ok ? '✓' : '✗'} {s.label}</strong>
+                  {s.detail && (
+                    <div style={{ color: 'var(--text-muted)', marginTop: 2, wordBreak: 'break-word' }}>{s.detail}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="notion-btn"
+                disabled={busy || !authorizedNode}
+                onClick={() => authorizedNode && void runVerify(authorizedNode)}
+              >
+                {busy ? '校验中…' : '重试校验'}
+              </button>
+              <button
+                type="button"
+                className="notion-btn primary"
+                onClick={finish}
+                data-testid="external-auth-finish"
+              >
+                完成
+              </button>
+            </div>
+            {verify && !verify.ok && (
+              <div style={{ marginTop: 10, color: 'var(--text-muted)', fontSize: 11 }}>
+                授权已写入；对端不可达时可稍后重试。完成仍会把节点标为已授权。
+              </div>
+            )}
           </div>
         )}
       </div>

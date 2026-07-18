@@ -759,7 +759,7 @@ export default function App() {
         open={!!authWizardNode}
         node={authWizardNode}
         onClose={() => setAuthWizardNode(null)}
-        onAuthorized={(node) => {
+        onAuthorized={(node, verify) => {
           store.dispatch(updateAgentNode({
             id: node.id,
             data: {
@@ -768,10 +768,16 @@ export default function App() {
               label: node.label,
             },
           }))
-          // 若不在画布则补上
           const exists = store.getState().agent.nodes.some(n => n.id === node.id)
           if (!exists) store.dispatch(addAgentNode(node))
-          flashHangHint(`已授权外部 Agent「${node.label}」`, 4500)
+          if (verify?.ok) {
+            flashHangHint(`已授权 · 部署校验通过「${node.label}」`, 5000)
+          } else if (verify) {
+            const fail = (verify.steps || []).filter(s => !s.ok).map(s => s.label).join('、')
+            flashHangHint(`已授权「${node.label}」· 校验未过：${fail || '见向导'}`, 6000)
+          } else {
+            flashHangHint(`已授权外部 Agent「${node.label}」`, 4500)
+          }
           setAuthWizardNode(null)
         }}
       />

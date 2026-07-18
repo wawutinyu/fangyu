@@ -115,9 +115,10 @@
 ㉙ Eval↔值班墙 + 跨厂投递样例     ✅ eval.fail 去观 · cross-factory-task
 ㉚ 跨厂 live smoke + 外部 ACL 默认  ✅ key-free cross_factory · agent:call:external:*
 ㉛ 授权向导 + 观告警铃铛           ✅ ExternalAuthWizard · PresenceAlertBell
+㉜ 授权后部署校验 + 大屏告警条     ✅ verify 步骤 · PresenceAlertStrip
 ```
 
-下一刀：真 IM（仍暂缓）· 外部授权后一键部署校验 · 告警铃铛进值班大屏投屏条。
+下一刀：真 IM（仍暂缓）· 外部 Agent 调用试跑样例 · Eval 红铃铛推 SSE。
 
 ---
 
