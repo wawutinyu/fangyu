@@ -67,6 +67,11 @@ def list_templates():
         ],
         "agent_templates": [
             {
+                "id": "office_report",
+                "label": "办公起草·审校·落盘",
+                "desc": "P4 办公×编排：三专家 + write_deliverable",
+            },
+            {
                 "id": "search_analyze_summarize",
                 "label": "检索·分析·汇总",
                 "desc": "路由器 + 三 Agent",

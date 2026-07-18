@@ -119,7 +119,7 @@ G2-E 多编排     ██████░░░░  ~55%
 | **P1** | 真双厂值班验收 | ✅ D1–D9 脚本可签字；挂 `factory_gate --live-tier smoke` |
 | **P2** | 编排边 ACL | ✅ topology 边 / rules；越权可拦可审计 |
 | **P3** | 真 IM（单开） | 飞书私聊触发→回复；不挡底座 |
-| **P4** | 办公×编排交叉 | 一句任务拆多专家；IM 触发整网 |
+| **P4** | 办公×编排交叉 | ✅ office_report + IM orchestrate 可演示验收 |
 
 详见 [毕业标准 · 推进计划](GRADUATION_EXPORTABLE_AGENT.md#建议推进顺序仍服务总毕业)。
 

@@ -2,7 +2,7 @@
 
 > 目标：无 Key 也能证明「原料 + harness + 导出物」可毕业；有 Key 再跑 live。
 
-关联：[技术雷达](TECH_RADAR_2026.md) · [毕业标准](GRADUATION_EXPORTABLE_AGENT.md) · `scripts/factory_gate.py`
+关联：[技术雷达](TECH_RADAR_2026.md) · [毕业标准](GRADUATION_EXPORTABLE_AGENT.md) · [A2A 发现](A2A_DISCOVERY.md) · [双厂值班](DUAL_FACTORY_DUTY.md) · [办公×编排](OFFICE_ORCHESTRATE.md) · `scripts/factory_gate.py`
 
 ## 怎么跑
 

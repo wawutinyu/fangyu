@@ -82,7 +82,7 @@
 | 1 | **设计态**：意图 → Agent 网 / Agent 画布协作拓扑 | 部分（`to-agents`、Agent 画布 MVP） |
 | 2 | **运行态**：`/orchestrate` / A2A 管线可跑通本厂+外来 | 部分（有 API / demo） |
 | 3 | **导出态**：多 Agent 拓扑 **打进 Bundle / 部署物**，脱离 Studio 也能编 | ✅ `profile multi` + `topology.json` + `bundle orchestrate` |
-| 4 | 与 G2-A/B 结合：一句办公任务可拆给多专家；IM 可触发整网而非单人 | 部分（im `mode=orchestrate`） |
+| 4 | 与 G2-A/B 结合：一句办公任务可拆给多专家；IM 可触发整网而非单人 | ✅ `office_report` + IM `mode=orchestrate`（需 multi/topology） |
 | 5 | 与 G2-C 结合：编排边上的权限（谁可调谁、跨 Agent 工具边界） | ✅ `topology` 边 `acl` + `core/topology_acl.py` |
 
 **现成资产：** Agent 画布 · `POST /orchestrate` · `intent/to-agents` · A2A · `bundle orchestrate` · `/api/v1/im/*`
@@ -97,9 +97,9 @@ G2-A 办公竖切 ████████░░  ~80%（md+docx+xlsx）
 G2-B IM       ████░░░░░░  ~45%（真机暂缓）
 G2-C 企业权限 ███████░░░  ~75%（ACL+SSO；编排边 ACL ✅）
 G2-D 托管     █████████░  ~85%（manage+Studio；升级/重启 ✅）
-G2-E 多编排   ███████░░░  ~65%（边 ACL ✅）
+G2-E 多编排   ███████░░░  ~70%（边 ACL + 办公模板/IM orchestrate）
 ────────────────────────
-总毕业(G1∧G2) █████░░░░░  ~62%
+总毕业(G1∧G2) ██████░░░░  ~65%
 ```
 
 ---
@@ -123,7 +123,7 @@ G2-E 多编排   ███████░░░  ~65%（边 ACL ✅）
 | **P1** | 真双厂值班验收 | ✅ `scripts/dual_factory_duty_acceptance.py`（D1–D9）；见 [双厂值班](DUAL_FACTORY_DUTY.md) |
 | **P2** | 编排边 ACL | ✅ topology 边声明 + 越权可拦可审计；G2-E #5 |
 | **P3** | 飞书真机（单开） | 运维向导配凭证 → 私聊触发 Bundle/harness → 回复回会话；不挡 P0–P2 |
-| **P4** | 办公×编排交叉 | 一句办公任务拆多专家；IM `mode=orchestrate` 触发整网可演示验收 |
+| **P4** | 办公×编排交叉 | ✅ `office_report` 模板 + IM orchestrate 单测；见 [办公×编排](OFFICE_ORCHESTRATE.md) |
 
 关联：[项目评估](PROJECT_ASSESSMENT.md) · [技术雷达](TECH_RADAR_2026.md)
 
@@ -137,7 +137,7 @@ G2-E 多编排   ███████░░░  ~65%（边 ACL ✅）
 | G1 live / graduation C 常绿 | ✅ **P0 已打通**（2026-07-19：mock 先 plan；live `FANGYU_SHELL_POLICY=allow`） |
 | G2-A workbuddy + live 脚本 | ✅ |
 | G2-E multi 导出编排 | ✅ 骨架 |
-| G2-E 编排边 ACL | ✅ **P2** `topology_acl` |
+| G2-E 办公×编排交叉 | ✅ **P4** `office_report` + IM orchestrate 单测 |
 | G2-B 飞书 IM 通道（代码） | ✅ |
 | G2-B 飞书真机 | ☐ **P3**（暂缓可开） |
 | G2-D 托管 manage | ✅ |

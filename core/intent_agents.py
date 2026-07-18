@@ -4,7 +4,13 @@ from __future__ import annotations
 import re
 from typing import Any, Literal
 
-TemplateId = Literal["search_analyze_summarize", "worker_pair", "simple_dual"]
+TemplateId = Literal[
+    "office_report",
+    "search_analyze_summarize",
+    "worker_pair",
+    "simple_dual",
+]
+
 
 _DEFAULT_TRUST = {
     "enabled": True,
@@ -21,6 +27,12 @@ def classify_agent_intent(intent: str) -> TemplateId:
     text = (intent or "").strip().lower()
     if not text:
         return "simple_dual"
+    # P4 办公×编排：周报/纪要/公文类优先走起草→审校→落盘
+    if any(k in text for k in (
+        "周报", "纪要", "公文", "会议纪要", "协作写", "落盘",
+        "deliverable", "brief", "memo", "docx", "xlsx",
+    )):
+        return "office_report"
     if any(k in text for k in ("搜索", "检索", "分析", "汇总", "总结", "search", "analyze", "summary")):
         return "search_analyze_summarize"
     if any(k in text for k in ("工人", "worker", "巡检", "执行", "干活", "产线")):
@@ -88,6 +100,73 @@ def _agent(
         },
         "trust": dict(_DEFAULT_TRUST),
         "skillFlows": {skill_id: _llm_flow(system_prompt)},
+    }
+
+
+def build_office_report(intent: str) -> dict[str, Any]:
+    """P4 办公×编排：起草 → 审校 → 落盘（office toolbelt / write_deliverable）。"""
+    title = _short(intent)
+    nodes = [
+        _agent(
+            "agent_draft", "起草专员", x=80, y=120,
+            skill_id="draft", skill_name="起草",
+            desc=f"起草：{title}",
+            system_prompt=(
+                f"你是办公起草专员。围绕「{title}」写出完整初稿。"
+                "优先用 write_deliverable 落盘到 deliverables/（md 即可）。"
+            ),
+        ),
+        _agent(
+            "agent_review", "审校专员", x=80, y=280,
+            skill_id="review", skill_name="审校",
+            desc=f"审校：{title}",
+            system_prompt=(
+                f"你是办公审校专员。根据上一步结果修订「{title}」。"
+                "用 write_deliverable 写出修订稿。"
+            ),
+        ),
+        _agent(
+            "agent_publish", "落盘专员", x=80, y=440,
+            skill_id="publish", skill_name="落盘",
+            desc=f"落盘：{title}",
+            system_prompt=(
+                f"你是办公落盘专员。把关于「{title}」的终稿整理成交付物。"
+                "必须调用 write_deliverable（可用 kind=md 或 docx），路径如 report/final。"
+            ),
+        ),
+        {
+            "id": "router_main",
+            "label": "办公协调",
+            "type": "a2a-router",
+            "position": {"x": 380, "y": 280},
+            "agentCard": {
+                "name": "办公协调",
+                "version": "1.0.0",
+                "capabilities": {"streaming": False, "pushNotifications": False},
+                "skills": [],
+                "defaultInterface": {"type": "in-memory"},
+            },
+            "trust": dict(_DEFAULT_TRUST),
+            "routingRules": [
+                {"id": "r1", "sourceSkill": "draft", "targetAgentId": "agent_draft", "priority": 10},
+                {"id": "r2", "sourceSkill": "review", "targetAgentId": "agent_review", "priority": 10},
+                {"id": "r3", "sourceSkill": "publish", "targetAgentId": "agent_publish", "priority": 10},
+            ],
+            "defaultTarget": "agent_draft",
+        },
+    ]
+    edges = [
+        {"id": "ae1", "source": "router_main", "target": "agent_draft", "label": "draft"},
+        {"id": "ae2", "source": "router_main", "target": "agent_review", "label": "review"},
+        {"id": "ae3", "source": "router_main", "target": "agent_publish", "label": "publish"},
+        {"id": "ae4", "source": "agent_draft", "target": "agent_review", "label": "handoff"},
+        {"id": "ae5", "source": "agent_review", "target": "agent_publish", "label": "handoff"},
+    ]
+    return {
+        "graph_name": f"意图·办公·{title}",
+        "nodes": nodes,
+        "edges": edges,
+        "pipeline": ["agent_draft", "agent_review", "agent_publish"],
     }
 
 
@@ -220,6 +299,8 @@ def build_simple_dual(intent: str) -> dict[str, Any]:
 
 
 def build_agent_graph(intent: str, template: TemplateId) -> dict[str, Any]:
+    if template == "office_report":
+        return build_office_report(intent)
     if template == "search_analyze_summarize":
         return build_search_analyze_summarize(intent)
     if template == "worker_pair":
@@ -243,6 +324,7 @@ def intent_to_agent_graph(
         "mode": "template",
         "graph": graph,
         "rationale": {
+            "office_report": "办公起草→审校→落盘（P4）",
             "search_analyze_summarize": "检索→分析→汇总 三角协作",
             "worker_pair": "观察 Worker + 执行 Worker",
             "simple_dual": "双 Agent 最小协作",

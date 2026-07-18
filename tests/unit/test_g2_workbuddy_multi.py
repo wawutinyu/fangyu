@@ -153,3 +153,69 @@ def test_orchestrate_mock_llm(tmp_path, restore_data_dir):
     tools = office_toolbelt()
     files = tools["list_deliverables"]()
     assert files, "应有 deliverables 落盘"
+
+
+def test_office_intent_picks_office_report_template(tmp_path, restore_data_dir):
+    from fangyu.core.intent_agents import classify_agent_intent, intent_to_agent_graph
+
+    assert classify_agent_intent("协作写本周产品周报并落盘") == "office_report"
+    g = intent_to_agent_graph("写会议纪要并导出")
+    assert g["template"] == "office_report"
+    assert g["graph"]["pipeline"] == ["agent_draft", "agent_review", "agent_publish"]
+
+    root = build_from_profile("multi", tmp_path / "office-multi", intent="写周报并落盘")
+    topo = load_topology(root)
+    ids = [a["id"] for a in topo.get("agents") or []]
+    assert "agent_draft" in ids
+    assert "agent_publish" in ids
+
+
+def test_im_orchestrate_office_multi_mock(tmp_path, restore_data_dir):
+    """P4：一句办公任务 → multi 拓扑 → IM mode=orchestrate → deliverables。"""
+    from fangyu.engine.im_inbound import handle_inbound_text, write_im_config
+
+    root = build_from_profile(
+        "multi",
+        tmp_path / "im-orch",
+        intent="协作写周报并落盘纪要",
+        name="OfficeNet",
+    )
+    write_im_config(root, {"channel": "generic", "mode": "orchestrate", "enabled": True})
+    calls = {"n": 0}
+
+    async def fake_llm(_messages):
+        calls["n"] += 1
+        if calls["n"] % 2 == 1:
+            return json.dumps({
+                "action": "tool",
+                "name": "write_deliverable",
+                "args": {
+                    "path": f"im_step{calls['n']}.md",
+                    "content": f"# IM step {calls['n']}\n周报内容\n",
+                    "kind": "md",
+                },
+            }, ensure_ascii=False)
+        return json.dumps({"action": "done", "result": f"im-done-{calls['n']}"}, ensure_ascii=False)
+
+    out = handle_inbound_text(
+        root,
+        "请写本周产品周报",
+        mode="orchestrate",
+        llm=fake_llm,
+        max_turns=4,
+    )
+    assert out.get("mode") == "orchestrate"
+    assert out.get("success") is True
+    assert out.get("steps") and len(out["steps"]) >= 2
+    init_bundle_workspace(root)
+    files = office_toolbelt()["list_deliverables"]()
+    assert files, "IM orchestrate 应落盘 deliverables"
+
+
+def test_im_orchestrate_requires_topology(tmp_path, restore_data_dir):
+    from fangyu.engine.im_inbound import handle_inbound_text
+
+    root = build_from_profile("workbuddy", tmp_path / "wb-only")
+    out = handle_inbound_text(root, "写周报", mode="orchestrate")
+    assert out.get("success") is False
+    assert "topology" in str(out.get("error") or "")

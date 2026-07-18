@@ -19,6 +19,7 @@ def client():
         ("hi", "simple_dual"),
         ("搜索并分析再汇总", "search_analyze_summarize"),
         ("产线巡检工人执行", "worker_pair"),
+        ("请协作写本周产品周报并落盘", "office_report"),
         ("please collaborate on a long enough topic", "search_analyze_summarize"),
     ],
 )
