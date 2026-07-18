@@ -154,7 +154,7 @@ async def run_agent_loop(
 
     policy_token = set_shell_policy(shell_policy or "ask")
     try:
-        return await _run_agent_loop_body(
+        out = await _run_agent_loop_body(
             goal=goal,
             tools=tools,
             llm=llm,
@@ -167,6 +167,16 @@ async def run_agent_loop(
             task_max_turns=task_max_turns,
             agent_mode=mode,
         )
+        if task_depth == 0:
+            try:
+                from fangyu.engine.harness_trace import append_harness_trace, summarize_loop_result
+
+                append_harness_trace(
+                    summarize_loop_result(goal=goal, out=out, agent_mode=mode),
+                )
+            except Exception:
+                pass
+        return out
     finally:
         reset_shell_policy(policy_token)
 

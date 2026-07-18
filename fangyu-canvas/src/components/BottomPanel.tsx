@@ -10,6 +10,7 @@ import McpPanel from './McpPanel'
 import AssetLibrary from './AssetLibrary'
 import WorkerPanel from './WorkerPanel'
 import OpsPanel from './OpsPanel'
+import MaterialsShelf from './MaterialsShelf'
 import { useAssetContext } from '../context/AssetContext'
 
 const PRIMARY_TABS = [
@@ -20,6 +21,7 @@ const PRIMARY_TABS = [
 ]
 
 const MORE_TABS = [
+  { key: 'materials', label: '原料', title: '工具/技能/MCP 货架', icon: 'M3 3h7v7H3V3zm11 0h7v7h-7V3zM3 14h7v7H3v-7zm11 0h7v7h-7v-7z' },
   { key: 'history', label: '运行历史', icon: 'M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z' },
   { key: 'trigger', label: '调度', icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-2-3.5l6-4.5-6-4.5v9z' },
   { key: 'monitor', label: '执行日志', icon: 'M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z' },
@@ -264,6 +266,7 @@ export default function BottomPanel({
         {activeTab === 'trigger' && <TriggerPanel />}
         {activeTab === 'monitor' && <MonitorPanel headerless />}
         {activeTab === 'ops' && <OpsPanel headerless />}
+        {activeTab === 'materials' && <MaterialsShelf headerless />}
         {activeTab === 'mcp' && <McpPanel headerless />}
         {activeTab === 'knowledge' && <KnowledgePanel headerless />}
         {activeTab === 'tools' && <ToolRegistry headerless />}

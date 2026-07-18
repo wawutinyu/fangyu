@@ -116,6 +116,10 @@ def merge_materials(base: dict[str, Any], overlay: dict[str, Any] | None) -> dic
             else:
                 by_id[tid] = dict(it)
         merged[key] = list(by_id.values())
+    if isinstance(overlay.get("mcp"), list):
+        merged["mcp"] = deepcopy(overlay["mcp"])
+    if isinstance(overlay.get("policies"), dict):
+        merged["policies"] = {**(merged.get("policies") or {}), **overlay["policies"]}
     return merged
 
 

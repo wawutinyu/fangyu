@@ -57,9 +57,9 @@
 
 ### 接着（2～4 周）— **工厂可装配体验**
 
-5. Studio「原料货架」：勾选 tools / skills / mcp → 写入 materials.json  
+5. Studio「原料货架」：勾选 tools / skills / mcp → 写入 materials.json ✅ `/api/v1/materials` + 更多·原料  
 6. 拓扑：并行边 + 与 `task` 职责说明（厂内动态 vs 导出编队）  
-7. 观测：agent-loop trace 结构化落盘（含 task 子会话、shell ask）  
+7. 观测：agent-loop trace 结构化落盘 ✅ `.fangyu/harness_trace.jsonl`（顶层 loop；子会话摘要可后续加厚）  
 8. 更多技能包：`explore-codebase`、`research-web`、`office-decompose`
 
 ### 以后（不挡主线）
@@ -87,9 +87,11 @@
 ② Skills frontmatter + 按需加载   ✅ skill_load + 目录摘要
 ③ MCP tools:"*" 展开             ✅ _expand_mcp_tool_names
 ④ Agent Card 导出校验            ✅ .well-known/agent-card.json
+⑤ Studio 原料货架 + draft/bundle ✅ routers/materials + MaterialsShelf
+⑥ harness_trace 落盘             ✅ engine/harness_trace.py
 ```
 
-下一刀：Studio 原料货架 UI · 观测落盘 · 更多技能包。
+下一刀：更多技能包 · task 子会话 trace 加厚 · 拓扑并行边说明。
 
 ---
 
