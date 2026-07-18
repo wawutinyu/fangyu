@@ -1,6 +1,7 @@
-/** 外部 Agent 试跑：经平台 A2A 发一条 ping */
+/** 外部 Agent 试跑：经平台 A2A 发一条 ping，并写入观事件 */
 import type { AgentCanvasNode } from '../store/agentSlice'
 import { a2aSend } from './a2aSend'
+import { emitPresenceEvent } from './presenceApi'
 
 export interface PingResult {
   ok: boolean
@@ -27,55 +28,86 @@ export function extractA2aTaskText(task: Record<string, unknown>): string {
   return '(无输出)'
 }
 
+async function emitPingPresence(
+  node: AgentCanvasNode,
+  result: PingResult,
+  skill: string,
+): Promise<void> {
+  const ok = result.ok
+  await emitPresenceEvent({
+    kind: 'external.ping',
+    actor: 'studio:external-auth',
+    target: node.id,
+    message: `试跑${ok ? '通过' : '未过'} · ${node.label || node.id}`,
+    severity: ok ? 'info' : (result.state === 'denied' ? 'deny' : 'warn'),
+    detail: {
+      ok,
+      state: result.state,
+      task_id: result.taskId,
+      skill_id: skill,
+      excerpt: result.excerpt,
+      error: result.error,
+      rpc_url: node.externalConfig?.rpcUrl,
+      source: 'ExternalAgentAuthWizard',
+    },
+  })
+}
+
 export async function pingExternalAgent(
   node: AgentCanvasNode,
   *,
   text = 'ping from 方隅授权向导',
   skillId?: string,
+  emitPresence = true,
 ): Promise<PingResult> {
   const skill = skillId
     || node.externalConfig?.allowedSkills?.[0]
     || node.agentCard?.skills?.[0]?.id
     || 'default'
+  const resolvedSkill = skill === '*' ? 'default' : skill
+  let result: PingResult
   try {
     const resp = await a2aSend({
       target_agent: node.id,
       message: {
         role: 'user',
         parts: [{ type: 'text', text }],
-        metadata: { skill_id: skill === '*' ? 'default' : skill },
+        metadata: { skill_id: resolvedSkill },
       },
     })
     const task = await resp.json() as Record<string, unknown>
     if (!resp.ok) {
-      return {
+      result = {
         ok: false,
         error: typeof task.detail === 'string' ? task.detail : `HTTP ${resp.status}`,
       }
-    }
-    if (task.violation) {
-      return {
+    } else if (task.violation) {
+      result = {
         ok: false,
         state: 'denied',
         excerpt: extractA2aTaskText(task),
         error: extractA2aTaskText(task),
         taskId: String(task.id || ''),
       }
-    }
-    const status = task.status as { state?: string } | undefined
-    const state = String(status?.state || '')
-    const ok = state === 'completed' || state === 'working' || state === 'submitted'
-    return {
-      ok: ok && state === 'completed',
-      state,
-      excerpt: extractA2aTaskText(task).slice(0, 240),
-      taskId: String(task.id || ''),
-      error: state && state !== 'completed' ? `state=${state}` : undefined,
+    } else {
+      const status = task.status as { state?: string } | undefined
+      const state = String(status?.state || '')
+      result = {
+        ok: state === 'completed',
+        state,
+        excerpt: extractA2aTaskText(task).slice(0, 240),
+        taskId: String(task.id || ''),
+        error: state && state !== 'completed' ? `state=${state}` : undefined,
+      }
     }
   } catch (e) {
-    return {
+    result = {
       ok: false,
       error: e instanceof Error ? e.message : String(e),
     }
   }
+  if (emitPresence) {
+    void emitPingPresence(node, result, resolvedSkill)
+  }
+  return result
 }

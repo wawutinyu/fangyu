@@ -214,3 +214,31 @@ export function formatEventTime(ts: number): string {
     return String(ts)
   }
 }
+
+/** 写入协作事件（观时间轴 / SSE） */
+export async function emitPresenceEvent(input: {
+  kind: string
+  actor?: string
+  target?: string | null
+  message?: string
+  detail?: Record<string, unknown>
+  severity?: string
+}): Promise<boolean> {
+  try {
+    const res = await fetch('/api/v1/presence/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        kind: input.kind,
+        actor: input.actor || '',
+        target: input.target ?? null,
+        message: input.message || '',
+        detail: input.detail || {},
+        severity: input.severity || 'info',
+      }),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}

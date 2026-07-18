@@ -68,4 +68,27 @@ describe('explainCollabEvent', () => {
     expect(up.title).toContain('升级')
     expect(up.plain).toContain('x')
   })
+
+  it('explains external.ping success and fail', () => {
+    const ok = explainCollabEvent(ev({
+      kind: 'external.ping',
+      actor: 'studio:external-auth',
+      target: 'ext_peer',
+      message: '试跑通过 · 西厂',
+      detail: { ok: true, excerpt: 'pong' },
+    }))
+    expect(ok.title).toContain('试跑通过')
+    expect(ok.plain).toContain('ext_peer')
+
+    const bad = explainCollabEvent(ev({
+      kind: 'external.ping',
+      actor: 'studio:external-auth',
+      target: 'ext_peer',
+      message: '试跑未过 · 西厂',
+      severity: 'warn',
+      detail: { ok: false, error: 'denied' },
+    }))
+    expect(bad.title).toContain('试跑未过')
+    expect(bad.severity).toBe('warn')
+  })
 })

@@ -59,7 +59,8 @@ python -m fangyu bundle peer-probe --instance <managed_id> --save
 | 画布「待授权」 | 同授权向导 |
 | Setup Copilot | URL 发现 → 继续授权向导 |
 | 授权后校验 | 向导第 4 步：本厂注册 + 对端探测 |
-| 试跑 ping | 同页「试跑 ping」→ 平台 `a2a/send` 一条短消息 |
+| 试跑 ping | 同页「试跑 ping」→ 平台 `a2a/send`；结果写观 `external.ping` |
+| 健康分 | `GET /factories` 附带 `health.score`；运维工厂行徽章 + 按分排序 |
 
 ```bash
 # 可执行演示（临时端口）

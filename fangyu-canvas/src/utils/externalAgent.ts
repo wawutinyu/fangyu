@@ -49,6 +49,10 @@ export async function listRemoteFactories(): Promise<Array<{
   base_url: string
   rpc_url?: string
   label?: string
+  card_name?: string
+  online?: boolean
+  last_heartbeat_at?: number
+  health?: { score: number; grade?: string; factors?: Record<string, unknown> }
 }>> {
   const resp = await fetch('/api/v1/a2a/factories')
   if (!resp.ok) return []

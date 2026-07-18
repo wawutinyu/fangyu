@@ -204,6 +204,22 @@ export function explainCollabEvent(ev: CollaborationEvent): PlainExplanation {
     }
   }
 
+  if (kind === 'external.ping') {
+    const ok = (ev.detail as { ok?: boolean } | undefined)?.ok
+    const excerpt = String((ev.detail as { excerpt?: string } | undefined)?.excerpt || '')
+    return {
+      title: ok ? '外部试跑通过' : '外部试跑未过',
+      plain: msg
+        || (ok
+          ? `${ev.actor} 对外部 Agent「${ev.target || '？'}」试跑成功${excerpt ? `：「${excerpt.slice(0, 80)}」` : ''}。`
+          : `${ev.actor} 对外部 Agent「${ev.target || '？'}」试跑失败。`),
+      nextStep: ok
+        ? '可在序·Agent 画布点名调用；需要权限时确认 agent:call:external:*。'
+        : '检查对端在线、授权技能与组织 ACL；可在授权向导重试试跑。',
+      severity: ok ? 'info' : (severity === 'deny' ? 'deny' : 'warn'),
+    }
+  }
+
   if (kind.includes('fail') || kind.includes('error') || severity === 'error') {
     return {
       title: '协作出错',

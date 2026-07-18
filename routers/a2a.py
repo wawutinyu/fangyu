@@ -355,8 +355,8 @@ def factories_probe_save(body: FactoryProbeSaveBody):
 
 @router.get("/factories")
 def factories_list():
-    from fangyu.core.a2a_factories import load_factories
-    return {"factories": load_factories()}
+    from fangyu.core.a2a_factories import list_factories_enriched
+    return {"factories": list_factories_enriched()}
 
 
 @router.post("/factories/heartbeat")

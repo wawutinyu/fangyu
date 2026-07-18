@@ -95,7 +95,9 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
     updated_at?: number
     online?: boolean
     last_heartbeat_at?: number
+    health?: { score: number; grade?: string }
   }>>([])
+  const [facSortHealth, setFacSortHealth] = useState(true)
   const [facProbe, setFacProbe] = useState<{
     ok?: boolean
     base_url?: string
@@ -1174,16 +1176,50 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
           {factories.length === 0 && (
             <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 12 }}>通讯录为空</div>
           )}
-          {factories.map(f => (
+          {factories.length > 0 && (
+            <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input
+                type="checkbox"
+                checked={facSortHealth}
+                onChange={e => setFacSortHealth(e.target.checked)}
+                data-testid="factory-sort-health"
+              />
+              按健康分排序
+            </label>
+          )}
+          {[...factories]
+            .sort((a, b) => {
+              if (!facSortHealth) return 0
+              return (b.health?.score ?? -1) - (a.health?.score ?? -1)
+            })
+            .map(f => {
+            const hs = f.health?.score
+            const healthColor = hs == null ? 'var(--text-muted)'
+              : hs >= 80 ? '#1a7f37'
+                : hs >= 50 ? '#d48806'
+                  : '#c0392b'
+            return (
             <div
               key={f.id}
               style={{ border: '1px solid var(--border-light)', borderRadius: 6, padding: 10 }}
             >
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <strong>{f.label || f.card_name || f.id}</strong>
                 {f.online != null && (
                   <span style={{ fontSize: 11, color: f.online ? '#1a7f37' : '#c0392b' }}>
                     {f.online ? '在线' : '离线'}
+                  </span>
+                )}
+                {hs != null && (
+                  <span
+                    data-testid="factory-health-badge"
+                    title={`健康分 ${hs} · 档 ${f.health?.grade || '—'}`}
+                    style={{
+                      fontSize: 11, fontWeight: 600, padding: '1px 6px', borderRadius: 4,
+                      color: '#fff', background: healthColor,
+                    }}
+                  >
+                    健康 {hs}
                   </span>
                 )}
               </div>
@@ -1226,7 +1262,8 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
                 </button>
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

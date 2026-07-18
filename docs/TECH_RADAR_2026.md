@@ -117,9 +117,10 @@
 ㉛ 授权向导 + 观告警铃铛           ✅ ExternalAuthWizard · PresenceAlertBell
 ㉜ 授权后部署校验 + 大屏告警条     ✅ verify 步骤 · PresenceAlertStrip
 ㉝ 试跑 ping + 告警铃铛 SSE        ✅ wizard 试跑 · Presence SSE 刷新 alerts
+㉞ 试跑写观 + 工厂健康分           ✅ external.ping · factories health score
 ```
 
-下一刀：真 IM（仍暂缓）· 试跑结果写 Presence 事件 · 工厂通讯录健康分。
+下一刀：真 IM（仍暂缓）· 健康分进值班墙主机色 · 试跑失败进观测告警。
 
 ---
 

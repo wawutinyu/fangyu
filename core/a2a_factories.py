@@ -133,12 +133,16 @@ def heartbeat_factories(
             row["rpc_url"] = probe["rpc_url"]
         meta = dict(row.get("meta") or {})
         meta["last_heartbeat_error"] = err or None
-        if was_online is True and not ok:
-            meta["offline_since"] = now
-            meta["alert"] = "offline"
-        elif ok:
+        if ok:
+            meta["consecutive_failures"] = 0
             meta.pop("offline_since", None)
             meta.pop("alert", None)
+        else:
+            fails = int(meta.get("consecutive_failures") or 0) + 1
+            meta["consecutive_failures"] = fails
+            if was_online is True or fails >= 1:
+                meta.setdefault("offline_since", now)
+                meta["alert"] = "offline"
         row["meta"] = meta
         if ok:
             online_n += 1
@@ -197,6 +201,7 @@ def heartbeat_factories(
         })
 
     save_factories(rows)
+    enriched = [enrich_factory_row(r, now=now, ttl_sec=ttl_sec) for r in rows]
     return {
         "ok": True,
         "ts": now,
@@ -204,7 +209,7 @@ def heartbeat_factories(
         "online": online_n,
         "offline": len(results) - online_n,
         "results": results,
-        "factories": rows,
+        "factories": enriched,
     }
 
 
@@ -316,5 +321,92 @@ def align_factories_and_presence(
         "import_details": imported,
         "export_details": exported,
         "heartbeat": hb,
-        "factories": load_factories(),
+        "factories": list_factories_enriched(),
     }
+
+
+def compute_factory_health(
+    row: dict[str, Any],
+    *,
+    now: float | None = None,
+    ttl_sec: float = 120.0,
+) -> dict[str, Any]:
+    """计算工厂健康分 0–100。
+
+    构成：在线 40 · 心跳新鲜 30 · 最近探测 20 · 连续失败惩罚最多 10。
+    """
+    ts = float(now if now is not None else time.time())
+    ttl = max(15.0, float(ttl_sec or 120.0))
+    meta = row.get("meta") if isinstance(row.get("meta"), dict) else {}
+    online = row.get("online")
+    last_hb = row.get("last_heartbeat_at")
+    probe_ok = row.get("last_probe_ok")
+    fails = int(meta.get("consecutive_failures") or 0)
+
+    factors: dict[str, Any] = {}
+    score = 0
+
+    if online is True:
+        score += 40
+        factors["online"] = 40
+    elif online is False:
+        factors["online"] = 0
+    else:
+        # 从未探测：给中性基线，避免全 0 误导
+        score += 20
+        factors["online"] = 20
+
+    if last_hb:
+        age = max(0.0, ts - float(last_hb))
+        freshness = max(0.0, 30.0 * (1.0 - min(1.0, age / ttl)))
+        score += freshness
+        factors["freshness"] = round(freshness, 1)
+        factors["heartbeat_age_sec"] = round(age, 1)
+    else:
+        factors["freshness"] = 0
+
+    if probe_ok is True:
+        score += 20
+        factors["probe"] = 20
+    elif probe_ok is False:
+        factors["probe"] = 0
+    else:
+        score += 10
+        factors["probe"] = 10
+
+    penalty = min(10, fails * 2)
+    score -= penalty
+    factors["fail_penalty"] = -penalty
+    factors["consecutive_failures"] = fails
+
+    score = int(max(0, min(100, round(score))))
+    if score >= 80:
+        grade = "A"
+    elif score >= 60:
+        grade = "B"
+    elif score >= 40:
+        grade = "C"
+    else:
+        grade = "D"
+    return {
+        "score": score,
+        "grade": grade,
+        "factors": factors,
+        "ttl_sec": ttl,
+    }
+
+
+def enrich_factory_row(
+    row: dict[str, Any],
+    *,
+    now: float | None = None,
+    ttl_sec: float = 120.0,
+) -> dict[str, Any]:
+    out = dict(row)
+    out["health"] = compute_factory_health(out, now=now, ttl_sec=ttl_sec)
+    return out
+
+
+def list_factories_enriched(*, ttl_sec: float = 120.0) -> list[dict[str, Any]]:
+    now = time.time()
+    return [enrich_factory_row(r, now=now, ttl_sec=ttl_sec) for r in load_factories()]
