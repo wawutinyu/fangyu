@@ -43,7 +43,7 @@
 |---|----|------|
 | 1 | `bundle create --profile workbuddy` | ✅ |
 | 2 | 一句话任务 → 拆解 → 多轮执行 | 部分（office agent-loop） |
-| 3 | **成品落盘**（至少 md；目标 docx/xlsx/页） | ✅ md via `write_deliverable`；docx/xlsx ☐ |
+| 3 | **成品落盘**（至少 md；目标 docx/xlsx/页） | ✅ md + **docx**；xlsx ☐ |
 | 4 | 工作区 = 用户授权文件夹 | 部分（`--workspace`） |
 | 5 | 办公 live / 验收脚本 | ✅ `scripts/workbuddy_harness_live.py` |
 
@@ -89,7 +89,7 @@
 
 ```text
 G1 OpenCode  █████████░  ~90%
-G2-A 办公竖切 ██████░░░░  ~55%
+G2-A 办公竖切 ███████░░░  ~70%（md+docx；xlsx ☐）
 G2-B IM       █████░░░░░  ~45%（真机暂缓）
 G2-C 企业权限 ███████░░░  ~65%（ACL+Studio 运维面板；SSO ☐）
 G2-D 托管     ████████░░  ~75%（manage+Studio 运维面板；升级 ☐）
@@ -109,7 +109,8 @@ G2-E 多编排   ██████░░░░  ~55%
 5. ~~G2-C 企业权限骨架~~ ✅  
 6. ~~**可演示竖切**~~ ✅  
 7. ~~Studio 托管/ACL 运维面板~~ ✅（更多 → 运维）  
-8. 下一优先候选：G2-A docx/xlsx · 飞书真机 · SSO  
+8. ~~G2-A docx~~ ✅（xlsx 后置）  
+9. 下一优先候选：飞书真机 · SSO · xlsx  
 
 ---
 

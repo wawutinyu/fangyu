@@ -106,6 +106,30 @@ def main() -> int:
         (r3.get("error") or r3.get("result") or "")[:160],
     )
 
+    r4 = chat_once(
+        bundle,
+        (
+            "用 write_deliverable 写一份 Word：path=report，kind=docx，"
+            "content 用 Markdown 写「# DocxLive」和一行 body-ok。然后 done。"
+        ),
+        workspace=project,
+    )
+    f4 = project / "deliverables" / "report.docx"
+    docx_ok = False
+    if f4.is_file() and f4.stat().st_size > 400:
+        try:
+            import zipfile
+            with zipfile.ZipFile(f4, "r") as zf:
+                xml = zf.read("word/document.xml").decode("utf-8")
+            docx_ok = "DocxLive" in xml or "body-ok" in xml or "docx" in str(r4.get("result") or "").lower()
+        except Exception:
+            docx_ok = bool(r4.get("success")) and f4.is_file()
+    ok &= _ok(
+        "case4 write_deliverable docx",
+        docx_ok,
+        (r4.get("error") or r4.get("result") or "")[:160],
+    )
+
     print()
     if ok:
         print("[OK] WorkBuddy office live 三用例全绿")

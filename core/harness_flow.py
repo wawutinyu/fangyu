@@ -70,6 +70,7 @@ OFFICE_SYSTEM = (
     '调用工具: {"action":"tool","name":"<name>","args":{...}}\n'
     '结束任务: {"action":"done","result":"<给用户的结论>"}\n'
     "优先把成品写入 deliverables/（用 write_deliverable）。\n"
+    "write_deliverable 参数：path、content、kind（md 或 docx；需要 Word 时用 kind=docx）。\n"
     "可用工具会在用户消息中列出。"
 )
 

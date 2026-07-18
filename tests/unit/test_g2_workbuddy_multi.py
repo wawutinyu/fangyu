@@ -55,6 +55,35 @@ def test_office_write_deliverable(tmp_path, restore_data_dir):
     assert any(p.endswith("hello.md") for p in listed)
 
 
+def test_office_write_docx(tmp_path, restore_data_dir):
+    import zipfile
+
+    dest = tmp_path / "wb-docx"
+    root = build_from_profile("workbuddy", dest)
+    init_bundle_workspace(root)
+    tools = office_toolbelt()
+    msg = tools["write_deliverable"](
+        path="report/week",
+        content="# 周报\n\n本周完成竖切。\n\n- 项A\n- 项B\n",
+        kind="docx",
+    )
+    assert "docx" in msg
+    from fangyu.engine.workspace import get_active_workspace
+    ws = get_active_workspace()
+    assert ws is not None
+    docx_path = ws.resolve("deliverables/report/week.docx")
+    assert docx_path.is_file()
+    assert docx_path.stat().st_size > 500
+    # 合法 zip/OOXML
+    with zipfile.ZipFile(docx_path, "r") as zf:
+        names = zf.namelist()
+        assert "word/document.xml" in names
+        xml = zf.read("word/document.xml").decode("utf-8")
+        assert "周报" in xml
+    listed = tools["list_deliverables"]()
+    assert any(p.endswith("week.docx") for p in listed)
+
+
 def test_multi_topology_export(tmp_path, restore_data_dir):
     dest = tmp_path / "multi"
     root = build_from_profile(

@@ -25,6 +25,8 @@ dev = ["pyinstaller>=6.0.0", "pytest>=8.0.0", "pytest-asyncio>=0.24.0"]
 mqtt = ["paho-mqtt>=2.0.0"]
 # 语义向量检索（体积大，可选；未安装时回退 n-gram）
 vector = ["sentence-transformers>=2.2.0"]
+# 更丰富的 Word 排版（未装时用内置简易 OOXML 写 docx）
+office = ["python-docx>=1.1.0"]
 
 [project.scripts]
 fangyu = "fangyu.__main__:main"

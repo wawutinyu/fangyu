@@ -40,6 +40,11 @@ class AgentWorkspace:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
 
+    def write_bytes(self, rel: str, data: bytes) -> None:
+        path = self.resolve(rel)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+
     def list(self, rel: str = ".") -> list[str]:
         path = self.resolve(rel)
         if not path.is_dir():

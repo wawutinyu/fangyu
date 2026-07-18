@@ -107,8 +107,7 @@ def coding_toolbelt() -> dict[str, Any]:
     }
 
 
-def tool_write_deliverable(path: str = "", content: str = "", kind: str = "md") -> str:
-    """把成品写入 workspace/deliverables/（默认 .md）。"""
+def _normalize_deliverable_rel(path: str, kind: str) -> str:
     rel = (path or "").strip().lstrip("/")
     if not rel:
         raise ValueError("deliverable path 为空")
@@ -116,11 +115,127 @@ def tool_write_deliverable(path: str = "", content: str = "", kind: str = "md") 
         raise ValueError("非法路径")
     if not rel.startswith("deliverables/"):
         rel = f"deliverables/{rel}"
-    # 缺扩展名时按 kind 补
     p = Path(rel)
-    if not p.suffix and kind:
-        ext = kind if kind.startswith(".") else f".{kind}"
-        rel = str(p) + ext
+    kind_l = (kind or "md").lower().lstrip(".")
+    if not p.suffix and kind_l:
+        rel = str(p) + f".{kind_l}"
+    return rel
+
+
+def _minimal_docx_bytes(content: str) -> bytes:
+    """零依赖：打包最小 OOXML docx（段落 + 简易标题/列表）。"""
+    import zipfile
+    from io import BytesIO
+    from xml.sax.saxutils import escape
+
+    def para(text: str, *, style: str | None = None) -> str:
+        ppr = f'<w:pPr><w:pStyle w:val="{style}"/></w:pPr>' if style else ""
+        return (
+            f"<w:p>{ppr}<w:r><w:t xml:space=\"preserve\">"
+            f"{escape(text)}</w:t></w:r></w:p>"
+        )
+
+    body_parts: list[str] = []
+    for line in (content or "").replace("\r\n", "\n").split("\n"):
+        raw = line.rstrip()
+        if raw.startswith("# "):
+            body_parts.append(para(raw[2:].strip() or "Untitled", style="Heading1"))
+        elif raw.startswith("## "):
+            body_parts.append(para(raw[3:].strip() or "Untitled", style="Heading2"))
+        elif raw.startswith("### "):
+            body_parts.append(para(raw[4:].strip() or "Untitled", style="Heading2"))
+        elif raw.startswith("- ") or raw.startswith("* "):
+            body_parts.append(para("• " + raw[2:].strip()))
+        elif raw.strip():
+            body_parts.append(para(raw))
+    if not body_parts:
+        body_parts.append(para(content or ""))
+
+    document_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        f"<w:body>{''.join(body_parts)}<w:sectPr/></w:body></w:document>"
+    )
+    content_types = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>
+"""
+    rels = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>
+"""
+    buf = BytesIO()
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("[Content_Types].xml", content_types)
+        zf.writestr("_rels/.rels", rels)
+        zf.writestr("word/document.xml", document_xml)
+    return buf.getvalue()
+
+
+def _content_to_docx_bytes(content: str) -> bytes:
+    """优先 python-docx；否则内置简易 OOXML。"""
+    try:
+        from docx import Document
+        from io import BytesIO
+
+        doc = Document()
+        text = content or ""
+        blocks = text.replace("\r\n", "\n").split("\n")
+        para_buf: list[str] = []
+
+        def flush_para() -> None:
+            nonlocal para_buf
+            if para_buf:
+                doc.add_paragraph("\n".join(para_buf).strip())
+                para_buf = []
+
+        for line in blocks:
+            raw = line.rstrip()
+            if raw.startswith("# "):
+                flush_para()
+                doc.add_heading(raw[2:].strip() or "Untitled", level=1)
+            elif raw.startswith("## "):
+                flush_para()
+                doc.add_heading(raw[3:].strip() or "Untitled", level=2)
+            elif raw.startswith("### "):
+                flush_para()
+                doc.add_heading(raw[4:].strip() or "Untitled", level=3)
+            elif raw.startswith("- ") or raw.startswith("* "):
+                flush_para()
+                doc.add_paragraph(raw[2:].strip(), style="List Bullet")
+            elif not raw.strip():
+                flush_para()
+            else:
+                para_buf.append(raw)
+        flush_para()
+        if not any(p.text.strip() for p in doc.paragraphs):
+            doc.add_paragraph(text or "")
+        buf = BytesIO()
+        doc.save(buf)
+        return buf.getvalue()
+    except ImportError:
+        return _minimal_docx_bytes(content)
+
+
+def tool_write_deliverable(path: str = "", content: str = "", kind: str = "md") -> str:
+    """把成品写入 workspace/deliverables/（md 文本；docx 用 python-docx）。"""
+    kind_l = (kind or "md").lower().lstrip(".")
+    # 路径已带后缀时以后缀为准
+    probe = (path or "").strip()
+    if probe.lower().endswith(".docx"):
+        kind_l = "docx"
+    elif probe.lower().endswith(".md") or probe.lower().endswith(".txt"):
+        kind_l = Path(probe).suffix.lstrip(".").lower() or kind_l
+
+    rel = _normalize_deliverable_rel(path, kind_l)
+    if kind_l == "docx":
+        data = _content_to_docx_bytes(content)
+        _ws().write_bytes(rel, data)
+        return f"deliverable {rel} (docx, {len(data)} bytes)"
     _ws().write(rel, content)
     return f"deliverable {rel} ({len(content)} chars)"
 
