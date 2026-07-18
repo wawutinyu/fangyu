@@ -40,7 +40,12 @@ python scripts/factory_gate.py --unit-only
 
 - `DATA_DIR/factory_eval_report.json`
 - 同步：仓库 `.fangyu/factory_eval_report.json`
+- 追加历史：`DATA_DIR/factory_eval_history.jsonl`
 
-Studio「观测 → Eval 报告」或 `GET /api/v1/monitor/eval-report` 可读。
+Studio「观测 → Eval 报告」展示最近结果 + 趋势条；API：
+
+- `GET /api/v1/monitor/eval-report`
+- `GET /api/v1/monitor/eval-history`
+- `GET /api/v1/monitor/eval-trend`
 
 Harness Trace：`GET /api/v1/monitor/harness-traces`（观测面板默认页）。

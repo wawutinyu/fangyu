@@ -21,9 +21,11 @@ import {
   listApprovals,
   listManagedInstances,
   quickStartDemo,
+  restartManaged,
   startManaged,
   stopManaged,
   syncSsoToAcl,
+  upgradeManaged,
   type AclDoc,
   type ApprovalItem,
   type ManagedInstance,
@@ -182,6 +184,31 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
         setSelectedId(null)
         setLogLines([])
       }
+      await reload()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+    setLoading(false)
+  }
+
+  const onRestart = async (id: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      await restartManaged(id)
+      await reload()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+    setLoading(false)
+  }
+
+  const onUpgrade = async (id: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const dir = bundleDir.trim()
+      await upgradeManaged(id, dir || undefined)
       await reload()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -387,6 +414,20 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
                 </span>
                 <div style={{ flex: 1 }} />
                 <button className="notion-btn" style={{ fontSize: 11 }} onClick={() => onLogs(inst.id)}>日志</button>
+                <button
+                  className="notion-btn"
+                  style={{ fontSize: 11 }}
+                  onClick={() => void onRestart(inst.id)}
+                  disabled={loading}
+                  title="同 Bundle 热重启"
+                >重启</button>
+                <button
+                  className="notion-btn"
+                  style={{ fontSize: 11 }}
+                  onClick={() => void onUpgrade(inst.id)}
+                  disabled={loading}
+                  title="升级：可先在上方填新 Bundle 路径，否则沿用原路径"
+                >升级</button>
                 {inst.alive && (
                   <button className="notion-btn" style={{ fontSize: 11 }} onClick={() => onStop(inst.id)}>停止</button>
                 )}

@@ -384,6 +384,84 @@ def remove_instance(instance_id: str, *, stop_first: bool = True) -> dict[str, A
     return {"ok": True, "removed": removed}
 
 
+def restart_instance(
+    instance_id: str,
+    *,
+    wait: bool = True,
+    timeout_sec: float = 25.0,
+) -> dict[str, Any]:
+    """同 Bundle 热重启（停→启，尽量保留 name/port）。"""
+    return upgrade_instance(instance_id, bundle_dir=None, wait=wait, timeout_sec=timeout_sec)
+
+
+def upgrade_instance(
+    instance_id: str,
+    *,
+    bundle_dir: str | Path | None = None,
+    wait: bool = True,
+    timeout_sec: float = 25.0,
+) -> dict[str, Any]:
+    """升级通道：停旧启新；可换 Bundle 目录，默认沿用原路径。"""
+    old = get_instance(instance_id)
+    if not old:
+        raise KeyError(f"实例不存在: {instance_id}")
+    iid = str(old["id"])
+    root = Path(bundle_dir or old.get("bundle_dir") or "").expanduser().resolve()
+    if not root.is_dir():
+        raise FileNotFoundError(f"Bundle 不存在: {root}")
+    name = old.get("name")
+    host = str(old.get("host") or "127.0.0.1")
+    port_raw = int(old.get("port") or 0)
+    port = port_raw if port_raw > 0 else None
+    workspace = old.get("workspace") or None
+
+    if old.get("alive"):
+        stop_instance(iid)
+    # 清掉旧登记，避免路径复用逻辑误判；新实例拿新 id
+    try:
+        remove_instance(iid, stop_first=False)
+    except KeyError:
+        pass
+
+    new = start_instance(
+        root,
+        name=str(name) if name else None,
+        host=host,
+        port=port,
+        workspace=workspace,
+        wait=wait,
+        timeout_sec=timeout_sec,
+    )
+    new_id = str(new.get("id") or "")
+    reg = _load_registry()
+    if new_id and new_id in reg["instances"]:
+        reg["instances"][new_id]["upgraded_from"] = iid
+        reg["instances"][new_id]["upgraded_at"] = time.time()
+        if bundle_dir:
+            reg["instances"][new_id]["upgrade_bundle"] = str(root)
+        _save_registry(reg)
+    try:
+        from fangyu.core.collaboration import emit_event
+        emit_event(
+            "managed.upgrade",
+            actor=f"managed:{new_id or iid}",
+            target=str(name or new_id or iid),
+            message=f"托管升级 {name or iid} → {new_id}",
+            detail={
+                "from": iid,
+                "to": new_id,
+                "bundle_dir": str(root),
+                "port": new.get("port"),
+            },
+        )
+    except Exception:
+        pass
+    out = get_instance(new_id) if new_id else new
+    if isinstance(out, dict):
+        out = {**out, "upgraded_from": iid, "upgrade": True}
+    return out
+
+
 def reset_registry_for_tests() -> None:
     """测试用：清空登记（不杀外部进程）。"""
     _save_registry({"version": 1, "instances": {}})

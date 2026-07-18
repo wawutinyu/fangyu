@@ -104,9 +104,10 @@
 ⑱ 观测 Trace + Eval 报告         ✅ monitor harness/eval · factory_eval_report.json
 ⑲ Presence↔托管 + 技能目录 UX    ✅ 观筛托管/停实例 · materials/skills 全文预览
 ⑳ A2A 跨厂发现 + 律产品面        ✅ discovery/probe/factories · 律禁项/Bundle 宪法
+㉑ 托管升级 + Eval 趋势           ✅ restart/upgrade · eval-history/trend
 ```
 
-下一刀：真 IM（仍暂缓）· 托管升级通道 · Eval 报告对比/趋势。
+下一刀：真 IM（仍暂缓）· 飞书凭证配置向导 · Presence 回放与托管事件对齐。
 
 ---
 

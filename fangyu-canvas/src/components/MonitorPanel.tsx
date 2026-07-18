@@ -69,6 +69,15 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
 
   const [evalPath, setEvalPath] = useState<string | null>(null)
   const [evalReport, setEvalReport] = useState<EvalReport | null>(null)
+  const [evalTrend, setEvalTrend] = useState<{
+    points?: Array<{ ts?: number; ok?: boolean; exit_code?: number }>
+    ok_streak?: number
+    compare?: {
+      changed?: boolean
+      exit_changed?: boolean
+      stage_diffs?: Array<{ stage: string; from: { ok?: boolean }; to: { ok?: boolean } }>
+    }
+  } | null>(null)
 
   const fetchLogs = useCallback(async (flowId?: string) => {
     setLoading(true)
@@ -100,10 +109,13 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
   const fetchEval = useCallback(async () => {
     setLoading(true)
     try {
-      const resp = await apiFetch('/api/v1/monitor/eval-report')
-      const json = await resp.json()
-      setEvalPath(json.path || null)
-      setEvalReport(json.report || null)
+      const [rep, trend] = await Promise.all([
+        apiFetch('/api/v1/monitor/eval-report').then(r => r.json()),
+        apiFetch('/api/v1/monitor/eval-trend?limit=12').then(r => r.json()),
+      ])
+      setEvalPath(rep.path || null)
+      setEvalReport(rep.report || null)
+      setEvalTrend(trend || null)
     } catch { /* ignore */ }
     setLoading(false)
   }, [])
@@ -288,6 +300,36 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
               </div>
               <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>{evalPath}</div>
               <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>{formatTs(evalReport.ts)}</div>
+
+              {evalTrend && (
+                <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: 8 }}>
+                  <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                    趋势 · 连续通过 {evalTrend.ok_streak ?? 0}
+                    {evalTrend.compare?.changed ? ' · 较上次有变化' : ''}
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+                    {(evalTrend.points || []).map((p, i) => (
+                      <span
+                        key={i}
+                        title={`${formatTs(p.ts)} exit=${p.exit_code}`}
+                        style={{
+                          width: 14, height: 14, borderRadius: 3,
+                          background: p.ok ? '#1a7f37' : '#c0392b',
+                          opacity: 0.85,
+                        }}
+                      />
+                    ))}
+                  </div>
+                  {(evalTrend.compare?.stage_diffs || []).length > 0 && (
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      阶段变化：{(evalTrend.compare?.stage_diffs || []).map(d => (
+                        `${d.stage}: ${d.from?.ok ? 'ok' : 'fail'}→${d.to?.ok ? 'ok' : 'fail'}`
+                      )).join(' · ')}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {Object.entries(evalReport.stages || {}).map(([name, st]) => (
                 <div key={name} style={{ borderTop: '1px solid var(--border-light)', paddingTop: 8 }}>
                   <div style={{ fontWeight: 600 }}>

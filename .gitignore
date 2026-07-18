@@ -49,6 +49,7 @@ Thumbs.db
 .fangyu/screenshots/
 .fangyu/factory_eval_report.json
 data/factory_eval_report.json
+data/factory_eval_history.jsonl
 data/a2a_factories.json
 
 # Build

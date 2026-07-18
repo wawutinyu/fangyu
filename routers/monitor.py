@@ -88,6 +88,23 @@ def get_eval_report():
     }
 
 
+@router.get("/eval-history")
+def get_eval_history(limit: int = Query(20, ge=1, le=100)):
+    from fangyu.core.factory_eval import eval_history_path, load_eval_history
+
+    return {
+        "path": str(eval_history_path()),
+        "history": load_eval_history(limit=limit),
+    }
+
+
+@router.get("/eval-trend")
+def get_eval_trend(limit: int = Query(10, ge=2, le=50)):
+    from fangyu.core.factory_eval import eval_trend
+
+    return eval_trend(limit=limit)
+
+
 @router.delete("/logs")
 async def clear_logs(
     flow_id: str = "",

@@ -67,6 +67,26 @@ export async function stopManaged(id: string): Promise<ManagedInstance> {
   return body
 }
 
+export async function restartManaged(id: string): Promise<ManagedInstance> {
+  const res = await apiFetch(`/api/v1/managed/instances/${encodeURIComponent(id)}/restart`, {
+    method: 'POST',
+  })
+  const body = await res.json()
+  if (!res.ok) throw new Error(body.detail || '重启失败')
+  return body
+}
+
+export async function upgradeManaged(id: string, bundleDir?: string): Promise<ManagedInstance> {
+  const res = await apiFetch(`/api/v1/managed/instances/${encodeURIComponent(id)}/upgrade`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bundle_dir: bundleDir || '', wait: true }),
+  })
+  const body = await res.json()
+  if (!res.ok) throw new Error(body.detail || '升级失败')
+  return body
+}
+
 export async function fetchManagedLogs(id: string, tail = 40): Promise<string[]> {
   const res = await apiFetch(
     `/api/v1/managed/instances/${encodeURIComponent(id)}/logs?tail=${tail}`,
