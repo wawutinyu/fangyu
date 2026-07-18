@@ -14,7 +14,7 @@
 | A2 | 竖切 demo 走 `office_report` / IM orchestrate | `demo_vertical_slice` 6 步可跑绿 | ✅ |
 | A3 | 毕业/评估与代码进度对齐 | `PROJECT_ASSESSMENT` v3.1 | ✅ |
 | A4 | `factory_gate --skip-live` + `npm test` 绿 | 退出码 0 | ✅ |
-| A5 | 尝试 `git push`；失败则留下本机推送说明 | 推成功或注明阻塞 | （执行中） |
+| A5 | 尝试 `git push`；失败则留下本机推送说明 | 推成功或注明阻塞 | ⚠ 本机无 GitHub 凭据；请醒后 `git push origin main`（当前 ahead 10） |
 
 ## 明确不做
 
