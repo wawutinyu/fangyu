@@ -143,7 +143,7 @@ def create_agent_bundle(
             "user_interface": user_enabled,
             "worker_only": worker_only,
             "agent_kind": agent_kind,
-            "harness": profile == "opencode" or any(
+            "harness": profile in ("opencode", "workbuddy", "multi") or any(
                 (f.get("meta") or {}).get("kind") == "harness" for f in skills.values()
             ),
         },
@@ -195,15 +195,25 @@ def create_agent_bundle(
     (root / "config").mkdir(exist_ok=True)
     (root / "config" / "interfaces.json").write_text(json.dumps(interfaces, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    # 工具闭包清单（运行时 coding_toolbelt 实现仍在引擎内；清单随包可审计）
+    # 工具闭包清单（运行时 toolbelt 实现仍在引擎内；清单随包可审计）
     if toolbelt:
-        from fangyu.engine.bundle_tools import coding_toolbelt
+        from fangyu.engine.bundle_tools import coding_toolbelt, office_toolbelt
+
         if toolbelt == "coding":
             tb = {
                 "id": "coding",
                 "tools": sorted(coding_toolbelt().keys()),
                 "scope": "bundle/workspace",
             }
+        elif toolbelt == "office":
+            tb = {
+                "id": "office",
+                "tools": sorted(office_toolbelt().keys()),
+                "scope": "bundle/workspace/deliverables",
+            }
+        else:
+            tb = None
+        if tb:
             (root / "config" / "toolbelt.json").write_text(
                 json.dumps(tb, ensure_ascii=False, indent=2), encoding="utf-8",
             )

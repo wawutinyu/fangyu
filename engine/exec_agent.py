@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from .agent_loop import run_agent_loop
-from .bundle_tools import coding_toolbelt
+from .agent_loop import DEFAULT_SYSTEM, run_agent_loop
+from .bundle_tools import resolve_toolbelt
 from .context import NodeContext
 from .llm import chat_completion, get_provider, PROVIDER_BASE_URL
 from .registry import register_executor
@@ -42,10 +42,8 @@ async def _exec_agent_loop(ctx: NodeContext) -> dict[str, Any]:
     goal = str(goal).strip() or "complete the task"
     max_turns = int(ctx.config.get("max_turns") or 8)
     toolbelt = str(ctx.config.get("toolbelt") or "coding")
-    if toolbelt == "coding":
-        tools = coding_toolbelt()
-    else:
-        tools = coding_toolbelt()
+    tools = resolve_toolbelt(toolbelt)
+    system = str(ctx.config.get("system") or DEFAULT_SYSTEM)
 
     custom = ctx.global_vars.get("_agent_loop_llm")
     if callable(custom):
@@ -54,7 +52,9 @@ async def _exec_agent_loop(ctx: NodeContext) -> dict[str, Any]:
         async def llm(messages: list[dict[str, str]]) -> str:
             return await _default_llm_from_ctx(ctx, messages)
 
-    out = await run_agent_loop(goal=goal, tools=tools, llm=llm, max_turns=max_turns)
+    out = await run_agent_loop(
+        goal=goal, tools=tools, llm=llm, max_turns=max_turns, system=system,
+    )
     return {
         "result": out.get("result"),
         "success": out.get("success"),

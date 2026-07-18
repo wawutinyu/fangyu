@@ -11,12 +11,17 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command", required=True)
 
     create_p = sub.add_parser("create", help="按 profile 工厂生成 Bundle")
-    create_p.add_argument("--profile", default="opencode", help="opencode | action")
+    create_p.add_argument(
+        "--profile", default="opencode",
+        help="opencode | workbuddy | multi | action",
+    )
     create_p.add_argument("--dest", default="", help="输出目录（须为空或不存在）")
     create_p.add_argument("--name", default=None, help="Agent 显示名")
     create_p.add_argument("--port", type=int, default=9001)
     create_p.add_argument("--max-turns", type=int, default=12)
     create_p.add_argument("--workspace", default="", help="绑定外部项目根目录")
+    create_p.add_argument("--intent", default="", help="multi profile：协作意图（生成 topology）")
+    create_p.add_argument("--template", default="", help="multi：intent 模板 id（可选）")
     create_p.add_argument("--list-profiles", action="store_true", help="列出可用 profile")
 
     run_p = sub.add_parser("run", help="启动 Bundle A2A daemon")
@@ -31,6 +36,12 @@ def build_parser() -> argparse.ArgumentParser:
     chat_p.add_argument("-m", "--message", default="", help="单轮消息（省略则进入交互）")
     chat_p.add_argument("--workspace", default="", help="绑定外部项目根目录")
     chat_p.add_argument("--clear", action="store_true", help="清空会话历史后开始")
+
+    orch_p = sub.add_parser("orchestrate", help="按 Bundle 内 topology.json 多 Agent 编排")
+    orch_p.add_argument("bundle_dir", help="含 config/topology.json 的 Bundle")
+    orch_p.add_argument("-m", "--message", required=True, help="任务消息")
+    orch_p.add_argument("--workspace", default="", help="绑定外部工作区")
+    orch_p.add_argument("--max-turns", type=int, default=8)
 
     rpc_p = sub.add_parser("rpc", help="向 Bundle RPC 发送 a2a.send_message")
     rpc_p.add_argument("bundle_dir", help="调用方 Bundle（用于签名身份）")
@@ -68,8 +79,10 @@ def cmd_create(args: argparse.Namespace) -> int:
         a2a_port=args.port,
         max_turns=args.max_turns,
         workspace=args.workspace or None,
+        intent=args.intent or None,
+        template=args.template or None,
     )
-    print(json.dumps({
+    out: dict = {
         "ok": True,
         "profile": args.profile,
         "bundle": str(root),
@@ -77,7 +90,15 @@ def cmd_create(args: argparse.Namespace) -> int:
         "run": f"python -m fangyu --run-bundle {root}",
         "chat": f"python -m fangyu bundle chat {root}"
         + (f" --workspace {args.workspace}" if args.workspace else ""),
-    }, ensure_ascii=False, indent=2))
+    }
+    topo = root / "config" / "topology.json"
+    if topo.is_file():
+        out["orchestrate"] = (
+            f"python -m fangyu bundle orchestrate {root} -m \"...\""
+            + (f" --workspace {args.workspace}" if args.workspace else "")
+        )
+        out["topology"] = str(topo)
+    print(json.dumps(out, ensure_ascii=False, indent=2))
     return 0
 
 
@@ -139,6 +160,19 @@ def cmd_chat(args: argparse.Namespace) -> int:
             print("(会话已清空)")
             continue
         _one(line)
+
+
+def cmd_orchestrate(args: argparse.Namespace) -> int:
+    from fangyu.engine.bundle_orchestrate import run_topology
+
+    result = run_topology(
+        args.bundle_dir,
+        args.message,
+        workspace=args.workspace or None,
+        max_turns=args.max_turns,
+    )
+    print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+    return 0 if result.get("success") else 1
 
 
 def cmd_rpc(args: argparse.Namespace) -> int:
@@ -240,6 +274,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_create(args)
     if args.command == "chat":
         return cmd_chat(args)
+    if args.command == "orchestrate":
+        return cmd_orchestrate(args)
     if args.command == "run":
         return cmd_run(args)
     if args.command == "rpc":

@@ -6,8 +6,13 @@ from typing import Any
 
 from fangyu.core.action_loop import get_action_loop_flow
 from fangyu.core.agent_bundle import BundleError, create_agent_bundle
-from fangyu.core.harness_flow import CODING_CONSTITUTION, get_opencode_harness_flow
-from fangyu.engine.bundle_tools import coding_toolbelt
+from fangyu.core.harness_flow import (
+    CODING_CONSTITUTION,
+    WORKBUDDY_CONSTITUTION,
+    get_opencode_harness_flow,
+    get_workbuddy_harness_flow,
+)
+from fangyu.engine.bundle_tools import coding_toolbelt, office_toolbelt
 
 PROFILES: dict[str, dict[str, Any]] = {
     "opencode": {
@@ -17,6 +22,24 @@ PROFILES: dict[str, dict[str, Any]] = {
         "require_envelope": False,
         "constitution": CODING_CONSTITUTION,
         "toolbelt": "coding",
+        "skill_id": "default",
+    },
+    "workbuddy": {
+        "description": "办公数字员工（成品落盘 deliverables/ + office toolbelt）",
+        "default_name": "WorkBuddy-Office",
+        "agent_kind": "worker",
+        "require_envelope": False,
+        "constitution": WORKBUDDY_CONSTITUTION,
+        "toolbelt": "office",
+        "skill_id": "default",
+    },
+    "multi": {
+        "description": "多 Agent 编排 Bundle（意图→topology.json，可 bundle orchestrate）",
+        "default_name": "Multi-Agent",
+        "agent_kind": "hybrid",
+        "require_envelope": False,
+        "constitution": WORKBUDDY_CONSTITUTION,
+        "toolbelt": "office",
         "skill_id": "default",
     },
     "action": {
@@ -47,6 +70,8 @@ def build_from_profile(
     require_envelope: bool | None = None,
     max_turns: int = 12,
     workspace: str | Path | None = None,
+    intent: str | None = None,
+    template: str | None = None,
 ) -> Path:
     """按 profile 生成 Bundle 目录。"""
     pid = (profile or "").strip().lower()
@@ -55,9 +80,26 @@ def build_from_profile(
     meta = PROFILES[pid]
     agent_name = (name or meta["default_name"]).strip() or meta["default_name"]
 
+    if pid == "multi":
+        from fangyu.core.topology_export import build_multi_agent_bundle
+
+        return build_multi_agent_bundle(
+            dest,
+            intent=intent or "",
+            name=agent_name if name else None,
+            a2a_port=a2a_port,
+            max_turns=max_turns,
+            workspace=workspace,
+            template=template,
+        )
+
     if pid == "opencode":
         skills = {
             meta["skill_id"]: get_opencode_harness_flow(meta["skill_id"], max_turns=max_turns),
+        }
+    elif pid == "workbuddy":
+        skills = {
+            meta["skill_id"]: get_workbuddy_harness_flow(meta["skill_id"], max_turns=max_turns),
         }
     else:
         skills = {meta["skill_id"]: get_action_loop_flow(meta["skill_id"], meta["skill_id"])}
@@ -86,5 +128,11 @@ def toolbelt_manifest(toolbelt: str | None) -> dict[str, Any] | None:
             "id": "coding",
             "tools": sorted(coding_toolbelt().keys()),
             "scope": "bundle/workspace",
+        }
+    if toolbelt == "office":
+        return {
+            "id": "office",
+            "tools": sorted(office_toolbelt().keys()),
+            "scope": "bundle/workspace/deliverables",
         }
     return None

@@ -12,6 +12,14 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 load_dotenv(PROJECT_ROOT / ".env")
 
+# Studio 设置库中的 Key（用户常在 UI 里配，不一定有 .env）
+try:
+    from fangyu.core.credentials import hydrate_api_keys_from_db
+
+    hydrate_api_keys_from_db(DATA_DIR / "fangyu.db")
+except Exception:
+    pass
+
 _data_dir_listeners: list[Callable[[Path], None]] = []
 
 

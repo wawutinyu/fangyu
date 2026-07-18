@@ -105,3 +105,51 @@ def coding_toolbelt() -> dict[str, Any]:
         "apply_patch": tool_apply_patch,
         "shell": tool_shell,
     }
+
+
+def tool_write_deliverable(path: str = "", content: str = "", kind: str = "md") -> str:
+    """把成品写入 workspace/deliverables/（默认 .md）。"""
+    rel = (path or "").strip().lstrip("/")
+    if not rel:
+        raise ValueError("deliverable path 为空")
+    if ".." in Path(rel).parts:
+        raise ValueError("非法路径")
+    if not rel.startswith("deliverables/"):
+        rel = f"deliverables/{rel}"
+    # 缺扩展名时按 kind 补
+    p = Path(rel)
+    if not p.suffix and kind:
+        ext = kind if kind.startswith(".") else f".{kind}"
+        rel = str(p) + ext
+    _ws().write(rel, content)
+    return f"deliverable {rel} ({len(content)} chars)"
+
+
+def tool_list_deliverables() -> list[str]:
+    ws = _ws()
+    root = ws.resolve("deliverables")
+    if not root.exists():
+        return []
+    out: list[str] = []
+    for f in sorted(root.rglob("*")):
+        if f.is_file():
+            out.append(str(f.relative_to(ws.root)))
+    return out
+
+
+def office_toolbelt() -> dict[str, Any]:
+    """WorkBuddy 办公工具表：读写 + 成品落盘（无 shell）。"""
+    return {
+        "read": tool_read,
+        "write": tool_write,
+        "list": tool_list,
+        "write_deliverable": tool_write_deliverable,
+        "list_deliverables": tool_list_deliverables,
+    }
+
+
+def resolve_toolbelt(toolbelt: str | None) -> dict[str, Any]:
+    tb = (toolbelt or "coding").strip().lower()
+    if tb == "office":
+        return office_toolbelt()
+    return coding_toolbelt()

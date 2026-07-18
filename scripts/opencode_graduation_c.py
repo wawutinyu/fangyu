@@ -30,13 +30,11 @@ try:
 except Exception:
     pass
 
+from fangyu.core.credentials import ensure_api_keys  # noqa: E402
+
 
 def _has_key() -> bool:
-    return bool(
-        os.getenv("DEEPSEEK_API_KEY")
-        or os.getenv("OPENAI_API_KEY")
-        or os.getenv("ANTHROPIC_API_KEY")
-    )
+    return ensure_api_keys()
 
 
 def _mark(ok: bool | None, label: str, detail: str = "") -> bool | None:

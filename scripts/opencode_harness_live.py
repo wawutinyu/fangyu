@@ -31,20 +31,18 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-# 与平台一致：允许从仓库 .env 读 Key
+# 与平台一致：.env 或 Studio data/fangyu.db settings
 try:
     from dotenv import load_dotenv
     load_dotenv(ROOT / ".env")
 except Exception:
     pass
 
+from fangyu.core.credentials import ensure_api_keys  # noqa: E402
+
 
 def _has_key() -> bool:
-    return bool(
-        os.getenv("DEEPSEEK_API_KEY")
-        or os.getenv("OPENAI_API_KEY")
-        or os.getenv("ANTHROPIC_API_KEY")
-    )
+    return ensure_api_keys()
 
 
 def _ok(label: str, cond: bool, detail: str = "") -> bool:
@@ -60,8 +58,8 @@ def main() -> int:
     args = parser.parse_args()
 
     if not _has_key():
-        print("[SKIP] 未设置 DEEPSEEK_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY")
-        print("提示: export DEEPSEEK_API_KEY=... && python scripts/opencode_harness_live.py")
+        print("[SKIP] 未设置 API Key（.env 或 Studio 设置 data/fangyu.db）")
+        print("提示: 在 Studio 设置 DeepSeek Key，或 export DEEPSEEK_API_KEY=...")
         return 2
 
     from fangyu.core.agent_factory import build_from_profile
