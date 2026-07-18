@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { useMonitorAlerts } from '../hooks/useMonitorAlerts'
 import type { MonitorAlert } from '../utils/monitorApi'
 import ExternalPingRetestButton from './ExternalPingRetestButton'
+import FactoryOfflineRetestButton from './FactoryOfflineRetestButton'
 
 interface Props {
   wallMode?: boolean
@@ -167,6 +168,14 @@ export default function PresenceAlertBell({ wallMode, pollMs = 45000 }: Props) {
                     target={a.target}
                     detail={a.detail}
                     source="PresenceAlertBell"
+                    onDone={() => { void reload() }}
+                    compact
+                  />
+                )}
+                {a.kind === 'factory.offline' && a.factory_id && (
+                  <FactoryOfflineRetestButton
+                    factoryId={a.factory_id}
+                    baseUrl={a.base_url}
                     onDone={() => { void reload() }}
                     compact
                   />

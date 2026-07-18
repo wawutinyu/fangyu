@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../platform'
 import ExternalPingRetestButton from './ExternalPingRetestButton'
+import FactoryOfflineRetestButton from './FactoryOfflineRetestButton'
 
 interface LogEntry {
   id: number
@@ -47,6 +48,22 @@ interface EvalReport {
   ts?: number
   live_skipped?: boolean
   stages?: Record<string, { ok?: boolean; skipped?: boolean; checks?: { id: string; ok: boolean }[]; scripts?: { script: string; ok: boolean }[] }>
+  factories_health?: {
+    count?: number
+    online?: number
+    offline?: number
+    avg_score?: number | null
+    min_score?: number | null
+    max_score?: number | null
+    factories?: Array<{
+      id?: string
+      label?: string
+      online?: boolean | null
+      score?: number | null
+      grade?: string
+      base_url?: string
+    }>
+  }
 }
 
 interface MonitorPanelProps {
@@ -417,6 +434,48 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
               <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>{evalPath}</div>
               <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>{formatTs(evalReport.ts)}</div>
 
+              {evalReport.factories_health && (
+                <div
+                  data-testid="eval-factories-health"
+                  style={{
+                    borderTop: '1px solid var(--border-light)',
+                    paddingTop: 8,
+                    fontSize: 11,
+                  }}
+                >
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                    工厂健康
+                    {evalReport.factories_health.avg_score != null
+                      ? ` · 均分 ${evalReport.factories_health.avg_score}`
+                      : ''}
+                    {` · 离线 ${evalReport.factories_health.offline ?? 0}/${evalReport.factories_health.count ?? 0}`}
+                  </div>
+                  {(evalReport.factories_health.factories || []).slice(0, 8).map(f => (
+                    <div
+                      key={String(f.id || f.label)}
+                      style={{
+                        display: 'flex',
+                        gap: 8,
+                        color: 'var(--text-muted)',
+                        marginBottom: 2,
+                      }}
+                    >
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {f.label || f.id}
+                      </span>
+                      <span style={{
+                        color: f.online === false ? '#c0392b'
+                          : (f.score != null && f.score < 50) ? '#d48806'
+                            : '#1a7f37',
+                      }}>
+                        {f.online === false ? '离线' : f.online ? '在线' : '—'}
+                        {f.score != null ? ` · ${f.score}${f.grade ? ` ${f.grade}` : ''}` : ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {evalTrend && (
                 <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: 8 }}>
                   <div style={{ fontWeight: 600, marginBottom: 6 }}>
@@ -673,6 +732,14 @@ export default function MonitorPanel({ headerless }: MonitorPanelProps) {
                     target={a.target}
                     detail={a.detail}
                     source="MonitorPanel"
+                    onDone={() => { void fetchAlerts() }}
+                    compact
+                  />
+                )}
+                {a.kind === 'factory.offline' && a.factory_id && (
+                  <FactoryOfflineRetestButton
+                    factoryId={a.factory_id}
+                    baseUrl={a.base_url}
                     onDone={() => { void fetchAlerts() }}
                     compact
                   />

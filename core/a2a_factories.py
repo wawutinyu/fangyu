@@ -436,3 +436,44 @@ def enrich_factory_row(
 def list_factories_enriched(*, ttl_sec: float = 120.0) -> list[dict[str, Any]]:
     now = time.time()
     return [enrich_factory_row(r, now=now, ttl_sec=ttl_sec) for r in load_factories()]
+
+
+def collect_factories_health_snapshot(*, ttl_sec: float = 120.0) -> dict[str, Any]:
+    """质检瞬间的工厂健康摘要，写入 Eval 报告。"""
+    rows = list_factories_enriched(ttl_sec=ttl_sec)
+    scores: list[int] = []
+    online_n = 0
+    offline_n = 0
+    brief: list[dict[str, Any]] = []
+    for r in rows:
+        health = r.get("health") if isinstance(r.get("health"), dict) else {}
+        score = health.get("score")
+        if isinstance(score, (int, float)):
+            scores.append(int(score))
+        online = r.get("online")
+        if online is True:
+            online_n += 1
+        elif online is False:
+            offline_n += 1
+        brief.append({
+            "id": r.get("id"),
+            "label": r.get("label") or r.get("card_name") or r.get("id"),
+            "base_url": r.get("base_url"),
+            "online": online,
+            "score": score,
+            "grade": health.get("grade"),
+        })
+    brief.sort(key=lambda x: (
+        0 if x.get("online") is False else 1,
+        int(x.get("score") if isinstance(x.get("score"), (int, float)) else 999),
+    ))
+    return {
+        "ts": time.time(),
+        "count": len(rows),
+        "online": online_n,
+        "offline": offline_n,
+        "avg_score": round(sum(scores) / len(scores), 1) if scores else None,
+        "min_score": min(scores) if scores else None,
+        "max_score": max(scores) if scores else None,
+        "factories": brief[:20],
+    }

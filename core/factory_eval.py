@@ -45,7 +45,7 @@ def _stage_digest(stages: dict[str, Any] | None) -> dict[str, Any]:
 
 
 def summarize_report(report: dict[str, Any]) -> dict[str, Any]:
-    return {
+    out: dict[str, Any] = {
         "ts": report.get("ts"),
         "exit_code": report.get("exit_code"),
         "ok": bool(report.get("ok")),
@@ -53,6 +53,16 @@ def summarize_report(report: dict[str, Any]) -> dict[str, Any]:
         "skip_live": bool(report.get("skip_live")),
         "stages": _stage_digest(report.get("stages") if isinstance(report.get("stages"), dict) else {}),
     }
+    fh = report.get("factories_health")
+    if isinstance(fh, dict):
+        out["factories_health"] = {
+            "count": fh.get("count"),
+            "online": fh.get("online"),
+            "offline": fh.get("offline"),
+            "avg_score": fh.get("avg_score"),
+            "min_score": fh.get("min_score"),
+        }
+    return out
 
 
 def append_eval_history(

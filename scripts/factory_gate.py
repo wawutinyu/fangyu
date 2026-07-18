@@ -84,6 +84,7 @@ UNIT_SUITE = [
     "tests/unit/test_monitor_alert_kinds.py",
     "tests/unit/test_monitor_alerts_ping.py",
     "tests/unit/test_a2a_factory_health.py",
+    "tests/unit/test_factories_health_eval.py",
     "tests/unit/test_collaboration.py",
     "tests/integration/test_opencode_factory.py",
     "tests/unit/test_factory_gate.py",
@@ -419,7 +420,14 @@ def _emit_report(
     if args.no_report:
         return
     try:
+        from fangyu.core.a2a_factories import collect_factories_health_snapshot
         from fangyu.core.factory_eval import write_eval_report
+
+        factories_health = None
+        try:
+            factories_health = collect_factories_health_snapshot()
+        except Exception:
+            factories_health = None
 
         path = write_eval_report({
             "exit_code": exit_code,
@@ -432,6 +440,7 @@ def _emit_report(
             "suite": list(UNIT_SUITE),
             "required_skills": sorted(REQUIRED_SKILLS),
             "stages": stages,
+            **({"factories_health": factories_health} if factories_health is not None else {}),
         })
         print(f"[report] {path}")
     except Exception as exc:
