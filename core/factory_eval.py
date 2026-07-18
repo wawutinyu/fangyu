@@ -129,7 +129,7 @@ def emit_eval_presence_event(
     *,
     data_dir: Path | None = None,
 ) -> dict[str, Any] | None:
-    """Eval 失败 / 回归时写入协作事件，供值班墙与 monitor/alerts。"""
+    """Eval 失败 / 回归 / 健康回归时写入协作事件，供值班墙与 monitor/alerts。"""
     from fangyu.core.collaboration import emit_event
 
     ok = bool(report.get("ok"))
@@ -146,7 +146,35 @@ def emit_eval_presence_event(
     ]
 
     if ok:
-        return None
+        # 质检通过时：仅在工厂健康明显恶化时告警
+        fh_diff = cmp.get("factories_health_diff") if prev else None
+        if not is_health_regression(fh_diff):
+            return None
+        avg_d = (fh_diff or {}).get("avg_score_delta")
+        off_d = (fh_diff or {}).get("offline_delta")
+        parts = []
+        if isinstance(avg_d, (int, float)):
+            parts.append(f"均分 Δ{avg_d:+g}")
+        if isinstance(off_d, (int, float)):
+            parts.append(f"离线 Δ{int(off_d):+d}")
+        left = (fh_diff or {}).get("left") or {}
+        message = "工厂健康回归 · " + (" · ".join(parts) if parts else "较上次恶化")
+        if left.get("offline") is not None and left.get("count") is not None:
+            message += f" · 当前离线 {left.get('offline')}/{left.get('count')}"
+        return emit_event(
+            "eval.health_regression",
+            actor="eval:factory_gate",
+            message=message,
+            detail={
+                "exit_code": exit_code,
+                "ok": ok,
+                "live_tier": report.get("live_tier"),
+                "factories_health": report.get("factories_health"),
+                "factories_health_diff": fh_diff,
+                "ts": report.get("ts"),
+            },
+            severity="warn",
+        )
 
     kind = "eval.regression" if regression else "eval.fail"
     failed = ", ".join(stage_fail[:6]) or "见 stages"
@@ -167,6 +195,19 @@ def emit_eval_presence_event(
         },
         severity="error",
     )
+
+
+def is_health_regression(fh_diff: dict[str, Any] | None) -> bool:
+    """离线增多或均分下降 ≥1 → 健康回归。"""
+    if not isinstance(fh_diff, dict) or not fh_diff.get("changed"):
+        return False
+    offline_delta = fh_diff.get("offline_delta")
+    avg_delta = fh_diff.get("avg_score_delta")
+    if isinstance(offline_delta, (int, float)) and offline_delta > 0:
+        return True
+    if isinstance(avg_delta, (int, float)) and avg_delta <= -1.0:
+        return True
+    return False
 
 
 def load_eval_report(*, data_dir: Path | None = None) -> dict[str, Any] | None:

@@ -22,6 +22,7 @@ export interface MonitorAlertsResponse {
   offline_factories?: number
   eval_fail?: number
   ping_fail?: number
+  health_regress?: number
   alerts: MonitorAlert[]
 }
 
@@ -35,6 +36,7 @@ export async function fetchMonitorAlerts(limit = 20): Promise<MonitorAlertsRespo
     offline_factories: body.offline_factories ?? 0,
     eval_fail: body.eval_fail ?? 0,
     ping_fail: body.ping_fail ?? 0,
+    health_regress: body.health_regress ?? 0,
     alerts: body.alerts || [],
   }
 }

@@ -69,7 +69,10 @@ export function useMonitorAlerts(pollMs = 45000) {
     }
   }, [scheduleReload])
 
-  const badge = (meta?.offline_factories ?? 0) + (meta?.eval_fail ?? 0) + (meta?.ping_fail ?? 0)
+  const badge = (meta?.offline_factories ?? 0)
+    + (meta?.eval_fail ?? 0)
+    + (meta?.ping_fail ?? 0)
+    + (meta?.health_regress ?? 0)
   const alerts: MonitorAlert[] = meta?.alerts || []
   const latest = alerts[0] || null
 

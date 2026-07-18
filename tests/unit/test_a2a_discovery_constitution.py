@@ -204,11 +204,14 @@ def test_factories_align_and_heartbeat_loop(monkeypatch, tmp_path):
             "import_hosts": True,
             "export_factories": True,
             "probe": False,
+            "retest_after": True,
         })
         assert aligned.status_code == 200
         body = aligned.json()
         assert body["imported"] >= 1
         assert body["exported"] >= 1
+        assert body.get("post_heartbeat") is not None
+        assert body["post_heartbeat"]["total"] >= 1
         bases = {f["base_url"] for f in fac.load_factories()}
         assert "http://east.example:8787" in bases
         assert "http://west.example:8787" in bases

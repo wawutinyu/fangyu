@@ -80,6 +80,7 @@ UNIT_SUITE = [
     "tests/unit/test_im_wizard.py",
     "tests/unit/test_presence_samples.py",
     "tests/unit/test_eval_alert_presence.py",
+    "tests/unit/test_eval_health_regression_alert.py",
     "tests/unit/test_external_acl_defaults.py",
     "tests/unit/test_monitor_alert_kinds.py",
     "tests/unit/test_monitor_alerts_ping.py",

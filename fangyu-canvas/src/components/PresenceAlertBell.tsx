@@ -126,6 +126,7 @@ export default function PresenceAlertBell({ wallMode, pollMs = 45000 }: Props) {
               {meta?.offline_factories ? ` · 离线 ${meta.offline_factories}` : ''}
               {meta?.eval_fail ? ` · Eval ${meta.eval_fail}` : ''}
               {meta?.ping_fail ? ` · 试跑 ${meta.ping_fail}` : ''}
+              {meta?.health_regress ? ` · 健康 ${meta.health_regress}` : ''}
             </span>
             <button type="button" className="notion-btn" style={{ fontSize: 10 }} onClick={() => void reload()}>
               刷新

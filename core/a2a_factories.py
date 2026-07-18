@@ -241,12 +241,14 @@ def align_factories_and_presence(
     import_hosts: bool = True,
     export_factories: bool = True,
     probe: bool = False,
+    retest_after: bool = True,
 ) -> dict[str, Any]:
     """Presence 主机 ↔ 工厂通讯录双向对齐。
 
     - import_hosts: 有 base_url 的远程主机写入通讯录
     - export_factories: 通讯录条目 upsert 到 Presence（role=factory）
     - probe: 对齐前先跑一轮批量心跳
+    - retest_after: 对齐后对「新导入 + 离线/未探」再探测
     """
     from fangyu.core.remote_hosts import list_remote_hosts, upsert_remote_host
 
@@ -335,6 +337,25 @@ def align_factories_and_presence(
                     "online": False,
                 })
 
+    post_hb = None
+    if retest_after:
+        ids: set[str] = set()
+        for d in imported:
+            fid = str(d.get("factory_id") or "").strip()
+            if fid:
+                ids.add(fid)
+        for row in load_factories():
+            fid = str(row.get("id") or "").strip()
+            if not fid:
+                continue
+            if row.get("online") is False or row.get("last_probe_ok") is None:
+                ids.add(fid)
+        if ids:
+            post_hb = heartbeat_factories(
+                factory_ids=sorted(ids),
+                sync_presence=True,
+            )
+
     return {
         "ok": True,
         "ts": now,
@@ -343,6 +364,7 @@ def align_factories_and_presence(
         "import_details": imported,
         "export_details": exported,
         "heartbeat": hb,
+        "post_heartbeat": post_hb,
         "factories": list_factories_enriched(),
     }
 

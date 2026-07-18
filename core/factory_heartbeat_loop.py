@@ -72,6 +72,7 @@ def _run_once() -> dict[str, Any]:
             import_hosts=True,
             export_factories=True,
             probe=False,
+            retest_after=False,  # 本轮已全量 heartbeat
         )
     summary = {
         "heartbeat": {
@@ -82,6 +83,7 @@ def _run_once() -> dict[str, Any]:
         "align": {
             "imported": (align_out or {}).get("imported"),
             "exported": (align_out or {}).get("exported"),
+            "post_heartbeat": (align_out or {}).get("post_heartbeat"),
         } if align_out else None,
     }
     with _lock:

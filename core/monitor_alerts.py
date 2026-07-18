@@ -55,6 +55,38 @@ def collect_monitor_alerts(*, limit: int = 40) -> dict[str, Any]:
             "source": "factory_eval",
         })
 
+    health_alerts: list[dict[str, Any]] = []
+    if report and report.get("ok") is not False and not eval_alerts:
+        from fangyu.core.factory_eval import (
+            compare_eval_reports,
+            is_health_regression,
+            load_eval_history,
+        )
+
+        hist = load_eval_history(limit=2)
+        prev = hist[1] if len(hist) > 1 else None
+        if prev:
+            cmp = compare_eval_reports(report, prev)
+            fh_diff = cmp.get("factories_health_diff")
+            if is_health_regression(fh_diff):
+                avg_d = (fh_diff or {}).get("avg_score_delta")
+                off_d = (fh_diff or {}).get("offline_delta")
+                parts = []
+                if isinstance(avg_d, (int, float)):
+                    parts.append(f"均分 Δ{avg_d:+g}")
+                if isinstance(off_d, (int, float)):
+                    parts.append(f"离线 Δ{int(off_d):+d}")
+                health_alerts.append({
+                    "id": "eval-health-regression-current",
+                    "kind": "eval.health_regression",
+                    "severity": "warn",
+                    "title": "工厂健康回归",
+                    "message": " · ".join(parts) if parts else "较上次健康恶化",
+                    "ts": float(report.get("ts") or now),
+                    "detail": {"factories_health_diff": fh_diff},
+                    "source": "factory_eval",
+                })
+
     events = list_events(limit=max(limit * 2, 80))
     event_alerts: list[dict[str, Any]] = []
     for ev in events:
@@ -84,11 +116,12 @@ def collect_monitor_alerts(*, limit: int = 40) -> dict[str, Any]:
         if kind.startswith("eval.") or kind in ("factory.offline", "host.offline") or (
             sev in ("warn", "error", "deny") and kind.startswith(("factory.", "host.", "eval."))
         ):
+            title = "工厂健康回归" if kind == "eval.health_regression" else kind
             event_alerts.append({
                 "id": f"ev-{ev.get('id')}",
                 "kind": kind,
                 "severity": sev,
-                "title": kind,
+                "title": title,
                 "message": str(ev.get("message") or ""),
                 "ts": float(ev.get("ts") or 0),
                 "actor": ev.get("actor"),
@@ -99,6 +132,7 @@ def collect_monitor_alerts(*, limit: int = 40) -> dict[str, Any]:
     # 合并：当前态优先，事件去重
     seen_fac: set[str] = set()
     seen_eval = bool(eval_alerts)
+    seen_health = bool(health_alerts)
     merged: list[dict[str, Any]] = []
     for a in offline_factories:
         fid = str(a.get("factory_id") or "")
@@ -106,23 +140,28 @@ def collect_monitor_alerts(*, limit: int = 40) -> dict[str, Any]:
             seen_fac.add(fid)
         merged.append(a)
     merged.extend(eval_alerts)
+    merged.extend(health_alerts)
     for a in event_alerts:
         fid = str((a.get("detail") or {}).get("factory_id") or "")
         if fid and fid in seen_fac and a.get("kind") in ("factory.offline", "host.offline"):
             continue
         if seen_eval and str(a.get("kind") or "").startswith("eval."):
             continue
+        if seen_health and a.get("kind") == "eval.health_regression":
+            continue
         merged.append(a)
 
     merged.sort(key=lambda x: float(x.get("ts") or 0), reverse=True)
     merged = merged[: max(1, min(limit, 100))]
     ping_fail = sum(1 for a in merged if a.get("kind") == "external.ping")
+    health_regress = sum(1 for a in merged if a.get("kind") == "eval.health_regression")
     return {
         "ok": True,
         "ts": now,
         "count": len(merged),
         "offline_factories": len(offline_factories),
         "eval_fail": len(eval_alerts),
+        "health_regress": health_regress,
         "ping_fail": ping_fail,
         "alerts": merged,
     }

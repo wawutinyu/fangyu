@@ -189,10 +189,18 @@ export function explainCollabEvent(ev: CollaborationEvent): PlainExplanation {
     }
   }
 
-  if (kind === 'eval.fail' || kind === 'eval.regression') {
+  if (kind === 'eval.fail' || kind === 'eval.regression' || kind === 'eval.health_regression') {
     const stages = ((ev.detail as { failed_stages?: string[] } | undefined)?.failed_stages || [])
       .slice(0, 4)
       .join('、')
+    if (kind === 'eval.health_regression') {
+      return {
+        title: '工厂健康回归',
+        plain: msg || '出厂质检通过，但工厂健康较上次恶化（均分下降或离线增多）。',
+        nextStep: '打开观测 · Eval 对比看健康差；对离线厂一键再探测。',
+        severity: 'warn',
+      }
+    }
     return {
       title: kind === 'eval.regression' ? '出厂质检回归' : '出厂质检未过',
       plain: msg

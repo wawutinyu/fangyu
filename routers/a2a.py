@@ -231,6 +231,7 @@ class FactoryAlignBody(BaseModel):
     import_hosts: bool = True
     export_factories: bool = True
     probe: bool = False
+    retest_after: bool = True
 
 
 class FactoryHeartbeatLoopBody(BaseModel):
@@ -382,6 +383,7 @@ def factories_align(body: FactoryAlignBody | None = None):
         import_hosts=req.import_hosts,
         export_factories=req.export_factories,
         probe=req.probe,
+        retest_after=req.retest_after,
     )
 
 

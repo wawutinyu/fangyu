@@ -147,10 +147,16 @@ export async function alignFactoriesPresence(input?: {
   import_hosts?: boolean
   export_factories?: boolean
   probe?: boolean
+  retest_after?: boolean
 }): Promise<{
   ok: boolean
   imported: number
   exported: number
+  post_heartbeat?: {
+    total?: number
+    online?: number
+    offline?: number
+  } | null
   factories?: Array<{ id: string; base_url: string; label?: string; online?: boolean }>
 }> {
   const resp = await fetch('/api/v1/a2a/factories/align', {
@@ -160,6 +166,7 @@ export async function alignFactoriesPresence(input?: {
       import_hosts: input?.import_hosts !== false,
       export_factories: input?.export_factories !== false,
       probe: !!input?.probe,
+      retest_after: input?.retest_after !== false,
     }),
   })
   const data = await resp.json()

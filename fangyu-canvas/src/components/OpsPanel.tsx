@@ -379,11 +379,21 @@ export default function OpsPanel({ headerless }: OpsPanelProps) {
     setError(null)
     setFacNote(null)
     try {
-      const out = await alignFactoriesPresence({ import_hosts: true, export_factories: true, probe: false })
+      const out = await alignFactoriesPresence({
+        import_hosts: true,
+        export_factories: true,
+        probe: false,
+        retest_after: true,
+      })
       if (out.factories) setFactories(out.factories)
       else await reloadFactories()
-      setFacNote(`对齐完成：导入 ${out.imported} · 导出 ${out.exported}`)
-    } catch (e) {
+      const ph = out.post_heartbeat
+      setFacNote(
+        `对齐完成：导入 ${out.imported} · 导出 ${out.exported}`
+        + (ph
+          ? ` · 再探测在线 ${ph.online ?? 0}/${ph.total ?? 0}`
+          : ''),
+      )    } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
     setLoading(false)
