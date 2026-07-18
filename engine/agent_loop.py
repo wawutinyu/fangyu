@@ -33,6 +33,7 @@ CODING_SYSTEM = (
     '2) 工具: {"action":"tool","name":"<name>","args":{...}}\n'
     "   仓内: read/write/list/glob/grep/search/apply_patch/shell\n"
     "   外网: websearch / webfetch；不确定问人: question\n"
+    "   技能: skill_load 按需加载工厂技能全文（目录已在 system 摘要里）\n"
     "   shell：只读命令可直接跑；写文件/安装等须 args.confirm=true（ask 策略）\n"
     "   MCP：mcp_current_time 等（若工具表中有）\n"
     '3) 委派子 Agent:\n'

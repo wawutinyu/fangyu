@@ -1,3 +1,9 @@
+---
+id: implement-and-verify
+description: 改代码必须走实现→验证→再改闭环
+when: 任何会修改仓库文件的编码任务
+---
+
 # implement-and-verify
 
 改代码必须走「实现 → 验证 → 再改」闭环，禁止只改不测。

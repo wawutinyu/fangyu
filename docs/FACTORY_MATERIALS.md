@@ -4,7 +4,7 @@
 > 工具 / 技能 / 角色模板 / 装配规则 = **原材料**，不是某个竞品的附属清单。  
 > OpenCode、WorkBuddy、办公数字员工、多 Agent 编排，都是用同一货架拼出来的产线。
 
-关联：[愿景](VISION_AND_PRODUCT.md) · [毕业标准](GRADUATION_EXPORTABLE_AGENT.md)
+关联：[愿景](VISION_AND_PRODUCT.md) · [毕业标准](GRADUATION_EXPORTABLE_AGENT.md) · [技术雷达 2026](TECH_RADAR_2026.md)
 
 **口径：** 原料要能 **进货架 → 进 Bundle → 被 agent-loop / 拓扑 / A2A 复用**。只存在于 Studio 节点、打不进导出物的，不算工厂原料（可标「平台侧」）。
 

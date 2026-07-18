@@ -130,6 +130,9 @@ def create_agent_bundle(
     if profile:
         card.setdefault("metadata", {})["profile"] = profile
 
+    from fangyu.core.agent_card import assert_agent_card, write_well_known_agent_card
+    assert_agent_card(card)
+
     manifest = {
         "bundle_version": BUNDLE_VERSION,
         "platform": PLATFORM_ID,
@@ -190,6 +193,7 @@ def create_agent_bundle(
 
     (root / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     (root / "agent.card.json").write_text(json.dumps(card, ensure_ascii=False, indent=2), encoding="utf-8")
+    write_well_known_agent_card(root, card)
     (root / "identity.json").write_text(json.dumps(identity_doc, ensure_ascii=False, indent=2), encoding="utf-8")
     (root / "constitution.json").write_text(json.dumps(constitution_doc, ensure_ascii=False, indent=2), encoding="utf-8")
     (root / "config").mkdir(exist_ok=True)

@@ -280,6 +280,8 @@ def tool_shell(
 
 def coding_toolbelt() -> dict[str, Any]:
     """agent_loop 用的默认编码工具表（含工厂 P0 原料）。"""
+    from fangyu.core.skill_pack import tool_skill_load
+
     return {
         "read": tool_read,
         "write": tool_write,
@@ -292,6 +294,7 @@ def coding_toolbelt() -> dict[str, Any]:
         "webfetch": tool_webfetch,
         "websearch": tool_websearch,
         "question": tool_question,
+        "skill_load": tool_skill_load,
     }
 
 
@@ -358,7 +361,7 @@ def resolve_toolbelt(
 
 
 def _mcp_tools_from_materials(materials: dict[str, Any]) -> dict[str, Any]:
-    """materials.mcp: [{id, tools: [name,...]}] → 异步/同步可调用工具。"""
+    """materials.mcp: [{id, tools: [name,...]|\"*\"}] → 可调用工具。"""
     servers = materials.get("mcp") or []
     if not isinstance(servers, list):
         return {}
@@ -368,17 +371,40 @@ def _mcp_tools_from_materials(materials: dict[str, Any]) -> dict[str, Any]:
             continue
         sid = str(srv.get("id") or "").strip() or "__internal__"
         names = srv.get("tools") or []
-        if names == "*":
-            names = ["current_time"]  # 最小默认；完整列表运行时再扩
+        if names == "*" or (isinstance(names, list) and len(names) == 1 and names[0] == "*"):
+            names = _expand_mcp_tool_names(sid)
         if not isinstance(names, list):
             continue
         for raw in names:
             tname = str(raw).strip()
-            if not tname:
+            if not tname or tname == "*":
                 continue
             key = f"mcp_{tname}" if sid == "__internal__" else f"mcp_{sid}_{tname}"
             out[key] = _make_mcp_callable(sid, tname)
     return out
+
+
+def _expand_mcp_tool_names(server: str) -> list[str]:
+    """tools:\"*\" → 展开为可用工具名列表。"""
+    if server == "__internal__":
+        try:
+            from fangyu.engine.tool_registry import list_tools, register_builtins
+            register_builtins()
+            return [
+                str(t.get("name"))
+                for t in list_tools()
+                if t.get("enabled", True) and t.get("name")
+            ]
+        except Exception:
+            return ["current_time"]
+    try:
+        from fangyu.engine.mcp import get_external_server
+        conn = get_external_server(server)
+        if not conn or not conn._tools_cache:
+            return []
+        return [str(t.get("name")) for t in conn._tools_cache if t.get("name")]
+    except Exception:
+        return []
 
 
 def _make_mcp_callable(server: str, tool_name: str):

@@ -12,8 +12,12 @@ from fangyu.engine.workspace import init_bundle_workspace
 
 
 def test_implement_and_verify_skill_pack_exists():
+    from fangyu.core.skill_pack import load_skill_pack, load_skill_parsed
+
     text = load_skill_pack("implement-and-verify")
     assert text and "验证" in text
+    parsed = load_skill_parsed("implement-and-verify")
+    assert parsed and parsed.get("id") == "implement-and-verify"
     mat = default_materials()
     assert any(
         s.get("id") == "implement-and-verify" and s.get("status") == "active"
@@ -21,7 +25,8 @@ def test_implement_and_verify_skill_pack_exists():
     )
     sys = append_skills_to_system("base", mat)
     assert "implement-and-verify" in sys
-    assert "工厂技能包" in sys
+    assert "工厂技能目录" in sys
+    assert "反例" not in sys
 
 
 def test_materials_has_plan_role_and_mcp():

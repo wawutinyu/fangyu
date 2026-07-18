@@ -24,6 +24,7 @@ DEFAULT_MATERIALS: dict[str, Any] = {
         {"id": "webfetch", "source": "builtin", "belts": ["coding", "scout"]},
         {"id": "websearch", "source": "builtin", "belts": ["coding", "scout"]},
         {"id": "question", "source": "builtin", "belts": ["coding", "general"]},
+        {"id": "skill_load", "source": "builtin", "belts": ["coding", "general", "plan"]},
         {"id": "task", "source": "runtime", "belts": ["coding"]},
         {"id": "write_deliverable", "source": "builtin", "belts": ["office"]},
         {"id": "list_deliverables", "source": "builtin", "belts": ["office"]},
@@ -39,7 +40,7 @@ DEFAULT_MATERIALS: dict[str, Any] = {
             "description": "通用编码子任务",
             "tools": [
                 "read", "write", "list", "glob", "grep", "search",
-                "apply_patch", "shell", "question",
+                "apply_patch", "shell", "question", "skill_load",
             ],
         },
         {
@@ -61,7 +62,7 @@ DEFAULT_MATERIALS: dict[str, Any] = {
             "mode": "primary",
             "tools": [
                 "read", "list", "glob", "grep", "search",
-                "webfetch", "websearch", "question",
+                "webfetch", "websearch", "question", "skill_load",
             ],
         },
     ],
