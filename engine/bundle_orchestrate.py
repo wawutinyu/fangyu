@@ -55,6 +55,11 @@ async def run_topology_async(
     from fangyu.core.agent_bundle import activate_bundle_runtime_context
 
     activate_bundle_runtime_context(root)
+    try:
+        from fangyu.core.org_acl import activate_bundle_acl
+        activate_bundle_acl(root)
+    except Exception:
+        pass
     if workspace:
         bind_external_workspace(root, workspace)
         init_bundle_workspace(root, workspace_override=str(workspace))
@@ -73,6 +78,7 @@ async def run_topology_async(
     current = query
     original = query
     step_index = 0
+    prev_stage: list[str] = []
 
     async def _run_one(aid: str, goal: str, index: int) -> dict[str, Any]:
         agent = agents.get(aid) or {"id": aid, "name": aid, "system": None, "toolbelt": "office"}
@@ -103,6 +109,23 @@ async def run_topology_async(
         }
 
     for stage_i, stage in enumerate(stages):
+        try:
+            from fangyu.core.topology_acl import assert_stage_handoff_allowed
+            assert_stage_handoff_allowed(prev_stage, list(stage), topology=topology)
+        except Exception as exc:
+            return {
+                "success": False,
+                "error": str(exc),
+                "steps": steps_out,
+                "final_output": current,
+                "topology": {
+                    "pipeline": topology.get("pipeline"),
+                    "stages": stages,
+                    "intent": topology.get("intent"),
+                },
+                "violation": getattr(exc, "to_dict", lambda: {"type": "edge_acl", "message": str(exc)})(),
+            }
+
         if pass_mode == "append" and steps_out:
             goal = (
                 f"原始任务：{original}\n\n"
@@ -130,6 +153,7 @@ async def run_topology_async(
                 }
             if step.get("output"):
                 current = str(step["output"])
+            prev_stage = list(stage)
             continue
 
         # 并行段：共享同一 goal
@@ -155,6 +179,7 @@ async def run_topology_async(
                 },
             }
         current = _merge_parallel_outputs(list(parallel_steps))
+        prev_stage = list(stage)
 
     return {
         "success": True,

@@ -15,7 +15,7 @@
 |----|------|------------|
 | **G1 · OpenCode harness** | 绑仓、**长任务 plan**、多轮手脚、复杂仓稳定性、chat/RPC、工厂出包、live 绿 | **~90%**（P0 live/graduation C 已绿） |
 
-| **G2 · WorkBuddy 全档** | 办公交付 + **IM** + **企业权限** + **托管** + **多 Agent 编排** | **~55%**（骨架多，真机/边 ACL 未满） |
+| **G2 · WorkBuddy 全档** | 办公交付 + **IM** + **企业权限** + **托管** + **多 Agent 编排** | **~60%**（边 ACL 已齐；真 IM 仍欠） |
 
 **平台毕业 = G1 ∧ G2。** 只完成 G1 不算总毕业。
 
@@ -83,7 +83,7 @@
 | 2 | **运行态**：`/orchestrate` / A2A 管线可跑通本厂+外来 | 部分（有 API / demo） |
 | 3 | **导出态**：多 Agent 拓扑 **打进 Bundle / 部署物**，脱离 Studio 也能编 | ✅ `profile multi` + `topology.json` + `bundle orchestrate` |
 | 4 | 与 G2-A/B 结合：一句办公任务可拆给多专家；IM 可触发整网而非单人 | 部分（im `mode=orchestrate`） |
-| 5 | 与 G2-C 结合：编排边上的权限（谁可调谁、跨 Agent 工具边界） | ☐ |
+| 5 | 与 G2-C 结合：编排边上的权限（谁可调谁、跨 Agent 工具边界） | ✅ `topology` 边 `acl` + `core/topology_acl.py` |
 
 **现成资产：** Agent 画布 · `POST /orchestrate` · `intent/to-agents` · A2A · `bundle orchestrate` · `/api/v1/im/*`
 
@@ -95,11 +95,11 @@
 G1 OpenCode  █████████░  ~90%（P0 live/graduation C 已绿 · 2026-07-19）
 G2-A 办公竖切 ████████░░  ~80%（md+docx+xlsx）
 G2-B IM       ████░░░░░░  ~45%（真机暂缓）
-G2-C 企业权限 ███████░░░  ~70%（ACL+SSO；编排边 ACL ☐）
+G2-C 企业权限 ███████░░░  ~75%（ACL+SSO；编排边 ACL ✅）
 G2-D 托管     █████████░  ~85%（manage+Studio；升级/重启 ✅）
-G2-E 多编排   ██████░░░░  ~55%
+G2-E 多编排   ███████░░░  ~65%（边 ACL ✅）
 ────────────────────────
-总毕业(G1∧G2) █████░░░░░  ~60%
+总毕业(G1∧G2) █████░░░░░  ~62%
 ```
 
 ---
@@ -121,7 +121,7 @@ G2-E 多编排   ██████░░░░  ~55%
 |--------|------|----------|
 | **P0** | 稳住 G1 live | `opencode_harness_live` 三用例绿；`opencode_graduation_c` 自动项绿；live 用 `FANGYU_SHELL_POLICY=allow` 避免人审卡死；`factory_gate --live-tier smoke` 可重复过 |
 | **P1** | 真双厂值班验收 | ✅ `scripts/dual_factory_duty_acceptance.py`（D1–D9）；见 [双厂值班](DUAL_FACTORY_DUTY.md) |
-| **P2** | 编排边 ACL | topology 边声明「谁可调谁」；越权可拦可审计；补齐 G2-E #5 |
+| **P2** | 编排边 ACL | ✅ topology 边声明 + 越权可拦可审计；G2-E #5 |
 | **P3** | 飞书真机（单开） | 运维向导配凭证 → 私聊触发 Bundle/harness → 回复回会话；不挡 P0–P2 |
 | **P4** | 办公×编排交叉 | 一句办公任务拆多专家；IM `mode=orchestrate` 触发整网可演示验收 |
 
@@ -137,7 +137,7 @@ G2-E 多编排   ██████░░░░  ~55%
 | G1 live / graduation C 常绿 | ✅ **P0 已打通**（2026-07-19：mock 先 plan；live `FANGYU_SHELL_POLICY=allow`） |
 | G2-A workbuddy + live 脚本 | ✅ |
 | G2-E multi 导出编排 | ✅ 骨架 |
-| G2-E 编排边 ACL | ☐ **P2** |
+| G2-E 编排边 ACL | ✅ **P2** `topology_acl` |
 | G2-B 飞书 IM 通道（代码） | ✅ |
 | G2-B 飞书真机 | ☐ **P3**（暂缓可开） |
 | G2-D 托管 manage | ✅ |

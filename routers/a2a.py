@@ -43,6 +43,8 @@ class OrchestrateRequest(BaseModel):
     query: str
     steps: list[OrchestrateStep]
     pass_mode: str = "replace"
+    topology: dict | None = None
+    principal_id: str | None = None
 
 
 @router.post("/send")
@@ -92,6 +94,8 @@ def orchestrate(body: OrchestrateRequest):
         body.query,
         [s.model_dump() for s in body.steps],
         pass_mode=body.pass_mode,
+        topology=body.topology,
+        principal_id=body.principal_id,
     )
     return result
 

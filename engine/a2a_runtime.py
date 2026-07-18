@@ -175,10 +175,19 @@ class AgentBus:
         except Exception as e:
             from ..core.constitution import ConstitutionViolation, audit_event, violation_to_dict
             from .trust_runtime import TrustViolation
-            if isinstance(e, (ConstitutionViolation, TrustViolation)):
-                task["violation"] = violation_to_dict(e)
+            from fangyu.core.org_acl import ACLError
+            from fangyu.core.topology_acl import TopologyACLError
+            if isinstance(e, (ConstitutionViolation, TrustViolation, ACLError, TopologyACLError)):
+                task["violation"] = (
+                    e.to_dict() if hasattr(e, "to_dict") else violation_to_dict(e)
+                )
+                kind = "edge_acl_violation" if isinstance(e, TopologyACLError) else (
+                    "acl_violation" if isinstance(e, ACLError) else (
+                        "constitution_violation" if isinstance(e, ConstitutionViolation) else "trust_violation"
+                    )
+                )
                 audit_event(
-                    "constitution_violation" if isinstance(e, ConstitutionViolation) else "trust_violation",
+                    kind,
                     {"agent": target_agent, "error": str(e), **getattr(e, "context", {})},
                 )
             task["status"] = {"state": "failed", "message": str(e), "updatedAt": time.time()}
@@ -206,6 +215,26 @@ class AgentBus:
         skill_id = (message.get("metadata") or {}).get("skill_id", "")
         inputs = message_to_inputs(message)
         text = inputs.get("message") or inputs.get("query") or ""
+
+        # P2 编排边 ACL：metadata / task.metadata 可带 from_agent + topology
+        msg_meta = message.get("metadata") or {}
+        task_meta = task.get("metadata") or {}
+        caller = (
+            msg_meta.get("from_agent")
+            or task_meta.get("from_agent")
+            or task_meta.get("source")
+            or "user"
+        )
+        topology = msg_meta.get("topology") or task_meta.get("topology")
+        if isinstance(topology, dict):
+            from fangyu.core.topology_acl import assert_topology_edge_allowed
+            principal = msg_meta.get("principal_id") or msg_meta.get("principal") or task_meta.get("principal_id")
+            assert_topology_edge_allowed(
+                str(caller),
+                agent_name,
+                topology=topology,
+                principal=str(principal) if principal else None,
+            )
 
         ext = AgentRegistry.get_external(agent_name)
         if ext:
@@ -399,10 +428,13 @@ class AgentOrchestrator:
         steps: list[dict],
         *,
         pass_mode: str = "replace",
+        topology: dict | None = None,
+        principal_id: str | None = None,
     ) -> dict:
         """
         steps: [{"agent": str, "skill_id": str, "label": str?}, ...]
         pass_mode: replace=每步只用上步输出; append=拼接原始问题与上步输出
+        topology: 可选，含 edge acl 时校验 caller→callee
         """
         if not steps:
             return {"success": False, "error": "pipeline 为空", "steps": [], "final_output": ""}
@@ -426,22 +458,63 @@ class AgentOrchestrator:
                     "pipeline_id": pipeline_id,
                 }
 
+            from_agent = "user"
+            if i > 0:
+                prev = steps[i - 1]
+                from_agent = str(prev.get("agent") or prev.get("target_agent") or "user")
+
+            if topology:
+                try:
+                    from fangyu.core.topology_acl import assert_topology_edge_allowed
+                    assert_topology_edge_allowed(
+                        from_agent,
+                        agent_name,
+                        topology=topology,
+                        principal=principal_id,
+                    )
+                except Exception as exc:
+                    return {
+                        "success": False,
+                        "error": str(exc),
+                        "steps": collab_steps,
+                        "final_output": current_text,
+                        "pipeline_id": pipeline_id,
+                        "violation": getattr(exc, "to_dict", lambda: {"type": "edge_acl", "message": str(exc)})(),
+                    }
+
             if pass_mode == "append" and i > 0:
                 message_text = f"原始问题：{original_query}\n\n上一步结果：\n{current_text}"
             else:
                 message_text = current_text if i > 0 else query
 
+            meta = {
+                "skill_id": skill_id,
+                "pipeline_id": pipeline_id,
+                "step_index": i,
+                "from_agent": from_agent,
+            }
+            if principal_id:
+                meta["principal_id"] = principal_id
+            if topology:
+                meta["topology"] = topology
+
             message = {
                 "role": "user",
                 "parts": [{"type": "text", "text": message_text}],
-                "metadata": {"skill_id": skill_id, "pipeline_id": pipeline_id, "step_index": i},
+                "metadata": meta,
             }
             started = time.time()
-            task = self._bus.send_message(
-                agent_name,
-                message,
-                metadata={"pipeline_id": pipeline_id, "step_index": i, "skill_id": skill_id},
-            )
+            send_meta: dict = {
+                "pipeline_id": pipeline_id,
+                "step_index": i,
+                "skill_id": skill_id,
+                "from_agent": from_agent,
+            }
+            if principal_id:
+                send_meta["principal_id"] = principal_id
+            if topology:
+                send_meta["topology"] = topology
+            task = self._bus.send_message(agent_name, message, metadata=send_meta)
             state = (task.get("status") or {}).get("state", "")
             output = extract_task_output(task)
             collab_steps.append({
@@ -449,6 +522,7 @@ class AgentOrchestrator:
                 "agent": agent_name,
                 "label": label,
                 "skill_id": skill_id,
+                "from_agent": from_agent,
                 "input": message_text,
                 "output": output,
                 "state": state,

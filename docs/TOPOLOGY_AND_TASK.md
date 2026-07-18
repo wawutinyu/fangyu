@@ -71,6 +71,40 @@
 
 详见 `normalize_pipeline_stages` / `stages_from_depends_edges`。
 
+### 编排边 ACL（P2）
+
+边上可声明谁可调谁；**无声明默认放行**。实现：`core/topology_acl.py`。
+
+```json
+{
+  "edges": [
+    {
+      "source": "scout",
+      "target": "writer",
+      "type": "depends",
+      "acl": {
+        "allowed_callers": ["scout"],
+        "deny_callers": ["hacker"]
+      }
+    }
+  ],
+  "edge_acl": {
+    "enabled": true,
+    "rules": [
+      {"caller": "x", "callee": "y", "effect": "deny"}
+    ]
+  }
+}
+```
+
+| 入口 | 行为 |
+|------|------|
+| `bundle orchestrate` | 波次切换校验 |
+| `AgentOrchestrator.run_pipeline` / `POST /a2a/orchestrate` | 传 `topology` 时逐步校验 |
+| `AgentBus.send_message` | metadata 带 `from_agent` + `topology` 时校验 |
+
+越权 → `TopologyACLError` + 审计 `edge_acl_violation`。与组织 ACL（人→资源）叠加，不互相替代。
+
 ## 3. task 并行速查
 
 ```json

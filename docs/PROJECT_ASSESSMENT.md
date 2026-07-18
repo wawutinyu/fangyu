@@ -117,7 +117,7 @@ G2-E 多编排     ██████░░░░  ~55%
 |--------|------|------|
 | **P0** | 稳住 G1 live | ✅ harness live + graduation C 已绿；`FANGYU_SHELL_POLICY=allow` |
 | **P1** | 真双厂值班验收 | ✅ D1–D9 脚本可签字；挂 `factory_gate --live-tier smoke` |
-| **P2** | 编排边 ACL | topology 边「谁可调谁」可拦可审计 |
+| **P2** | 编排边 ACL | ✅ topology 边 / rules；越权可拦可审计 |
 | **P3** | 真 IM（单开） | 飞书私聊触发→回复；不挡底座 |
 | **P4** | 办公×编排交叉 | 一句任务拆多专家；IM 触发整网 |
 
