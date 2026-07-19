@@ -169,3 +169,39 @@ app.include_router(auth_router.router)
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "version": "1.0.0"}
+
+
+def _mount_studio_ui() -> None:
+    """生产单进程：托管 fangyu-studio/dist（FANGYU_SERVE_UI=1 或目录存在且显式开启）。"""
+    import os
+    from pathlib import Path
+
+    flag = (os.getenv("FANGYU_SERVE_UI") or "").strip().lower()
+    if flag not in ("1", "true", "yes", "on"):
+        return
+    dist = Path(os.getenv("FANGYU_UI_DIST") or (Path(__file__).resolve().parent / "fangyu-studio" / "dist"))
+    if not dist.is_dir() or not (dist / "index.html").is_file():
+        return
+    from fastapi.responses import FileResponse
+    from fastapi.staticfiles import StaticFiles
+
+    assets = dist / "assets"
+    if assets.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(assets)), name="studio-assets")
+
+    @app.get("/")
+    async def studio_index():
+        return FileResponse(dist / "index.html")
+
+    @app.get("/{full_path:path}")
+    async def studio_spa(full_path: str):
+        # API / docs 已由路由优先匹配；其余走静态或 SPA fallback
+        if full_path.startswith("api/") or full_path in ("docs", "redoc", "openapi.json"):
+            return JSONResponse(status_code=404, content={"detail": "Not Found"})
+        candidate = dist / full_path
+        if candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(dist / "index.html")
+
+
+_mount_studio_ui()

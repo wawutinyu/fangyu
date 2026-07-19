@@ -38,6 +38,7 @@ worker-local.json
 
 # Environment
 .env
+.env.deploy
 .vscode/*
 !.vscode/extensions.json
 .idea/

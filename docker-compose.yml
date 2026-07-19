@@ -1,0 +1,44 @@
+# 方隅一键部署（单机 Docker）
+# 用法：复制 .env.deploy.example 为 .env.deploy 后：
+#   docker compose --env-file .env.deploy up -d --build
+
+services:
+  fangyu:
+    build: .
+    image: fangyu:latest
+    restart: unless-stopped
+    ports:
+      - "${FANGYU_HTTP_PORT:-8000}:8000"
+    env_file:
+      - .env.deploy
+    environment:
+      FANGYU_SERVE_UI: "1"
+      FANGYU_UI_DIST: /app/fangyu-studio/dist
+      FANGYU_DATA_DIR: /data
+      HOST: "0.0.0.0"
+      PORT: "8000"
+      CORS_ORIGINS: "${CORS_ORIGINS:-*}"
+    volumes:
+      - fangyu_data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # 可选：前面挂 nginx（域名 / HTTPS 时启用 profile gateway）
+  nginx:
+    profiles: ["gateway"]
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "${FANGYU_GATEWAY_PORT:-80}:80"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      fangyu:
+        condition: service_healthy
+
+volumes:
+  fangyu_data:
