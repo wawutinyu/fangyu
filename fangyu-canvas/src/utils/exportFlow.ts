@@ -31,13 +31,17 @@ function _downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
+export type FlowExportMode = 'source' | 'compile'
+
 /**
- * 一键导出：后端编译 .exe 并打包为含源码 + a2a/ + trust/ + .exe 的 ZIP，一次下载完成。
+ * 导出流程 ZIP。
+ * - source（默认）：只打包源码 / 配置 / build 脚本，秒级返回，不堵 API
+ * - compile：服务端 PyInstaller 编译后再打包（慢，Linux 上通常不是 Windows .exe）
  */
 export async function downloadFlowExport(
   nodes: Node[],
   edges: Edge[],
-  options: GenerateOptions & { enableA2A?: boolean } = {},
+  options: GenerateOptions & { enableA2A?: boolean; exportMode?: FlowExportMode } = {},
   backendUrl: string = '',
   onCompileProgress?: () => void,
   agentNodes?: AgentCanvasNode[],
@@ -46,8 +50,10 @@ export async function downloadFlowExport(
   const exportOptions = await fetchExportOptions(options)
   const bundle = getFlowExportBundle(nodes, edges, exportOptions, agentNodes)
   const flowConfig = { nodes, edges, options: exportOptions }
+  const mode: FlowExportMode = options.exportMode === 'compile' ? 'compile' : 'source'
+  const endpoint = mode === 'compile' ? `${API_BASE}/compile-bundle` : `${API_BASE}/bundle`
 
-  const res = await fetch(`${backendUrl}${API_BASE}/compile-bundle`, {
+  const res = await fetch(`${backendUrl}${endpoint}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -58,17 +64,17 @@ export async function downloadFlowExport(
       extraFiles: bundle.extraFiles,
       console: true,
     }),
-    signal: AbortSignal.timeout(660_000),
+    signal: AbortSignal.timeout(mode === 'compile' ? 660_000 : 60_000),
   })
   if (!res.ok) {
     let detail = ''
     try { const j = await res.json(); detail = j.detail } catch { detail = await res.text() }
     throw new Error(`导出失败 (${res.status}): ${detail.slice(0, 200)}`)
   }
-  const compileOk = res.headers.get('X-Fangyu-Compile-Ok')
-  _downloadBlob(await res.blob(), 'flow_export_bundle.zip')
-  if (compileOk === 'false') {
-    alert('flow_export.exe 编译未成功，ZIP 内包含 compile.log 与源码，请查看日志或运行 build_exe.bat 手动编译')
+  const filename = mode === 'compile' ? 'flow_export_bundle.zip' : 'flow_export.zip'
+  _downloadBlob(await res.blob(), filename)
+  if (mode === 'compile' && res.headers.get('X-Fangyu-Compile-Ok') === 'false') {
+    alert('可执行文件编译未成功，ZIP 内包含 compile.log 与源码，请查看日志或运行 build_exe.bat 手动编译')
   }
 }
 

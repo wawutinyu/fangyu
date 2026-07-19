@@ -78,6 +78,30 @@ GitHub → 仓库 → **Settings → Secrets and variables → Actions** → New
 
 服务器 `authorized_keys` 里需有对应**公钥**（本机若已生成过 `.fangyu/github-deploy`，公钥已可写到服务器）。
 
+---
+
+## GitHub 不稳：直推服务器仓库
+
+网络访问 GitHub 差时，不必等 Actions。服务器有 bare 仓库 `/opt/fangyu.git`，推送后 hook 自动更新 `/opt/fangyu` 并重启。
+
+一次性（已跑过可跳过）：
+
+```bash
+./scripts/setup-server-git.sh root@117.72.174.168 .fangyu/github-deploy
+```
+
+日常：
+
+```bash
+# GitHub 不好时 → 直推服务器
+GIT_SSH_COMMAND='ssh -i .fangyu/github-deploy -o IdentitiesOnly=yes' git push production main
+
+# 网络正常时 → 仍推 GitHub（Actions CD）
+git push origin main
+```
+
+两套可并存；不必每次推三个地方。本机只有一份工作区。
+
 ### 本机 Docker 方案（可选）
 
 若目标机走 Compose 而不是 systemd：

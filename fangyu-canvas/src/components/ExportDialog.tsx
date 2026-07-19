@@ -17,11 +17,24 @@ export default function ExportDialog({ nodes, edges, onClose, onCompileStart, on
   const globalPrompts = useAppSelector(s => s.flow.globalPrompts)
   const [enableA2A, setEnableA2A] = useState(agentNodes.length > 0)
   const [includeDesktopGUI, setIncludeDesktopGUI] = useState(true)
+  const [compileExe, setCompileExe] = useState(false)
 
   const handleExport = async () => {
     onCompileStart()
     try {
-      await downloadFlowExport(nodes, edges, { desktopGUI: includeDesktopGUI, enableA2A, globalPrompts }, '', undefined, enableA2A ? agentNodes : undefined)
+      await downloadFlowExport(
+        nodes,
+        edges,
+        {
+          desktopGUI: includeDesktopGUI,
+          enableA2A,
+          globalPrompts,
+          exportMode: compileExe ? 'compile' : 'source',
+        },
+        '',
+        undefined,
+        enableA2A ? agentNodes : undefined,
+      )
     } catch (e: any) {
       alert(`导出失败: ${e.message}`)
     } finally {
@@ -53,6 +66,11 @@ export default function ExportDialog({ nodes, edges, onClose, onCompileStart, on
             启用 A2A 智能体通讯
           </label>
 
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+            <input type="checkbox" checked={compileExe} onChange={e => setCompileExe(e.target.checked)} />
+            服务端编译可执行文件（慢，可选）
+          </label>
+
           {enableA2A && agentNodes.length > 0 && (
             <div style={{ fontSize: 12, color: '#666', background: '#f5f5f5', borderRadius: 6, padding: 8 }}>
               将包含 {agentNodes.filter(n => n.type === 'a2a-agent').length} 个智能体
@@ -61,10 +79,12 @@ export default function ExportDialog({ nodes, edges, onClose, onCompileStart, on
           )}
 
           <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
-            导出 ZIP：含 flow_export.exe + 源码 + compile.log（首次编译约 1–3 分钟）
+            {compileExe
+              ? '将尝试服务端编译并打包 ZIP（可能数分钟；Linux 服务器上通常不是 Windows .exe）'
+              : '默认导出源码 ZIP（秒级）：含 .py / flow_config.json / build_exe.bat，可在本机编译'}
           </div>
           <div style={{ fontSize: 11, color: '#b8860b', marginTop: 4 }}>
-            运行 exe 前请设置 LLM_API_KEY 与 LLM_ENDPOINT 环境变量
+            运行前请设置 LLM_API_KEY 与 LLM_ENDPOINT 环境变量
           </div>
         </div>
 
