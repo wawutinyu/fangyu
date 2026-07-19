@@ -15,6 +15,7 @@ from fangyu.core.intent_flow import (
     intent_to_flow,
     build_action_loop_flow,
     build_doc_assistant_flow,
+    build_opencode_harness_flow,
     build_simple_io_flow,
 )
 from fangyu.engine.executor import register_executors
@@ -40,6 +41,8 @@ def client():
         ("完成巡检任务并写入结果", "action_loop"),
         ("帮我执行 workspace 清理", "action_loop"),
         ("please do something long enough", "action_loop"),  # len >= 12
+        ("用 harness 改代码写 hello.md", "opencode_harness"),
+        ("OpenCode 多轮工具环验证", "opencode_harness"),
     ],
 )
 def test_classify_intent(intent, expected):
@@ -79,6 +82,16 @@ def test_build_action_loop_llm_plan():
     types = [n["type"] for n in flow["nodes"]]
     assert "llm" in types
     assert any(n["name"] == "plan_parse" for n in flow["nodes"])
+
+
+def test_build_opencode_harness_chain():
+    flow = build_opencode_harness_flow("在仓库写 hello.md")
+    types = [n["type"] for n in flow["nodes"]]
+    assert types == ["input", "agent-loop", "output"]
+    loop = flow["nodes"][1]
+    assert loop["name"] == "Harness"
+    assert loop["config"]["toolbelt"] == "coding"
+    assert loop["config"]["require_plan"] is True
 
 
 def test_intent_to_flow_scan_not_blocked():
@@ -165,4 +178,16 @@ def test_router_templates(client):
     resp = client.get("/api/v1/intent/templates")
     assert resp.status_code == 200
     ids = {t["id"] for t in resp.json()["templates"]}
-    assert ids == {"action_loop", "doc_assistant", "simple_io"}
+    assert ids == {"opencode_harness", "action_loop", "doc_assistant", "simple_io"}
+
+
+def test_router_to_flow_opencode_harness(client):
+    resp = client.post(
+        "/api/v1/intent/to-flow",
+        json={"intent": "改代码验证 harness", "template": "opencode_harness"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["template"] == "opencode_harness"
+    assert data["scan"]["blocked"] is False
+    assert [n["type"] for n in data["flow"]["nodes"]] == ["input", "agent-loop", "output"]

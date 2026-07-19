@@ -37,6 +37,12 @@
 
 脚本：`scripts/opencode_graduation_c.py` · `scripts/opencode_harness_live.py`
 
+**Studio 画布入口（交互验证）：**
+
+1. 顶栏 → 示例用例 → **OpenCode Harness**（或节点库 **AI 能力 → Agent 工具环**）  
+2. 或 **意图生成** → 模板选「OpenCode Harness」→ 应用到画布  
+3. 预览/跑通后导出 Agent Bundle（与 CLI `bundle create --profile opencode` 同机床）
+
 ---
 
 ## G2 · WorkBuddy 全档（硬清单）

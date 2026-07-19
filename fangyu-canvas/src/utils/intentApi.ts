@@ -1,6 +1,10 @@
 /** Intent → Flow API client */
 
-export type IntentTemplateId = 'action_loop' | 'doc_assistant' | 'simple_io'
+export type IntentTemplateId =
+  | 'action_loop'
+  | 'doc_assistant'
+  | 'simple_io'
+  | 'opencode_harness'
 
 export interface IntentScanResult {
   deny: unknown[]

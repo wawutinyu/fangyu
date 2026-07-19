@@ -50,6 +50,11 @@ def list_templates():
     return {
         "templates": [
             {
+                "id": "opencode_harness",
+                "label": "OpenCode Harness",
+                "desc": "input → agent-loop → output（画布验证多轮工具环）",
+            },
+            {
                 "id": "action_loop",
                 "label": "行动闭环",
                 "desc": "observe → plan → act → verify",

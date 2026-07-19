@@ -9,7 +9,7 @@ from typing import Any, Literal
 
 from .constitution import apply_flow_governance
 
-TemplateId = Literal["action_loop", "doc_assistant", "simple_io"]
+TemplateId = Literal["action_loop", "doc_assistant", "simple_io", "opencode_harness"]
 
 # 意图生成必须用 Python：底部「预览」聊天与后端沙箱只跑 Python。
 # 兼容上游 result 嵌套，以及无 workspace 时的内存 files（序内预览 / 聊天）。
@@ -115,6 +115,11 @@ def classify_intent(intent: str) -> TemplateId:
     if not text:
         return "simple_io"
 
+    harness_keys = (
+        "改代码", "写代码", "编码", "仓库", "repo", "harness", "opencode",
+        "refactor", "coding", "patch", "读改跑", "工具环", "agent-loop",
+        "多轮工具",
+    )
     doc_keys = (
         "文档", "总结", "摘要", "问答", "知识", "阅读", "说明", "写邮件",
         "document", "summary", "qa", "knowledge", "readme",
@@ -124,6 +129,8 @@ def classify_intent(intent: str) -> TemplateId:
         "验证", "observe", "action", "loop", "干活", "处理文件", "workspace",
     )
 
+    if any(k.lower() in text for k in harness_keys):
+        return "opencode_harness"
     if any(k.lower() in text for k in doc_keys):
         return "doc_assistant"
     if any(k.lower() in text for k in action_keys):
@@ -237,6 +244,44 @@ def build_action_loop_flow(
     return _export(f"意图·行动·{title}", nodes, links)
 
 
+def build_opencode_harness_flow(
+    intent: str,
+    *,
+    max_turns: int = 24,
+    model: str = "deepseek-chat",
+) -> dict[str, Any]:
+    """画布可加载的 OpenCode harness：input → agent-loop → output。"""
+    title = _short_title(intent)
+    goal = intent.strip() or "complete the coding task"
+    nodes = [
+        _node("n1", "input", "任务", x=80, config={"default_value": goal}),
+        _node(
+            "loop",
+            "agent-loop",
+            "Harness",
+            x=340,
+            category="AI 能力",
+            config={
+                "max_turns": max_turns,
+                "toolbelt": "coding",
+                "temperature": 0.2,
+                "max_tokens": 4096,
+                "model": model,
+                "require_plan": True,
+                "enable_task": True,
+                "agent_mode": "build",
+                "shell_policy": "ask",
+            },
+        ),
+        _node("o", "output", "输出", x=600),
+    ]
+    links = [
+        _link("e1", "n1", "loop"),
+        _link("e2", "loop", "o"),
+    ]
+    return _export(f"意图·Harness·{title}", nodes, links)
+
+
 def build_flow_for_template(
     intent: str,
     template: TemplateId,
@@ -248,6 +293,8 @@ def build_flow_for_template(
         return build_doc_assistant_flow(intent, model=model)
     if template == "action_loop":
         return build_action_loop_flow(intent, use_llm_plan=use_llm_plan, model=model)
+    if template == "opencode_harness":
+        return build_opencode_harness_flow(intent, model=model)
     return build_simple_io_flow(intent)
 
 
@@ -269,6 +316,8 @@ def export_nodes_to_scan_payload(nodes: list[dict]) -> list[dict]:
 
 
 def _rationale(template: TemplateId, use_llm_plan: bool) -> str:
+    if template == "opencode_harness":
+        return "识别为编码/Harness 类意图 → 生成 input → agent-loop(Harness) → output"
     if template == "doc_assistant":
         return "识别为文档/问答类意图 → 生成 input → llm → output"
     if template == "action_loop":

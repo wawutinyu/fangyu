@@ -224,6 +224,18 @@ export function generatePythonCode(nodes: Node[], edges: Edge[], options: Genera
         w(`${INDENT}pool["${nodeId}"] = ${varName}`)
         break
       }
+      case 'agent-loop': {
+        w(`${INDENT}# Agent 工具环 (Harness) — 画布预览走后端；完整手脚需 fangyu Bundle 运行时`)
+        w(`${INDENT}# toolbelt=${String(config.toolbelt || 'coding')} max_turns=${Number(config.max_turns || 24)}`)
+        w(`${INDENT}${varName} = {`)
+        w(`${INDENT}${INDENT}"result": _inputs.get("input", _inputs.get("result", _inputs)),`)
+        w(`${INDENT}${INDENT}"success": False,`)
+        w(`${INDENT}${INDENT}"turns": 0,`)
+        w(`${INDENT}${INDENT}"error": "agent-loop requires fangyu runtime (Studio 预览或 bundle chat)",`)
+        w(`${INDENT}}`)
+        w(`${INDENT}pool["${nodeId}"] = ${varName}`)
+        break
+      }
       case 'llm': {
         const model = config.model || 'deepseek-chat'
         w(`${INDENT}# LLM 调用: ${model}`)

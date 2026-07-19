@@ -187,6 +187,12 @@ describe('loop ports', () => {
     expect(canConnectTypes('loop', 'output')).toBe(true)
     expect(getCompatibleTargets('loop')).toContain('output')
   })
+
+  it('agent-loop (Harness) chains from input to output', () => {
+    expect(canConnectTypes('input', 'agent-loop')).toBe(true)
+    expect(canConnectTypes('agent-loop', 'output')).toBe(true)
+    expect(getCompatibleTargets('agent-loop')).toContain('output')
+  })
 })
 
 describe('active palette nodes', () => {
