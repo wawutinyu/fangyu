@@ -233,8 +233,8 @@ export default function TopToolbar(props: Props) {
                 ...(props.onOpenIntent ? [{ label: '意图生成', hint: '自然语言 → Flow', onClick: props.onOpenIntent }] : []),
                 ...(props.onLoadDemo
                   ? [{
-                      label: '节点编排 · Harness',
-                      hint: '任务→记忆→计划→执行→记忆→验收（可继续插节点）',
+                      label: '拼装验收 · Harness 级',
+                      hint: '循环(until_done)+工具轮 — 验平台能否拖拽拼出',
                       onClick: () => props.onLoadDemo!('opencode_harness'),
                     }]
                   : []),

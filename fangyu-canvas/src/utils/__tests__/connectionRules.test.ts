@@ -193,6 +193,13 @@ describe('loop ports', () => {
     expect(canConnectTypes('agent-loop', 'output')).toBe(true)
     expect(getCompatibleTargets('agent-loop')).toContain('output')
   })
+
+  it('tool-round and until_done loop compose', () => {
+    expect(canConnectTypes('input', 'tool-round')).toBe(true)
+    expect(canConnectTypes('input', 'loop')).toBe(true)
+    expect(canConnectTypes('tool-round', 'output')).toBe(true)
+    expect(canConnectTypes('loop', 'output')).toBe(true)
+  })
 })
 
 describe('active palette nodes', () => {

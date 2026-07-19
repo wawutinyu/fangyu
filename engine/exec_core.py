@@ -12,57 +12,118 @@ def _non_null_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in inputs.items() if v is not None}
 
 
+async def _run_inner_once(
+    ctx: NodeContext,
+    *,
+    extra_inputs: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    inner_nodes_raw = (ctx.node_data or {}).get("inner_nodes", [])
+    inner_links_raw = (ctx.node_data or {}).get("inner_links", [])
+    if not inner_nodes_raw:
+        return {}
+    inner_nodes = [
+        {
+            "id": n["id"],
+            "data": {
+                "originType": n.get("originType", "start"),
+                "config": n.get("config", {}),
+                "mappings": n.get("mappings", {}),
+            },
+        }
+        for n in inner_nodes_raw
+    ]
+    inner_edges = [
+        {
+            "source": e["sourceNodeId"],
+            "target": e["targetNodeId"],
+            "data": {
+                "linkType": e.get("linkType", "serial"),
+                "mappings": e.get("mappings", {}),
+            },
+        }
+        for e in inner_links_raw
+    ]
+    merged = _non_null_inputs({
+        **ctx.external_inputs,
+        **ctx.inputs,
+        **(extra_inputs or {}),
+    })
+    inner_result = await run_flow(
+        nodes=inner_nodes,
+        edges=inner_edges,
+        external_inputs=merged,
+        global_vars=ctx.global_vars,
+    )
+    inner_outputs = {}
+    for r in inner_result.get("results", []):
+        inner_outputs[r["nodeId"]] = r.get("outputs", {})
+    return inner_outputs
+
+
 async def _exec_loop(ctx: NodeContext) -> dict[str, Any]:
+    mode = str(ctx.config.get("mode") or "foreach").strip().lower()
+    max_iter = int(ctx.config.get("max_iterations") or ctx.config.get("max_turns") or 100)
+    loop_var = ctx.config.get("loop_var", "item")
+
+    # until_done：多轮执行内嵌子图（通常内含 tool-round），直到 _harness_done
+    if mode in ("until_done", "turns", "harness"):
+        from fangyu.engine.harness_round import DONE_KEY
+
+        max_turns = int(ctx.config.get("max_turns") or max_iter or 8)
+        ctx.global_vars["_harness_max_turns"] = max_turns
+        ctx.global_vars[DONE_KEY] = False
+        # 无内嵌节点时，默认每轮跑一个 tool-round（仍可由用户改成自拼子图）
+        inner_nodes_raw = (ctx.node_data or {}).get("inner_nodes", [])
+        if not inner_nodes_raw:
+            from fangyu.engine.exec_harness import _exec_tool_round
+            results = []
+            for i in range(max_turns):
+                if ctx.global_vars.get(DONE_KEY):
+                    break
+                ctx.global_vars["_loop_index"] = i
+                out = await _exec_tool_round(ctx)
+                results.append({"index": i, "body_outputs": {"tool-round": out}})
+                if out.get("done") or ctx.global_vars.get(DONE_KEY):
+                    break
+            return {
+                "result": results,
+                "count": len(results),
+                "done": bool(ctx.global_vars.get(DONE_KEY)),
+                "mode": "until_done",
+            }
+
+        results = []
+        for i in range(max_turns):
+            if ctx.global_vars.get(DONE_KEY):
+                break
+            ctx.global_vars[loop_var] = i
+            ctx.global_vars["_loop_index"] = i
+            body = await _run_inner_once(ctx, extra_inputs={"item": i, "index": i})
+            results.append({"index": i, loop_var: i, "body_outputs": body})
+            if ctx.global_vars.get(DONE_KEY):
+                break
+        return {
+            "result": results,
+            "count": len(results),
+            "done": bool(ctx.global_vars.get(DONE_KEY)),
+            "mode": "until_done",
+        }
+
     arr = ctx.inputs.get("array", [])
     if not isinstance(arr, list):
         arr = [arr]
-    max_iter = int(ctx.config.get("max_iterations", 100))
-    loop_var = ctx.config.get("loop_var", "item")
-    inner_nodes_raw = (ctx.node_data or {}).get("inner_nodes", [])
-    inner_links_raw = (ctx.node_data or {}).get("inner_links", [])
-
     results = []
     for i, item in enumerate(arr):
         if i >= max_iter:
             break
         ctx.global_vars[loop_var] = item
         ctx.global_vars["_loop_index"] = i
-        if inner_nodes_raw:
-            inner_nodes = [
-                {
-                    "id": n["id"],
-                    "data": {
-                        "originType": n.get("originType", "start"),
-                        "config": n.get("config", {}),
-                        "mappings": n.get("mappings", {}),
-                    },
-                }
-                for n in inner_nodes_raw
-            ]
-            inner_edges = [
-                {
-                    "source": e["sourceNodeId"],
-                    "target": e["targetNodeId"],
-                    "data": {
-                        "linkType": e.get("linkType", "serial"),
-                        "mappings": e.get("mappings", {}),
-                    },
-                }
-                for e in inner_links_raw
-            ]
-            inner_result = await run_flow(
-                nodes=inner_nodes,
-                edges=inner_edges,
-                external_inputs=_non_null_inputs({**ctx.external_inputs, **ctx.inputs, "item": item, "index": i}),
-                global_vars=ctx.global_vars,
-            )
-            inner_outputs = {}
-            for r in inner_result.get("results", []):
-                inner_outputs[r["nodeId"]] = r.get("outputs", {})
-            results.append({"index": i, loop_var: item, "body_outputs": inner_outputs})
+        if (ctx.node_data or {}).get("inner_nodes"):
+            body = await _run_inner_once(ctx, extra_inputs={"item": item, "index": i})
+            results.append({"index": i, loop_var: item, "body_outputs": body})
         else:
             results.append({"index": i, loop_var: item})
-    return {"result": results, "count": len(results)}
+    return {"result": results, "count": len(results), "mode": "foreach"}
 
 
 async def _exec_start(ctx: NodeContext) -> dict[str, Any]:

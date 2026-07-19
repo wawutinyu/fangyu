@@ -97,7 +97,7 @@ export const demoFlows: Record<string, { label: string; desc?: string; category?
       nodes: [
         { id: 'n1', type: 'input', name: '输入', category: '流程控制', config: { default_value: 'a,b,c' }, position: { x: 60, y: 220 } },
         { id: 'n1b', type: 'code', name: '转数组', category: '代码', config: { code: "const val = (input && typeof input === 'object' && input.input != null) ? input.input : ''\nreturn String(val).split(',').map(x => x.trim()).filter(Boolean)" }, position: { x: 200, y: 220 } },
-        { id: 'n2', type: 'loop', name: '循环', category: '流程控制', config: { loop_var: 'item', max_iterations: 100 }, position: { x: 340, y: 220 } },
+        { id: 'n2', type: 'loop', name: '循环', category: '流程控制', config: { mode: 'foreach', loop_var: 'item', max_iterations: 100 }, position: { x: 340, y: 220 } },
         { id: 'n3', type: 'output', name: '结果', category: '流程控制', config: {}, position: { x: 620, y: 220 } },
       ],
       links: [
@@ -507,7 +507,7 @@ export const demoFlows: Record<string, { label: string; desc?: string; category?
         { id: 'n1', type: 'input', name: '输入', category: '流程控制', config: { default_value: 'x,y,z' }, position: { x: 60, y: 220 } },
         { id: 'n1b', type: 'code', name: '转数组', category: '代码', config: { code: "const val = (input && input.input != null) ? input.input : ''\nreturn String(val).split(',').map(x => x.trim()).filter(Boolean)" }, position: { x: 200, y: 220 } },
         {
-          id: 'n2', type: 'loop', name: '循环', category: '流程控制', config: { loop_var: 'item', max_iterations: 10 }, position: { x: 360, y: 220 },
+          id: 'n2', type: 'loop', name: '循环', category: '流程控制', config: { mode: 'foreach', loop_var: 'item', max_iterations: 10 }, position: { x: 360, y: 220 },
           is_group: false,
           inner_nodes: [
             { id: 'li', type: 'code', name: '处理', config: { code: "const item = (input && input.item) || ''\nreturn { item: String(item).toUpperCase() }" } },
@@ -816,88 +816,51 @@ export const demoFlows: Record<string, { label: string; desc?: string; category?
     },
   },
   opencode_harness: {
-    label: '节点编排 · Harness',
+    label: '拼装验收 · Harness 级',
     category: 'Harness',
-    desc: '任务→记忆→计划→执行→记忆→验收→输出；用节点拼 harness，可继续插工具/分支/MCP',
+    desc: '平台能力：循环(until_done)+工具轮，无 agent-loop；可再插记忆/分支。见 docs/PLATFORM_COMPOSE_HARNESS.md',
     data: {
       flow_id: '',
-      flow_name: '节点编排 · Harness',
+      flow_name: '拼装验收 · Harness 级',
       nodes: [
         {
           id: 'n1',
           type: 'input',
           name: '任务',
           category: '流程控制',
-          config: { default_value: '在工作区创建 hello.md，内容写方隅 harness 验证' },
-          position: { x: 40, y: 220 },
+          config: { default_value: '在工作区创建 hello.md，内容写 compose-harness-ok' },
+          position: { x: 80, y: 220 },
         },
         {
-          id: 'mem_in',
+          id: 'mem',
           type: 'memory',
           name: '记目标',
           category: '记忆存储',
-          config: { operation: 'write', memory_key: 'harness_goal', scope: 'session' },
-          position: { x: 220, y: 220 },
+          config: { operation: 'write', memory_key: 'compose_goal', scope: 'session' },
+          position: { x: 280, y: 220 },
         },
         {
-          id: 'plan',
-          type: 'llm',
-          name: '计划',
-          category: 'AI 能力',
-          config: {
-            model: 'deepseek-chat',
-            temperature: 0.2,
-            max_tokens: 1024,
-            system_prompt:
-              '你是编码 harness 的规划节点。根据任务拆成 2～5 步可执行计划，说明要用哪些工具（读/写/搜/shell）。不要假装已改文件。',
-            prompt: '任务：{{input}}\n请输出分步计划。',
-          },
-          position: { x: 420, y: 220 },
-        },
-        {
-          id: 'act',
-          type: 'code',
-          name: '执行',
-          category: 'AI 能力',
-          config: {
-            // 与意图模板一致：后端沙箱跑 Python
-            code:
-              "src = _input if isinstance(_input, dict) else {'input': _input}\n"
-              + "if isinstance(src.get('result'), dict):\n"
-              + "    src = {**src, **src['result']}\n"
-              + "goal = src.get('input') or src.get('goal') or src.get('result') or 'task'\n"
-              + "if not isinstance(goal, str):\n"
-              + "    goal = str(goal)\n"
-              + "files = list(src.get('files') or [])\n"
-              + "if 'hello.md' not in files:\n"
-              + "    files = files + ['hello.md']\n"
-              + "result = {'phase': 'act', 'goal': goal, 'files': files, 'acted': True,\n"
-              + "          'note': '可在此后插入 tool-call / MCP / 分支'}\n",
-          },
-          position: { x: 620, y: 220 },
-        },
-        {
-          id: 'mem_out',
-          type: 'memory',
-          name: '记结果',
-          category: '记忆存储',
-          config: { operation: 'write', memory_key: 'harness_last_act', scope: 'session' },
-          position: { x: 820, y: 220 },
-        },
-        {
-          id: 'verify',
-          type: 'llm',
-          name: '验收',
-          category: 'AI 能力',
-          config: {
-            model: 'deepseek-chat',
-            temperature: 0.2,
-            max_tokens: 512,
-            system_prompt:
-              '你是验收员。根据上游结果说明是否达成任务、还缺哪步、建议在画布上再加哪个节点（记忆/工具/分支）。',
-            prompt: '上游结果：{{input}}\n请验收并给出下一步画布改造建议。',
-          },
-          position: { x: 1020, y: 220 },
+          id: 'until',
+          type: 'loop',
+          name: '直到完成',
+          category: '流程控制',
+          config: { mode: 'until_done', max_turns: 12, max_iterations: 12 },
+          // 内嵌工具轮：可打开子图改成自己的拼法
+          inner_nodes: [
+            {
+              id: 'tr',
+              originType: 'tool-round',
+              name: '工具轮',
+              config: {
+                toolbelt: 'coding',
+                require_plan: true,
+                agent_mode: 'build',
+                model: 'deepseek-chat',
+              },
+            },
+          ],
+          inner_links: [],
+          position: { x: 500, y: 220 },
         },
         {
           id: 'o',
@@ -905,16 +868,13 @@ export const demoFlows: Record<string, { label: string; desc?: string; category?
           name: '输出',
           category: '流程控制',
           config: {},
-          position: { x: 1220, y: 220 },
+          position: { x: 760, y: 220 },
         },
       ],
       links: [
-        { id: 'e1', sourceNodeId: 'n1', targetNodeId: 'mem_in', linkType: 'serial', mappings: {} },
-        { id: 'e2', sourceNodeId: 'mem_in', targetNodeId: 'plan', linkType: 'serial', mappings: {} },
-        { id: 'e3', sourceNodeId: 'plan', targetNodeId: 'act', linkType: 'serial', mappings: {} },
-        { id: 'e4', sourceNodeId: 'act', targetNodeId: 'mem_out', linkType: 'serial', mappings: {} },
-        { id: 'e5', sourceNodeId: 'mem_out', targetNodeId: 'verify', linkType: 'serial', mappings: {} },
-        { id: 'e6', sourceNodeId: 'verify', targetNodeId: 'o', linkType: 'serial', mappings: {} },
+        { id: 'e1', sourceNodeId: 'n1', targetNodeId: 'mem', linkType: 'serial', mappings: {} },
+        { id: 'e2', sourceNodeId: 'mem', targetNodeId: 'until', linkType: 'serial', mappings: {} },
+        { id: 'e3', sourceNodeId: 'until', targetNodeId: 'o', linkType: 'serial', mappings: {} },
       ],
       global_meta: { session_id: '', user_id: '' },
     },

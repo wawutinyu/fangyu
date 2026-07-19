@@ -26,9 +26,10 @@ def _init_registry():
         "end": ("结束", "流程控制", [{"name": "input", "type": "any", "required": True}], []),
         "condition": ("条件分支", "流程控制", [{"name": "input", "type": "any", "required": True}], [{"name": "true", "type": "any"}, {"name": "false", "type": "any"}]),
         "switch": ("多路分支", "流程控制", [{"name": "input", "type": "any", "required": True}], [{"name": "default", "type": "any"}]),
-        "loop": ("循环", "流程控制", [{"name": "array", "type": "array", "required": True}, {"name": "body", "type": "any"}], [{"name": "result", "type": "array"}]),
+        "loop": ("循环", "流程控制", [{"name": "array", "type": "array", "required": False}, {"name": "body", "type": "any"}], [{"name": "result", "type": "array"}, {"name": "done", "type": "boolean"}]),
         "trigger": ("触发器", "流程控制", [{"name": "message", "type": "string"}], [{"name": "message", "type": "string"}, {"name": "triggered", "type": "boolean"}]),
         "llm": ("大模型调用", "AI 能力", [{"name": "input", "type": "string"}, {"name": "system_prompt", "type": "string"}, {"name": "context", "type": "array"}], [{"name": "result", "type": "string"}, {"name": "usage", "type": "object"}]),
+        "tool-round": ("工具轮", "AI 能力", [{"name": "input", "type": "string"}], [{"name": "result", "type": "any"}, {"name": "done", "type": "boolean"}, {"name": "turn", "type": "number"}, {"name": "success", "type": "boolean"}]),
         "agent-loop": ("Agent 工具环", "AI 能力", [{"name": "input", "type": "string"}], [{"name": "result", "type": "any"}, {"name": "success", "type": "boolean"}, {"name": "turns", "type": "number"}]),
         "code": ("代码执行", "AI 能力", [{"name": "input", "type": "any"}, {"name": "params", "type": "object"}], [{"name": "result", "type": "any"}, {"name": "error", "type": "string"}]),
         "knowledge": ("知识库检索", "AI 能力", [{"name": "query", "type": "string", "required": True}], [{"name": "results", "type": "array"}, {"name": "context", "type": "string"}]),
@@ -87,4 +88,5 @@ def register_executors():
     from .exec_tools import register as r5
     from .exec_unified import register as r6
     from .exec_agent import register as r7
-    r1(); r2(); r3(); r4(); r5(); r6(); r7()
+    from .exec_harness import register as r8
+    r1(); r2(); r3(); r4(); r5(); r6(); r7(); r8()

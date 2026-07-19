@@ -37,14 +37,11 @@
 
 脚本：`scripts/opencode_graduation_c.py` · `scripts/opencode_harness_live.py`
 
-**Studio 画布入口（用节点编排搭 Harness）：**
+**平台能力验收（拖拽拼出 Harness 级 — 正途）：**
 
-1. 顶栏 **创建 → 节点编排 · Harness**（或示例用例同名）  
-2. 画布上应看到：**任务 → 记目标 → 计划 → 执行 → 记结果 → 验收 → 输出**  
-3. 在此骨架上继续插入工具 / MCP / 分支 / 更多记忆，再导出  
-4. 节点库里的「整环执行器」只是可选捷径，**不是**搭 harness 的正途  
-
-> CLI `bundle create --profile opencode` 仍可能含整环节点以跑 live；与画布「编排搭建」对齐是后续刀。
+见 [PLATFORM_COMPOSE_HARNESS.md](PLATFORM_COMPOSE_HARNESS.md)。  
+顶栏 **创建 → 拼装验收 · Harness 级**：`循环(until_done)` + **工具轮**（无 `agent-loop`）。  
+整环执行器保留为高级捷径；过关看「能不能拼」，不是「有没有成品」。
 
 ---
 

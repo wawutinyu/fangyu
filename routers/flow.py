@@ -48,9 +48,34 @@ async def _inject_settings(global_vars: dict, db: AsyncSession) -> dict:
 
 async def _prepare_global_vars(raw: dict, db: AsyncSession) -> dict:
     from fangyu.engine.flow_prompts import inject_canvas_prompts
+    from fangyu.engine.workspace import get_active_workspace, init_bundle_workspace
+    import tempfile
+    from pathlib import Path
 
     global_vars = await _inject_settings(dict(raw or {}), db)
-    return inject_canvas_prompts(global_vars)
+    global_vars = inject_canvas_prompts(global_vars)
+
+    # 画布预览：为 coding / tool-round 准备 workspace（可拼 harness 验收）
+    if get_active_workspace() is None:
+        override = global_vars.get("workspace_path") or global_vars.get("workspace")
+        bundle = global_vars.get("_bundle_root") or global_vars.get("bundle_root")
+        if override:
+            root = Path(str(override)).expanduser()
+            root.mkdir(parents=True, exist_ok=True)
+            tmp = Path(tempfile.mkdtemp(prefix="fangyu-flow-ws-"))
+            (tmp / "config").mkdir(parents=True, exist_ok=True)
+            init_bundle_workspace(tmp, workspace_override=root)
+            global_vars["_bundle_root"] = str(tmp)
+            global_vars["workspace_path"] = str(root.resolve())
+        elif bundle:
+            init_bundle_workspace(bundle)
+        else:
+            tmp = Path(tempfile.mkdtemp(prefix="fangyu-compose-ws-"))
+            (tmp / "workspace").mkdir(exist_ok=True)
+            init_bundle_workspace(tmp)
+            global_vars["_bundle_root"] = str(tmp)
+            global_vars["workspace_path"] = str(tmp / "workspace")
+    return global_vars
 
 
 @router.post("/run")

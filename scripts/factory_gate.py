@@ -67,6 +67,7 @@ UNIT_SUITE = [
     "tests/unit/test_plan_shell_skills.py",
     "tests/unit/test_subagent_task.py",
     "tests/unit/test_agent_loop.py",
+    "tests/unit/test_compose_harness.py",
     "tests/unit/test_bundle_tools.py",
     "tests/unit/test_skills_topology_trace.py",
     "tests/unit/test_g2_workbuddy_multi.py",

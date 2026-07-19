@@ -11,32 +11,34 @@ const toolbarSrc = readFileSync(
   'utf8',
 )
 
-describe('节点编排 · Harness 页面入口', () => {
-  it('demo 是多节点骨架（含记忆/计划/执行/验收）', () => {
+describe('拼装验收 · Harness 级入口', () => {
+  it('demo 用 until_done + tool-round，不含 agent-loop', () => {
     const demo = demoFlows.opencode_harness
     expect(demo).toBeTruthy()
-    expect(demo.label).toMatch(/节点编排/)
-    const data = demo.data as { nodes: { type: string; name: string }[] }
+    expect(demo.label).toMatch(/拼装验收/)
+    const data = demo.data as {
+      nodes: { type: string; config?: { mode?: string }; inner_nodes?: { originType: string }[] }[]
+    }
     const types = data.nodes.map(n => n.type)
+    expect(types).toContain('loop')
     expect(types).toContain('memory')
-    expect(types).toContain('llm')
-    expect(types).toContain('code')
     expect(types).not.toContain('agent-loop')
-    expect(data.nodes.length).toBeGreaterThanOrEqual(6)
+    const until = data.nodes.find(n => n.type === 'loop')
+    expect(until?.config?.mode).toBe('until_done')
+    expect(until?.inner_nodes?.some(n => n.originType === 'tool-round')).toBe(true)
   })
 
   it('CATEGORY_ORDER 含 Harness', () => {
     expect(toolbarSrc).toMatch(/CATEGORY_ORDER\s*=\s*\[[^\]]*['"]Harness['"]/)
   })
 
-  it('创建菜单一键加载编排骨架', () => {
-    expect(toolbarSrc).toMatch(/节点编排 · Harness/)
+  it('创建菜单一键加载拼装验收', () => {
+    expect(toolbarSrc).toMatch(/拼装验收 · Harness 级/)
     expect(toolbarSrc).toMatch(/opencode_harness/)
   })
 
-  it('agent-loop 降级为高级整环，不当产品入口名', () => {
-    const meta = getNodeMeta('agent-loop')
-    expect(meta.name).toMatch(/高级/)
-    expect(meta.desc).toMatch(/节点编排/)
+  it('可拼原语在节点库：tool-round；整环仍保留', () => {
+    expect(getNodeMeta('tool-round').name).toMatch(/工具轮/)
+    expect(getNodeMeta('agent-loop').name).toMatch(/高级/)
   })
 })

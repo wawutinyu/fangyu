@@ -85,16 +85,22 @@ export const NODE_CATEGORIES: Category[] = [
         ],
       },
       {
-        type: 'loop', name: '循环', desc: '遍历数组，对每个元素执行子流程',
-        defaultConfig: { loop_var: 'item', max_iterations: 100 },
+        type: 'loop', name: '循环', desc: 'foreach 遍历；或 until_done 多轮直到 harness 完成（内嵌 tool-round）',
+        defaultConfig: { mode: 'foreach', loop_var: 'item', max_iterations: 100, max_turns: 8 },
         inputSchema: [
-          { name: 'array', type: 'array', label: '数组', required: true },
+          { name: 'array', type: 'array', label: '数组（foreach）', required: false },
+          { name: 'input', type: 'any', label: '任务输入（until_done）', required: false },
           { name: 'body', type: 'any', label: '循环体输入' },
         ],
-        outputSchema: [{ name: 'result', type: 'array', label: '结果数组' }],
+        outputSchema: [
+          { name: 'result', type: 'array', label: '结果数组' },
+          { name: 'done', type: 'boolean', label: '是否完成' },
+        ],
         configSchema: [
+          { key: 'mode', label: '模式', type: 'select', default: 'foreach', options: ['foreach', 'until_done'] },
           { key: 'loop_var', label: '循环变量名', type: 'input', default: 'item', placeholder: '例如: item' },
-          { key: 'max_iterations', label: '最大迭代数', type: 'number', default: 100, min: 1, max: 10000 },
+          { key: 'max_iterations', label: '最大迭代（foreach）', type: 'number', default: 100, min: 1, max: 10000 },
+          { key: 'max_turns', label: '最大轮次（until_done）', type: 'number', default: 8, min: 1, max: 64 },
         ],
       },
       {
@@ -191,9 +197,43 @@ export const NODE_CATEGORIES: Category[] = [
         ],
       },
       {
+        type: 'tool-round',
+        name: '工具轮',
+        desc: '可拼原语：一轮 plan/tool/done + 工具结果回灌。用循环(until_done)包住可拼出 harness 级',
+        defaultConfig: {
+          max_turns_hint: 24,
+          toolbelt: 'coding',
+          temperature: 0.2,
+          max_tokens: 4096,
+          model: 'deepseek-chat',
+          require_plan: true,
+          agent_mode: 'build',
+          system: '',
+        },
+        inputSchema: [
+          { name: 'input', type: 'string', label: '任务 / 目标', required: false },
+        ],
+        outputSchema: [
+          { name: 'result', type: 'any', label: '本轮结果' },
+          { name: 'done', type: 'boolean', label: '是否结束' },
+          { name: 'turn', type: 'number', label: '轮次' },
+          { name: 'success', type: 'boolean', label: '成功' },
+        ],
+        configSchema: [
+          { key: 'model', label: '模型', type: 'select', default: 'deepseek-chat',
+            options: ['deepseek-chat', 'deepseek-v4-flash', 'deepseek-v4-pro', 'gpt-4o', 'gpt-4o-mini'] },
+          { key: 'toolbelt', label: '工具带', type: 'select', default: 'coding', options: ['coding', 'office'] },
+          { key: 'require_plan', label: '先 plan', type: 'select', default: true, options: [true, false] },
+          { key: 'agent_mode', label: '模式', type: 'select', default: 'build', options: ['build', 'plan'] },
+          { key: 'temperature', label: '温度', type: 'number', default: 0.2, min: 0, max: 2, step: 0.1 },
+          { key: 'max_tokens', label: '最大 Token', type: 'number', default: 4096, min: 256, max: 128000 },
+          { key: 'system', label: '系统提示（空则 coding 默认）', type: 'textarea', default: '', rows: 3 },
+        ],
+      },
+      {
         type: 'agent-loop',
         name: '整环执行器（高级）',
-        desc: '可选捷径：单节点多轮 tool-loop。日常请用「节点编排·Harness」骨架自己拼记忆/计划/工具/验收',
+        desc: '可选捷径：单节点多轮 tool-loop。平台能力验收请用 循环(until_done)+工具轮 自己拼',
         defaultConfig: {
           max_turns: 24,
           toolbelt: 'coding',

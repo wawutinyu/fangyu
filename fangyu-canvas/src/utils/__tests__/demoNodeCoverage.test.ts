@@ -25,6 +25,7 @@ const UNIFIED_VARIANTS: Record<string, { field: string; values: string[] }> = {
   execute: { field: 'mode', values: ['tool', 'skill'] },
   register: { field: 'mode', values: ['tool', 'skill'] },
   mcp: { field: 'operation', values: ['list', 'call'] },
+  loop: { field: 'mode', values: ['foreach', 'until_done'] },
 }
 
 function collectUnifiedVariants(): Record<string, Set<string>> {
