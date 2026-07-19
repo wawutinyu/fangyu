@@ -4,7 +4,7 @@
 
 1. [产品说明书](PRODUCT_MANUAL.md) — 方隅是什么、不是什么、四门两包、场景  
 2. [使用手册](USER_GUIDE.md) — 安装、五分钟跑通、日常操作、FAQ  
-3. [部署到服务器](DEPLOY.md) — Docker 单机 / 远程脚本  
+3. [部署到服务器](DEPLOY.md) — 现网 systemd / GitHub CD / Docker 可选  
 
 **常用专题：**
 

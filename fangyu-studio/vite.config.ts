@@ -8,7 +8,8 @@ const CANVAS_SRC = path.resolve(__dirname, '../fangyu-canvas/src')
 const CORE_SRC = path.resolve(__dirname, '../fangyu-core/src')
 
 export default defineConfig({
-  base: process.env.TAURI === '1' ? './' : '/',
+  // TAURI 打包用相对路径；生产挂在 /fangyu/ 时设 BASE_PATH=/fangyu/
+  base: process.env.TAURI === '1' ? './' : (process.env.BASE_PATH || '/'),
   plugins: [react()],
   resolve: {
     alias: {

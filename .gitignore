@@ -57,3 +57,7 @@ data/a2a_factories.json
 build/
 .eggs/
 *.egg
+
+# CI deploy key (local only)
+.fangyu/github-deploy
+.fangyu/github-deploy.pub

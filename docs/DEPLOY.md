@@ -38,38 +38,55 @@ docker compose --env-file .env.deploy down
 
 ---
 
-## 部署到远程 Linux
+## 现网（已上线）：systemd + nginx
 
-### 你需要提供
+生产机当前形态（非 Docker）：
 
-1. **主机**：如 `root@117.72.174.168`（本机 `known_hosts` 里曾出现过此 IP）  
-2. **SSH 登录**：私钥文件路径，或配置好 `ssh-agent`  
-3. 远程已装 **Docker + Compose 插件**
+- 代码目录：`/opt/fangyu`
+- API：`fangyu.service` → `127.0.0.1:8000`
+- 对外：HTTPS nginx  
+  - Studio：`/fangyu/`  
+  - API：`/api/`
 
-当前助手环境：**无 SSH 私钥**（`ssh-add -l` 为空），对 `117.72.174.168` 试连为 `Permission denied`，**无法代你完成实际上机**。
-
-### 有密钥后一条命令
+手工 / 本机一键（与线上一致）：
 
 ```bash
-chmod +x scripts/deploy-remote.sh
+chmod +x scripts/deploy-systemd-remote.sh
+./scripts/deploy-systemd-remote.sh root@你的IP /path/to/私钥
+# 构建时使用 BASE_PATH=/fangyu/
+```
+
+---
+
+## GitHub 自动部署（CD）
+
+工作流：[`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)
+
+**效果**：`main` 上 **CI 全部通过** 后，自动把该 commit 同步到服务器、重启 `fangyu`、检查健康。也可在 Actions 里手动点 **Deploy → Run workflow**。
+
+### 一次性配置（仓库 Secrets）
+
+GitHub → 仓库 → **Settings → Secrets and variables → Actions** → New repository secret：
+
+| Secret | 例 |
+|--------|-----|
+| `DEPLOY_HOST` | `117.72.174.168` |
+| `DEPLOY_USER` | `root` |
+| `DEPLOY_SSH_KEY` | 部署专用私钥全文（含 `BEGIN` / `END` 行） |
+
+可选 Variables：`DEPLOY_HEALTH_URL`、`DEPLOY_UI_URL`（默认 `https://主机/api/health` 与 `https://主机/fangyu/`）。
+
+服务器 `authorized_keys` 里需有对应**公钥**（本机若已生成过 `.fangyu/github-deploy`，公钥已可写到服务器）。
+
+### 本机 Docker 方案（可选）
+
+若目标机走 Compose 而不是 systemd：
+
+```bash
 ./scripts/deploy-remote.sh root@你的IP ~/.ssh/你的私钥
 ```
 
-脚本会：rsync 代码 → 远程 `docker compose up -d --build` → 打健康检查。
-
-### 无脚本、纯手工
-
-```bash
-ssh root@你的IP
-# 安装 Docker 后：
-git clone <你的仓库> /opt/fangyu   # 或 scp/rsync
-cd /opt/fangyu
-cp .env.deploy.example .env.deploy
-nano .env.deploy
-docker compose --env-file .env.deploy up -d --build
-```
-
-防火墙放行 **8000**（或 gateway 的 80/443）。
+防火墙放行 **443/80**（现网）或 **8000**（直连 Compose）。
 
 ---
 
@@ -97,10 +114,10 @@ docker compose --env-file .env.deploy up -d --build
 
 ## 验收清单
 
-- [ ] `GET /api/health` 返回 `ok`  
-- [ ] 浏览器打开 `http://IP:8000` 能进 Studio  
+- [ ] `GET https://主机/api/health` 返回 `ok`  
+- [ ] 浏览器打开 `https://主机/fangyu/` 能进 Studio  
 - [ ] 设置里 Key 可用，**创建 → 体验全部 → 预览** 能跑  
-- [ ] 重启容器后 `/data` 数据还在  
+- [ ] `systemctl restart fangyu` 后 API 仍健康；`/opt/fangyu/data` 还在  
 
 ---
 
@@ -108,11 +125,8 @@ docker compose --env-file .env.deploy up -d --build
 
 | 现象 | 处理 |
 |------|------|
-| 构建失败 npm | 机器内存不够；加大 swap 或本机构建后导出镜像 |
-| 页面空白 | 看容器日志 `docker compose logs -f fangyu`；确认 `FANGYU_SERVE_UI=1` 且 dist 存在 |
-| 外网打不开 | 云安全组 / `ufw allow 8000` |
-| SSH Permission denied | 配密钥：`ssh-copy-id` 或把公钥写入服务器 `authorized_keys` |
-
----
-
-*把「用户@主机」和私钥路径发我之后，可以继续代跑 `deploy-remote.sh`。*
+| Deploy 失败 SSH | 检查 Secrets 与服务器 `authorized_keys`；私钥须完整 |
+| 构建失败 npm | 本机/CI 构建；线上 systemd 路径不在服务器上跑 vite |
+| 页面空白 / 资源 404 | 确认构建带 `BASE_PATH=/fangyu/`，nginx `alias` 指向 `fangyu-studio/dist` |
+| 外网打不开 | 走 HTTPS；`:8000` 仅本机监听属正常 |
+| SSH Permission denied | 配密钥或核对 `DEPLOY_SSH_KEY` |
