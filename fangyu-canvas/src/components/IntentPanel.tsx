@@ -17,7 +17,7 @@ interface Props {
 
 const FLOW_TEMPLATES: Array<{ id: IntentTemplateId | ''; label: string }> = [
   { id: '', label: '自动选择' },
-  { id: 'opencode_harness', label: 'OpenCode Harness' },
+  { id: 'opencode_harness', label: '节点编排 · Harness' },
   { id: 'action_loop', label: '行动闭环' },
   { id: 'doc_assistant', label: '文档助手' },
   { id: 'simple_io', label: '简单输入输出' },

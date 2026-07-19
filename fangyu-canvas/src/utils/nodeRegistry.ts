@@ -192,8 +192,8 @@ export const NODE_CATEGORIES: Category[] = [
       },
       {
         type: 'agent-loop',
-        name: 'Agent 工具环',
-        desc: 'OpenCode 式 Harness：多轮 plan/tool/done，coding 手脚（画布验证入口）',
+        name: '整环执行器（高级）',
+        desc: '可选捷径：单节点多轮 tool-loop。日常请用「节点编排·Harness」骨架自己拼记忆/计划/工具/验收',
         defaultConfig: {
           max_turns: 24,
           toolbelt: 'coding',

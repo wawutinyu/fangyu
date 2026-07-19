@@ -37,11 +37,14 @@
 
 脚本：`scripts/opencode_graduation_c.py` · `scripts/opencode_harness_live.py`
 
-**Studio 画布入口（交互验证）：**
+**Studio 画布入口（用节点编排搭 Harness）：**
 
-1. 顶栏 → 示例用例 → **OpenCode Harness**（或节点库 **AI 能力 → Agent 工具环**）  
-2. 或 **意图生成** → 模板选「OpenCode Harness」→ 应用到画布  
-3. 预览/跑通后导出 Agent Bundle（与 CLI `bundle create --profile opencode` 同机床）
+1. 顶栏 **创建 → 节点编排 · Harness**（或示例用例同名）  
+2. 画布上应看到：**任务 → 记目标 → 计划 → 执行 → 记结果 → 验收 → 输出**  
+3. 在此骨架上继续插入工具 / MCP / 分支 / 更多记忆，再导出  
+4. 节点库里的「整环执行器」只是可选捷径，**不是**搭 harness 的正途  
+
+> CLI `bundle create --profile opencode` 仍可能含整环节点以跑 live；与画布「编排搭建」对齐是后续刀。
 
 ---
 

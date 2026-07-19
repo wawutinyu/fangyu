@@ -244,42 +244,113 @@ def build_action_loop_flow(
     return _export(f"意图·行动·{title}", nodes, links)
 
 
+# Harness 编排骨架里的 code 节点：无 workspace 时也能预览；有 files 列表可模拟落盘。
+HARNESS_ACT_PY = _UNWRAP + """\
+goal = src.get('input') or src.get('goal') or src.get('result') or 'task'
+if not isinstance(goal, str):
+    goal = str(goal)
+plan = src.get('result') if isinstance(src.get('result'), str) else str(src.get('result') or '')
+files = list(src.get('files') or [])
+if 'hello.md' not in files:
+    files = files + ['hello.md']
+result = {
+    'phase': 'act',
+    'goal': goal,
+    'plan_excerpt': plan[:200],
+    'files': files,
+    'acted': True,
+    'note': '可在此后插入 tool-call / MCP / 更多 code；或改成真实 workspace 写文件',
+}
+"""
+
+HARNESS_VERIFY_HINT = (
+    "你是验收员。根据上游的 plan/act 结果，用简短中文说明：是否达成任务、"
+    "还缺哪一步、建议在画布上再加哪个节点（记忆/工具/分支）。"
+)
+
+
 def build_opencode_harness_flow(
     intent: str,
     *,
     max_turns: int = 24,
     model: str = "deepseek-chat",
 ) -> dict[str, Any]:
-    """画布可加载的 OpenCode harness：input → agent-loop → output。"""
+    """用节点编排搭出的 Harness 骨架（非单点 agent-loop）。
+
+    任务 → 记忆 → 计划(LLM) → 执行(code) → 记忆 → 验收(LLM) → 输出
+    可在画布上继续插入工具/分支/MCP。
+    """
+    del max_turns  # 编排图轮次由节点与环决定；保留参数兼容调用方
     title = _short_title(intent)
     goal = intent.strip() or "complete the coding task"
     nodes = [
-        _node("n1", "input", "任务", x=80, config={"default_value": goal}),
+        _node("n1", "input", "任务", x=40, config={"default_value": goal}),
         _node(
-            "loop",
-            "agent-loop",
-            "Harness",
-            x=340,
+            "mem_in",
+            "memory",
+            "记目标",
+            x=220,
+            category="记忆存储",
+            config={"operation": "write", "memory_key": "harness_goal", "scope": "session"},
+        ),
+        _node(
+            "plan",
+            "llm",
+            "计划",
+            x=420,
             category="AI 能力",
             config={
-                "max_turns": max_turns,
-                "toolbelt": "coding",
-                "temperature": 0.2,
-                "max_tokens": 4096,
                 "model": model,
-                "require_plan": True,
-                "enable_task": True,
-                "agent_mode": "build",
-                "shell_policy": "ask",
+                "temperature": 0.2,
+                "max_tokens": 1024,
+                "system_prompt": (
+                    "你是编码 harness 的规划节点。根据任务拆成 2～5 步可执行计划，"
+                    "说明要用哪些工具（读/写/搜/shell）。不要假装已改文件。"
+                ),
+                "prompt": "任务：{{input}}\n请输出分步计划。",
             },
         ),
-        _node("o", "output", "输出", x=600),
+        _node(
+            "act",
+            "code",
+            "执行",
+            x=620,
+            category="AI 能力",
+            config={"code": HARNESS_ACT_PY},
+        ),
+        _node(
+            "mem_out",
+            "memory",
+            "记结果",
+            x=820,
+            category="记忆存储",
+            config={"operation": "write", "memory_key": "harness_last_act", "scope": "session"},
+        ),
+        _node(
+            "verify",
+            "llm",
+            "验收",
+            x=1020,
+            category="AI 能力",
+            config={
+                "model": model,
+                "temperature": 0.2,
+                "max_tokens": 512,
+                "system_prompt": HARNESS_VERIFY_HINT,
+                "prompt": "上游结果：{{input}}\n请验收并给出下一步画布改造建议。",
+            },
+        ),
+        _node("o", "output", "输出", x=1220),
     ]
     links = [
-        _link("e1", "n1", "loop"),
-        _link("e2", "loop", "o"),
+        _link("e1", "n1", "mem_in"),
+        _link("e2", "mem_in", "plan"),
+        _link("e3", "plan", "act"),
+        _link("e4", "act", "mem_out"),
+        _link("e5", "mem_out", "verify"),
+        _link("e6", "verify", "o"),
     ]
-    return _export(f"意图·Harness·{title}", nodes, links)
+    return _export(f"意图·编排Harness·{title}", nodes, links)
 
 
 def build_flow_for_template(
@@ -317,7 +388,7 @@ def export_nodes_to_scan_payload(nodes: list[dict]) -> list[dict]:
 
 def _rationale(template: TemplateId, use_llm_plan: bool) -> str:
     if template == "opencode_harness":
-        return "识别为编码/Harness 类意图 → 生成 input → agent-loop(Harness) → output"
+        return "识别为编码/Harness 类意图 → 生成节点编排骨架：记忆→计划→执行→记忆→验收"
     if template == "doc_assistant":
         return "识别为文档/问答类意图 → 生成 input → llm → output"
     if template == "action_loop":

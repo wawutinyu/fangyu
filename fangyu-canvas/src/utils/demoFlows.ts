@@ -765,29 +765,29 @@ export const demoFlows: Record<string, { label: string; desc?: string; category?
       global_meta: { session_id: '', user_id: '' },
     },
   },
-  opencode_harness: {
-    label: 'OpenCode Harness',
+  agent_loop_advanced: {
+    label: '整环执行器（高级）',
     category: 'Harness',
-    desc: 'input → agent-loop(Harness) → output；画布验证多轮工具环，可再导出 Bundle',
+    desc: '可选捷径：单节点多轮 tool-loop。搭 harness 请用「节点编排 · Harness」',
     data: {
       flow_id: '',
-      flow_name: 'OpenCode Harness',
+      flow_name: '整环执行器（高级）',
       nodes: [
         {
           id: 'n1',
           type: 'input',
           name: '任务',
           category: '流程控制',
-          config: { default_value: '在工作区创建 hello.md，内容写方隅 harness 验证' },
+          config: { default_value: '（高级）仅当你明确需要整包 tool-loop 时用此节点' },
           position: { x: 80, y: 220 },
         },
         {
           id: 'loop',
           type: 'agent-loop',
-          name: 'Harness',
+          name: '整环',
           category: 'AI 能力',
           config: {
-            max_turns: 24,
+            max_turns: 12,
             toolbelt: 'coding',
             temperature: 0.2,
             max_tokens: 4096,
@@ -811,6 +811,110 @@ export const demoFlows: Record<string, { label: string; desc?: string; category?
       links: [
         { id: 'e1', sourceNodeId: 'n1', targetNodeId: 'loop', linkType: 'serial', mappings: {} },
         { id: 'e2', sourceNodeId: 'loop', targetNodeId: 'o', linkType: 'serial', mappings: {} },
+      ],
+      global_meta: { session_id: '', user_id: '' },
+    },
+  },
+  opencode_harness: {
+    label: '节点编排 · Harness',
+    category: 'Harness',
+    desc: '任务→记忆→计划→执行→记忆→验收→输出；用节点拼 harness，可继续插工具/分支/MCP',
+    data: {
+      flow_id: '',
+      flow_name: '节点编排 · Harness',
+      nodes: [
+        {
+          id: 'n1',
+          type: 'input',
+          name: '任务',
+          category: '流程控制',
+          config: { default_value: '在工作区创建 hello.md，内容写方隅 harness 验证' },
+          position: { x: 40, y: 220 },
+        },
+        {
+          id: 'mem_in',
+          type: 'memory',
+          name: '记目标',
+          category: '记忆存储',
+          config: { operation: 'write', memory_key: 'harness_goal', scope: 'session' },
+          position: { x: 220, y: 220 },
+        },
+        {
+          id: 'plan',
+          type: 'llm',
+          name: '计划',
+          category: 'AI 能力',
+          config: {
+            model: 'deepseek-chat',
+            temperature: 0.2,
+            max_tokens: 1024,
+            system_prompt:
+              '你是编码 harness 的规划节点。根据任务拆成 2～5 步可执行计划，说明要用哪些工具（读/写/搜/shell）。不要假装已改文件。',
+            prompt: '任务：{{input}}\n请输出分步计划。',
+          },
+          position: { x: 420, y: 220 },
+        },
+        {
+          id: 'act',
+          type: 'code',
+          name: '执行',
+          category: 'AI 能力',
+          config: {
+            // 与意图模板一致：后端沙箱跑 Python
+            code:
+              "src = _input if isinstance(_input, dict) else {'input': _input}\n"
+              + "if isinstance(src.get('result'), dict):\n"
+              + "    src = {**src, **src['result']}\n"
+              + "goal = src.get('input') or src.get('goal') or src.get('result') or 'task'\n"
+              + "if not isinstance(goal, str):\n"
+              + "    goal = str(goal)\n"
+              + "files = list(src.get('files') or [])\n"
+              + "if 'hello.md' not in files:\n"
+              + "    files = files + ['hello.md']\n"
+              + "result = {'phase': 'act', 'goal': goal, 'files': files, 'acted': True,\n"
+              + "          'note': '可在此后插入 tool-call / MCP / 分支'}\n",
+          },
+          position: { x: 620, y: 220 },
+        },
+        {
+          id: 'mem_out',
+          type: 'memory',
+          name: '记结果',
+          category: '记忆存储',
+          config: { operation: 'write', memory_key: 'harness_last_act', scope: 'session' },
+          position: { x: 820, y: 220 },
+        },
+        {
+          id: 'verify',
+          type: 'llm',
+          name: '验收',
+          category: 'AI 能力',
+          config: {
+            model: 'deepseek-chat',
+            temperature: 0.2,
+            max_tokens: 512,
+            system_prompt:
+              '你是验收员。根据上游结果说明是否达成任务、还缺哪步、建议在画布上再加哪个节点（记忆/工具/分支）。',
+            prompt: '上游结果：{{input}}\n请验收并给出下一步画布改造建议。',
+          },
+          position: { x: 1020, y: 220 },
+        },
+        {
+          id: 'o',
+          type: 'output',
+          name: '输出',
+          category: '流程控制',
+          config: {},
+          position: { x: 1220, y: 220 },
+        },
+      ],
+      links: [
+        { id: 'e1', sourceNodeId: 'n1', targetNodeId: 'mem_in', linkType: 'serial', mappings: {} },
+        { id: 'e2', sourceNodeId: 'mem_in', targetNodeId: 'plan', linkType: 'serial', mappings: {} },
+        { id: 'e3', sourceNodeId: 'plan', targetNodeId: 'act', linkType: 'serial', mappings: {} },
+        { id: 'e4', sourceNodeId: 'act', targetNodeId: 'mem_out', linkType: 'serial', mappings: {} },
+        { id: 'e5', sourceNodeId: 'mem_out', targetNodeId: 'verify', linkType: 'serial', mappings: {} },
+        { id: 'e6', sourceNodeId: 'verify', targetNodeId: 'o', linkType: 'serial', mappings: {} },
       ],
       global_meta: { session_id: '', user_id: '' },
     },

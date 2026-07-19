@@ -87,11 +87,11 @@ def test_build_action_loop_llm_plan():
 def test_build_opencode_harness_chain():
     flow = build_opencode_harness_flow("在仓库写 hello.md")
     types = [n["type"] for n in flow["nodes"]]
-    assert types == ["input", "agent-loop", "output"]
-    loop = flow["nodes"][1]
-    assert loop["name"] == "Harness"
-    assert loop["config"]["toolbelt"] == "coding"
-    assert loop["config"]["require_plan"] is True
+    assert types == ["input", "memory", "llm", "code", "memory", "llm", "output"]
+    assert "agent-loop" not in types
+    assert flow["nodes"][1]["name"] == "记目标"
+    assert flow["nodes"][2]["name"] == "计划"
+    assert "result =" in flow["nodes"][3]["config"]["code"]
 
 
 def test_intent_to_flow_scan_not_blocked():
@@ -190,4 +190,6 @@ def test_router_to_flow_opencode_harness(client):
     data = resp.json()
     assert data["template"] == "opencode_harness"
     assert data["scan"]["blocked"] is False
-    assert [n["type"] for n in data["flow"]["nodes"]] == ["input", "agent-loop", "output"]
+    assert [n["type"] for n in data["flow"]["nodes"]] == [
+        "input", "memory", "llm", "code", "memory", "llm", "output",
+    ]

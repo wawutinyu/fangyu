@@ -51,8 +51,8 @@ def list_templates():
         "templates": [
             {
                 "id": "opencode_harness",
-                "label": "OpenCode Harness",
-                "desc": "input → agent-loop → output（画布验证多轮工具环）",
+                "label": "节点编排 · Harness",
+                "desc": "任务→记忆→计划→执行→记忆→验收→输出（可继续插工具/分支）",
             },
             {
                 "id": "action_loop",

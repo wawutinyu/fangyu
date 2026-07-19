@@ -1,4 +1,4 @@
-/** 回归：OpenCode Harness 必须出现在「创建」菜单可点路径上 */
+/** 回归：Harness 入口 = 多节点编排骨架，不是单点 agent-loop */
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -11,23 +11,32 @@ const toolbarSrc = readFileSync(
   'utf8',
 )
 
-describe('OpenCode Harness 页面入口可见', () => {
-  it('demoFlows 含 opencode_harness', () => {
-    expect(demoFlows.opencode_harness).toBeTruthy()
-    expect(demoFlows.opencode_harness.label).toMatch(/Harness/i)
+describe('节点编排 · Harness 页面入口', () => {
+  it('demo 是多节点骨架（含记忆/计划/执行/验收）', () => {
+    const demo = demoFlows.opencode_harness
+    expect(demo).toBeTruthy()
+    expect(demo.label).toMatch(/节点编排/)
+    const data = demo.data as { nodes: { type: string; name: string }[] }
+    const types = data.nodes.map(n => n.type)
+    expect(types).toContain('memory')
+    expect(types).toContain('llm')
+    expect(types).toContain('code')
+    expect(types).not.toContain('agent-loop')
+    expect(data.nodes.length).toBeGreaterThanOrEqual(6)
   })
 
-  it('CATEGORY_ORDER 含 Harness，避免示例用例滤掉', () => {
+  it('CATEGORY_ORDER 含 Harness', () => {
     expect(toolbarSrc).toMatch(/CATEGORY_ORDER\s*=\s*\[[^\]]*['"]Harness['"]/)
   })
 
-  it('创建菜单有一键 OpenCode Harness', () => {
-    expect(toolbarSrc).toMatch(/label:\s*'OpenCode Harness'/)
+  it('创建菜单一键加载编排骨架', () => {
+    expect(toolbarSrc).toMatch(/节点编排 · Harness/)
     expect(toolbarSrc).toMatch(/opencode_harness/)
   })
 
-  it('节点库有 agent-loop', () => {
+  it('agent-loop 降级为高级整环，不当产品入口名', () => {
     const meta = getNodeMeta('agent-loop')
-    expect(meta.name).toBe('Agent 工具环')
+    expect(meta.name).toMatch(/高级/)
+    expect(meta.desc).toMatch(/节点编排/)
   })
 })
