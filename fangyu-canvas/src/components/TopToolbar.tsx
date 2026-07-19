@@ -3,7 +3,7 @@ import type { WorkerInfo } from '@fangyu/core/schema'
 import { demoFlows } from '../utils/demoFlows'
 import { isDesktop, isNative, queryNativeHealth } from '../platform'
 
-const CATEGORY_ORDER = ['入门', '流程控制', 'AI 能力', '数据操作', '记忆存储', '工具集成', '其他']
+const CATEGORY_ORDER = ['Harness', '入门', '流程控制', 'AI 能力', '数据操作', '记忆存储', '工具集成', '其他']
 
 const DEMO_CATEGORY_BY_ID: Record<string, string> = {
   core: 'AI 能力',
@@ -231,6 +231,13 @@ export default function TopToolbar(props: Props) {
               title="意图 / 场景 / 用例 / 资产"
               items={[
                 ...(props.onOpenIntent ? [{ label: '意图生成', hint: '自然语言 → Flow', onClick: props.onOpenIntent }] : []),
+                ...(props.onLoadDemo
+                  ? [{
+                      label: 'OpenCode Harness',
+                      hint: '加载 input → Agent 工具环 → output',
+                      onClick: () => props.onLoadDemo!('opencode_harness'),
+                    }]
+                  : []),
                 ...(props.onOpenScenario ? [{ label: '场景模板', hint: '一键实例化', onClick: props.onOpenScenario }] : []),
                 ...(props.onFullExperience ? [{ label: '体验全部功能', hint: '推荐新手', onClick: props.onFullExperience }] : []),
                 { label: `示例用例 (${DEMO_COUNT})`, hint: '加载演示流程', submenu: true },
