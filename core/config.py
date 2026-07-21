@@ -63,6 +63,11 @@ class Settings:
     PLATFORM_REQUIRE_ENVELOPE: bool = os.getenv(
         "FANGYU_PLATFORM_REQUIRE_ENVELOPE", "0",
     ).lower() in ("1", "true", "yes")
+    # S0：生产设 FANGYU_REQUIRE_AUTH=1；本地开发可保持默认关闭
+    REQUIRE_AUTH: bool = os.getenv("FANGYU_REQUIRE_AUTH", "0").lower() in ("1", "true", "yes")
+    # S0：匿名签发 JWT；生产务必 FANGYU_ALLOW_DEV_TOKEN=0
+    # 空字符串表示「跟随 REQUIRE_AUTH 反义」——见 auth_gate.allow_dev_token
+    ALLOW_DEV_TOKEN: str = os.getenv("FANGYU_ALLOW_DEV_TOKEN", "")
 
 
 settings = Settings()

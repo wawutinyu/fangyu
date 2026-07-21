@@ -2,7 +2,7 @@
 import asyncio, json, threading, time
 from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/v1/trigger", tags=["trigger"])
@@ -47,7 +47,13 @@ def delete_schedule(sid: str):
 @router.post("/webhooks")
 def create_webhook(body: WebhookCreate):
     wid = f"wh_{int(time.time())}_{len(webhooks)}"
-    webhooks[wid] = {**body.model_dump(), "id": wid, "created_at": time.time(), "secret": f"whsec_{wid}"}
+    import secrets as _secrets
+    webhooks[wid] = {
+        **body.model_dump(),
+        "id": wid,
+        "created_at": time.time(),
+        "secret": f"whsec_{_secrets.token_urlsafe(24)}",
+    }
     return webhooks[wid]
 
 @router.get("/webhooks")
@@ -61,15 +67,24 @@ def delete_webhook(wid: str):
     del webhooks[wid]
     return {"ok": True}
 
-# Public webhook receiver
+# Public webhook receiver — 必须带 secret
 @router.post("/hook/{wid}")
-async def receive_webhook(wid: str, body: dict):
+async def receive_webhook(wid: str, request: Request, body: dict):
     if wid not in webhooks:
         raise HTTPException(404, "Webhook not found")
     wh = webhooks[wid]
     if not wh["enabled"]:
         raise HTTPException(400, "Webhook disabled")
-    # Queue execution (simplified)
+    expected = (wh.get("secret") or "").strip()
+    provided = (
+        (request.headers.get("x-fangyu-webhook-secret") or "").strip()
+        or (request.headers.get("x-webhook-secret") or "").strip()
+    )
+    auth = request.headers.get("authorization") or ""
+    if not provided and auth.lower().startswith("bearer "):
+        provided = auth.split(" ", 1)[1].strip()
+    if not expected or provided != expected:
+        raise HTTPException(401, "invalid webhook secret")
     threading.Thread(target=_run_flow, args=(wh["flow_config"],), daemon=True).start()
     return {"ok": True, "message": f"Webhook {wid} triggered"}
 

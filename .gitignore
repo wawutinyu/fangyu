@@ -61,3 +61,7 @@ build/
 # CI deploy key (local only)
 .fangyu/github-deploy
 .fangyu/github-deploy.pub
+
+# S0 local secrets
+.fangyu/bootstrap_secret.txt
+.fangyu/admin_access_token.txt

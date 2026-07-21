@@ -14,6 +14,23 @@ def _ensure():
         REGISTRY_FILE.write_text("[]", encoding="utf-8")
 
 
+def _resolve_under(root: Path, *parts: str) -> Path:
+    """将相对片段解析到 root 下；拒绝 .. / 绝对路径穿越。"""
+    root_r = root.resolve()
+    if not parts:
+        raise ValueError("empty path")
+    for part in parts:
+        if part is None or str(part).strip() == "":
+            raise ValueError("invalid path segment")
+        p = Path(str(part))
+        if p.is_absolute() or ".." in p.parts:
+            raise ValueError("path escape rejected")
+    target = root_r.joinpath(*[str(p) for p in parts]).resolve()
+    if not target.is_relative_to(root_r):
+        raise ValueError("path escape rejected")
+    return target
+
+
 def _registry() -> list[dict]:
     _ensure()
     try:
@@ -37,6 +54,11 @@ def create_skill(name: str, description: str, content: str) -> dict:
     if any(s["name"] == name for s in registry):
         return {"success": False, "error": f"技能 '{name}' 已存在"}
 
+    try:
+        file_path = _resolve_under(SKILLS_DIR, f"{name}.md")
+    except ValueError as e:
+        return {"success": False, "error": str(e)}
+
     entry = {
         "name": name,
         "description": description,
@@ -44,7 +66,6 @@ def create_skill(name: str, description: str, content: str) -> dict:
         "created": int(time.time()),
         "file": f"{name}.md",
     }
-    file_path = SKILLS_DIR / f"{name}.md"
     file_path.write_text(content, encoding="utf-8")
 
     registry.append(entry)
@@ -53,7 +74,10 @@ def create_skill(name: str, description: str, content: str) -> dict:
 
 
 def edit_skill(name: str, content: str) -> dict:
-    file_path = SKILLS_DIR / f"{name}.md"
+    try:
+        file_path = _resolve_under(SKILLS_DIR, f"{name}.md")
+    except ValueError as e:
+        return {"success": False, "error": str(e)}
     if not file_path.exists():
         return {"success": False, "error": f"技能 '{name}' 不存在"}
     file_path.write_text(content, encoding="utf-8")
@@ -69,7 +93,10 @@ def edit_skill(name: str, content: str) -> dict:
 def delete_skill(name: str) -> dict:
     registry = [s for s in _registry() if s["name"] != name]
     _save_registry(registry)
-    file_path = SKILLS_DIR / f"{name}.md"
+    try:
+        file_path = _resolve_under(SKILLS_DIR, f"{name}.md")
+    except ValueError as e:
+        return {"success": False, "error": str(e)}
     if file_path.exists():
         file_path.unlink()
     return {"success": True}
@@ -80,23 +107,30 @@ def list_skills() -> list[dict]:
 
 
 def get_skill_content(name: str) -> str | None:
-    file_path = SKILLS_DIR / f"{name}.md"
+    try:
+        file_path = _resolve_under(SKILLS_DIR, f"{name}.md")
+    except ValueError:
+        return None
     if file_path.exists():
         return file_path.read_text(encoding="utf-8")
     return None
 
 
 def skill_write_file(skill_name: str, filename: str, content: str) -> dict:
-    skill_dir = SKILLS_DIR / skill_name
-    skill_dir.mkdir(parents=True, exist_ok=True)
-    file_path = skill_dir / filename
+    try:
+        file_path = _resolve_under(SKILLS_DIR, skill_name, filename)
+    except ValueError as e:
+        return {"success": False, "error": str(e)}
     file_path.parent.mkdir(parents=True, exist_ok=True)
     file_path.write_text(content, encoding="utf-8")
-    return {"success": True, "path": str(file_path.relative_to(SKILLS_DIR))}
+    return {"success": True, "path": str(file_path.relative_to(SKILLS_DIR.resolve()))}
 
 
 def skill_remove_file(skill_name: str, filename: str) -> dict:
-    file_path = SKILLS_DIR / skill_name / filename
+    try:
+        file_path = _resolve_under(SKILLS_DIR, skill_name, filename)
+    except ValueError as e:
+        return {"success": False, "error": str(e)}
     if file_path.exists():
         file_path.unlink()
         return {"success": True}

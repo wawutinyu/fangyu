@@ -90,7 +90,12 @@ app.add_middleware(
 
 @app.middleware("http")
 async def auth_principal_middleware(request: Request, call_next):
-    """Bearer JWT → ACL principal；SSO 关闭时允许 X-Fangyu-Principal 旁路。"""
+    """Bearer JWT → ACL principal；可选强制鉴权（S0）。"""
+    from fangyu.core.auth_gate import (
+        allow_principal_header_bypass,
+        is_public_route,
+        require_auth,
+    )
     from fangyu.core.org_acl import reset_principal, set_principal
     from fangyu.core.sso import (
         load_sso_config,
@@ -110,12 +115,19 @@ async def auth_principal_middleware(request: Request, call_next):
             principal = principal_from_payload(payload)
             request.state.auth_payload = payload
         except ValueError:
-            if cfg.get("enabled"):
+            if cfg.get("enabled") or require_auth():
                 return JSONResponse(status_code=401, content={"detail": "invalid or expired token"})
-    if not principal and not cfg.get("enabled"):
+    if not principal and not cfg.get("enabled") and allow_principal_header_bypass():
         bypass = (request.headers.get("x-fangyu-principal") or "").strip()
         if bypass:
             principal = bypass
+
+    if require_auth() and not principal and not is_public_route(request.method, request.url.path):
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "未认证：需要 Authorization: Bearer <token>"},
+        )
+
     token = set_principal(principal) if principal else None
     if principal:
         request.state.principal_id = principal

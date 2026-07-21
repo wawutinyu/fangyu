@@ -144,6 +144,10 @@ def test_browser_in_coding_materials():
 def test_sso_mint_and_me(tmp_path, monkeypatch):
     monkeypatch.setattr(config_mod, "DATA_DIR", tmp_path / "data")
     (tmp_path / "data").mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("FANGYU_REQUIRE_AUTH", "0")
+    monkeypatch.delenv("FANGYU_ALLOW_DEV_TOKEN", raising=False)
+    monkeypatch.setattr(config_mod.settings, "REQUIRE_AUTH", False)
+    monkeypatch.setattr(config_mod.settings, "ALLOW_DEV_TOKEN", "")
     save_sso_config({"enabled": False, "issuer": "fangyu-local", "audience": "fangyu-api"})
     tok = mint_access_token(principal_id="alice", name="Alice", roles=["admin"])
     payload = verify_access_token(tok["access_token"])

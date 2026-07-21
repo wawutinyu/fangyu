@@ -55,10 +55,33 @@ def put_auth_config(body: SsoConfigBody):
 
 
 @router.post("/token")
-def issue_token(body: TokenBody):
-    """开发/内网：签发本地 JWT（对接 ACL principal）。"""
+def issue_token(body: TokenBody, request: Request):
+    """开发签发本地 JWT。生产关闭：FANGYU_ALLOW_DEV_TOKEN=0。
+
+    生产可用：Header ``X-Fangyu-Bootstrap: <FANGYU_BOOTSTRAP_SECRET>`` 运维签发。
+    """
+    from fangyu.core.auth_gate import allow_dev_token, bootstrap_header_ok
+
     cfg = load_sso_config()
-    # 始终允许签发；enabled 控制是否强制校验
+    bootstrap = bootstrap_header_ok(request.headers.get("x-fangyu-bootstrap"))
+    if not allow_dev_token() and not bootstrap:
+        principal = getattr(request.state, "principal_id", None)
+        roles = []
+        payload = getattr(request.state, "auth_payload", None)
+        if isinstance(payload, dict):
+            roles = list(payload.get("roles") or [])
+        if not principal or "admin" not in roles:
+            raise HTTPException(
+                403,
+                "开发签发已关闭（FANGYU_ALLOW_DEV_TOKEN=0）。请使用 OIDC、Bootstrap Secret 或 admin 代签。",
+            )
+    if cfg.get("enabled") and not allow_dev_token() and not bootstrap:
+        principal = getattr(request.state, "principal_id", None)
+        payload = getattr(request.state, "auth_payload", None)
+        roles = list((payload or {}).get("roles") or []) if isinstance(payload, dict) else []
+        if not principal or "admin" not in roles:
+            raise HTTPException(403, "SSO 已启用：禁止匿名签发 token")
+
     out = mint_access_token(
         principal_id=body.principal_id.strip(),
         name=body.name,
@@ -108,8 +131,9 @@ def auth_me(request: Request):
             except ValueError as exc:
                 raise HTTPException(401, str(exc)) from exc
         else:
+            from fangyu.core.auth_gate import allow_principal_header_bypass
             bypass = (request.headers.get("x-fangyu-principal") or "").strip()
-            if bypass and not load_sso_config().get("enabled"):
+            if bypass and allow_principal_header_bypass() and not load_sso_config().get("enabled"):
                 principal = bypass
             else:
                 raise HTTPException(401, "未认证：需要 Bearer token")

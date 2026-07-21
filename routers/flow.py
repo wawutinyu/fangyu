@@ -14,6 +14,13 @@ from ..models.setting import Setting
 router = APIRouter(prefix="/api/v1/flow", tags=["流程执行"])
 
 
+def _redact_log_json(obj) -> str:
+    from fangyu.core.auth_gate import redact_mapping
+    if isinstance(obj, dict):
+        return json.dumps(redact_mapping(obj), ensure_ascii=False)
+    return json.dumps(obj, ensure_ascii=False)
+
+
 class ExecuteCodeBody(BaseModel):
     code: str
     input: dict = {}
@@ -114,8 +121,8 @@ async def run_flow_endpoint(body: RunFlowBody, db: AsyncSession = Depends(get_se
             node_name=log_entry.get("nodeName", ""),
             node_type=log_entry.get("type", ""),
             log_type=lt_map.get(log_type, "error"),
-            inputs_json=json.dumps(log_entry.get("data", {}).get("inputs", {}), ensure_ascii=False),
-            outputs_json=json.dumps(log_entry.get("data", {}).get("outputs", {}), ensure_ascii=False),
+            inputs_json=_redact_log_json(log_entry.get("data", {}).get("inputs", {})),
+            outputs_json=_redact_log_json(log_entry.get("data", {}).get("outputs", {})),
             error=log_entry.get("data", {}).get("error", ""),
             duration_ms=duration,
         ))
