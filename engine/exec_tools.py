@@ -84,8 +84,28 @@ async def _exec_register_tool(ctx: NodeContext) -> dict[str, Any]:
     llm_output = ctx.inputs.get("llm_output", ctx.config.get("llm_output", ""))
     if not llm_output:
         llm_output = ctx.global_vars.get("_lastLLMOutput", "")
+    warnings: list[str] = []
+    try:
+        from fangyu.core.llm_validator import validate_tool_registration_payload
+
+        vr = validate_tool_registration_payload(str(llm_output))
+        if vr.warned and vr.error:
+            warnings.append(vr.error)
+        if not vr.passed:
+            return {
+                "tools": [],
+                "count": 0,
+                "error": vr.error,
+                "validator_warnings": warnings,
+                "success": False,
+            }
+    except Exception:
+        pass
     results = parse_tools(str(llm_output))
-    return {"tools": results, "count": len(results)}
+    out = {"tools": results, "count": len(results)}
+    if warnings:
+        out["validator_warnings"] = warnings
+    return out
 
 
 async def _exec_execute_skill(ctx: NodeContext) -> dict[str, Any]:

@@ -65,7 +65,7 @@
 - SQLite→PG、多机、重写前端  
 - 102 项里所有 P2/P3 一次清完  
 
-S0 完成后进入 **Q0**（scope exclusion + guardrails + validator warn + 失败模式文档）。
+S0 主项已完成（C1 仍 PARTIAL）。**Q0 已开工**：见 [Q0_ROADMAP](Q0_ROADMAP.md)。
 
 ---
 

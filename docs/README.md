@@ -18,6 +18,7 @@
 | 办公×编排 | [OFFICE_ORCHESTRATE](OFFICE_ORCHESTRATE.md) |
 | 飞书 | [IM_FEISHU](IM_FEISHU.md) |
 | 项目评估 | [PROJECT_ASSESSMENT](PROJECT_ASSESSMENT.md) |
-| **S0 安全止血（当前路线）** | [S0_ROADMAP](S0_ROADMAP.md) |
+| **S0 安全止血** | [S0_ROADMAP](S0_ROADMAP.md) |
+| **Q0 质量地基** | [Q0_ROADMAP](Q0_ROADMAP.md) · [失败模式](FAILURE_MODES.md) |
 
 其余文件多为工程/协议专题，按需查阅。

@@ -41,6 +41,24 @@ async def _exec_llm(ctx: NodeContext) -> dict[str, Any]:
     user_content = prompt or ctx.inputs.get("input") or ""
     mem_scope = _resolve_mem_scope(ctx)
 
+    # Q0 guardrails：输入扫描 + system 加固（默认 warn）
+    guard_warnings: list[str] = []
+    try:
+        from fangyu.core.guardrails import guardrail_filter, wrap_system_prompt
+
+        filtered_in, _, win = guardrail_filter(str(user_content), None)
+        guard_warnings.extend(win)
+        if filtered_in is None:
+            return {
+                "result": None,
+                "error": "输入被安全护栏拦截（疑似 prompt 注入）",
+                "guardrail_warnings": guard_warnings,
+            }
+        user_content = filtered_in
+        system_prompt = wrap_system_prompt(system_prompt)
+    except Exception:
+        pass
+
     auto_inject = ctx.config.get("auto_inject_memory", False)
     if auto_inject:
         inject_parts = []
@@ -88,6 +106,23 @@ async def _exec_llm(ctx: NodeContext) -> dict[str, Any]:
     )
 
     content = result.get("result", "")
+    # Q0：输出敏感信息扫描
+    try:
+        from fangyu.core.guardrails import guardrail_filter
+
+        _, filtered_out, wout = guardrail_filter(None, str(content) if content is not None else "")
+        guard_warnings.extend(wout)
+        if filtered_out is None:
+            return {
+                "result": None,
+                "error": "输出被安全护栏拦截（疑似泄露密钥）",
+                "usage": result.get("usage", {}),
+                "guardrail_warnings": guard_warnings,
+            }
+        content = filtered_out
+    except Exception:
+        pass
+
     ctx.global_vars["_lastLLMOutput"] = content
     if "_chatHistory" not in ctx.global_vars:
         ctx.global_vars["_chatHistory"] = []
@@ -103,7 +138,10 @@ async def _exec_llm(ctx: NodeContext) -> dict[str, Any]:
         except Exception:
             pass
 
-    return {"result": content, "usage": result.get("usage", {})}
+    out = {"result": content, "usage": result.get("usage", {})}
+    if guard_warnings:
+        out["guardrail_warnings"] = guard_warnings
+    return out
 
 
 async def _exec_code(ctx: NodeContext) -> dict[str, Any]:
