@@ -99,3 +99,11 @@ def test_async_timeout(monkeypatch):
     out = asyncio.run(_run())
     assert out["result"] is None
     assert "超时" in (out["error"] or "")
+
+
+def test_class_escape_blocked():
+    """S0-B5：禁止 () .__class__ / __subclasses__ 等逃逸。"""
+    payload = "result = ().__class__.__bases__[0].__subclasses__()"
+    out = _run_code(payload, {}, {})
+    assert out["result"] is None
+    assert out["error"] and ("逃逸" in out["error"] or "__class__" in out["error"])

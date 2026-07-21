@@ -36,3 +36,10 @@ def test_shell_in_workspace(ws):
 def test_shell_deny_dangerous(ws):
     with pytest.raises(PermissionError):
         tool_shell(command="sudo rm -rf /")
+
+
+def test_shell_rejects_metacharacters(ws):
+    with pytest.raises(PermissionError, match="元字符"):
+        tool_shell(command="echo hi > out.txt")
+    with pytest.raises(PermissionError, match="元字符"):
+        tool_shell(command="cat a | wc")

@@ -230,6 +230,8 @@ _SHELL_DENY = re.compile(
     r"(rm\s+-rf\s+/|sudo\s+|mkfs|dd\s+if=|:\(\)\s*\{|curl\s+[^\n]*\|\s*sh)",
     re.I,
 )
+# S0-B2：禁止依赖 shell 元字符（管道/重定向/替换），强制 argv
+_SHELL_META = re.compile(r"[|;&$`<>\n\\]")
 
 
 def tool_shell(
@@ -238,13 +240,16 @@ def tool_shell(
     confirm: bool = False,
     approval_id: str = "",
 ) -> dict[str, Any]:
-    """在 workspace 根目录执行 shell。
+    """在 workspace 根目录执行命令（argv 列表，无 shell=True）。
 
     策略（contextvar shell_policy）：
       - deny: 一律拒绝
       - ask: 非只读命令需人审批准（approval_id），否则返回 needs_approval
       - allow: 仅受危险命令黑名单约束
     """
+    import os
+    import shlex
+
     from fangyu.engine.approval_queue import (
         consume_shell_approval,
         enqueue_shell_approval,
@@ -260,6 +265,10 @@ def tool_shell(
         raise PermissionError("shell 策略为 deny，禁止执行")
     if _SHELL_DENY.search(cmd):
         raise PermissionError(f"命令被策略拒绝: {cmd[:80]}")
+    if _SHELL_META.search(cmd):
+        raise PermissionError(
+            "禁止 shell 元字符（|;&$`<>\\）；请用单命令 argv，或用 write/apply_patch 改文件"
+        )
     if shell_needs_confirm(cmd):
         aid = (approval_id or "").strip()
         if confirm and aid and consume_shell_approval(aid, cmd):
@@ -286,10 +295,16 @@ def tool_shell(
                     "或在人审面板点「批准并执行」。"
                 ),
             }
+    try:
+        argv = shlex.split(cmd, posix=(os.name != "nt"))
+    except ValueError as e:
+        raise ValueError(f"无法解析命令: {e}") from e
+    if not argv:
+        raise ValueError("empty command")
     ws = _ws()
     proc = subprocess.run(
-        cmd,
-        shell=True,
+        argv,
+        shell=False,
         cwd=str(ws.root),
         capture_output=True,
         text=True,

@@ -25,7 +25,7 @@ def test_approval_api_approve_and_execute(tmp_path):
     tok = set_shell_policy("ask")
     client = TestClient(app)
     try:
-        blocked = tool_shell(command="echo ok > approved.txt")
+        blocked = tool_shell(command="touch approved.txt")
         assert blocked["status"] == "needs_approval"
         aid = blocked["approval_id"]
 
@@ -38,14 +38,14 @@ def test_approval_api_approve_and_execute(tmp_path):
         body = res.json()
         assert body["approval"]["status"] == "consumed"
         assert body["execution"]["exit_code"] == 0
-        assert (root / "workspace" / "approved.txt").read_text(encoding="utf-8").startswith("ok")
+        assert (root / "workspace" / "approved.txt").exists()
 
-        denied_block = tool_shell(command="echo no > denied.txt")
+        denied_block = tool_shell(command="touch denied.txt")
         did = denied_block["approval_id"]
         d = client.post(f"/api/v1/approvals/{did}/deny")
         assert d.status_code == 200
         assert d.json()["approval"]["status"] == "denied"
-        again = tool_shell(command="echo no > denied.txt", confirm=True, approval_id=did)
+        again = tool_shell(command="touch denied.txt", confirm=True, approval_id=did)
         assert again.get("status") == "needs_approval"
     finally:
         reset_shell_policy(tok)

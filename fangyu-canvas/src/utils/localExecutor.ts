@@ -12,6 +12,28 @@ function envVar(name: string): string | undefined {
   return process.env[name]
 }
 
+/** S0-B4：浏览器内 new Function 默认关；Vitest / 显式开关 / Tauri 可开 */
+export function allowLocalJsCode(): boolean {
+  const inVitest = (typeof import.meta !== 'undefined' && !!import.meta.env?.VITEST)
+    || envVar('VITEST') != null
+  if (inVitest) return true
+  if (envVar('FANGYU_ALLOW_LOCAL_JS') === '1' || envVar('FANGYU_ALLOW_LOCAL_JS') === 'true') {
+    return true
+  }
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('fangyu_allow_local_js') === '1') {
+      return true
+    }
+  } catch {
+    /* ignore */
+  }
+  if (typeof window !== 'undefined') {
+    const w = window as unknown as { __TAURI__?: unknown; __TAURI_INTERNALS__?: unknown }
+    if (w.__TAURI__ != null || w.__TAURI_INTERNALS__ != null) return true
+  }
+  return false
+}
+
 function resolveApiUrl(url: string): string {
   if (/^https?:\/\//i.test(url)) return url
   const backendBase = envVar('FANGYU_BACKEND') || 'http://127.0.0.1:8000'
@@ -472,6 +494,13 @@ async function simulateNode(
         }
       }
       try {
+        if (!allowLocalJsCode()) {
+          return {
+            error:
+              '本地 JS code 节点已禁用（S0）。请改用 Python（走后端沙箱），或设置 localStorage.fangyu_allow_local_js=1 / FANGYU_ALLOW_LOCAL_JS=1',
+            result: null,
+          }
+        }
         const fn = new Function('input', code)
         const result = fn(codeInput)
         return { result }

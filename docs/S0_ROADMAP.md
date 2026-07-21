@@ -25,11 +25,11 @@
 | ID | 项 | 仓库现状 | 状态 | 改法（摘要） |
 |----|----|----------|------|--------------|
 | B1 | `tool_registry` `exec` + 危险内置 | `engine/tool_registry.py` | **DONE** | shell/file 原生 argv；拒危险注册；收紧 builtins |
-| B2 | `bundle_tools` shell 黑名单可绕过 | `engine/bundle_tools.py` `_SHELL_DENY` + `shell=True` | **OPEN** | 禁止 shell=True，改 argv 列表；或强沙箱 |
+| B2 | `bundle_tools` shell 黑名单可绕过 | `engine/bundle_tools.py` | **DONE** | argv + 禁止元字符；无 shell=True |
 | B3 | skills 路径遍历 | `engine/skill.py` | **DONE** | `_resolve_under` / `is_relative_to` |
-| B4 | 前端 `new Function` | `fangyu-canvas/.../localExecutor.ts:475` | **OPEN** | 默认关 JS code 节点；或仅 Tauri/本机可信模式 |
-| B5 | 沙箱 `().__class__` 逃逸 | `engine/sandbox.py` | **OPEN** | 加重禁止模式或子进程隔离 |
-| B6 | 导出 compile 任意源码 | `routers/export_compile.py`（已有 to_thread，仍无鉴权） | **OPEN** | 挂鉴权 + 路径净化 + 限流；默认只允许 source ZIP |
+| B4 | 前端 `new Function` | `localExecutor.ts` | **DONE** | 默认关；Vitest/Tauri/`fangyu_allow_local_js` 可开 |
+| B5 | 沙箱 `().__class__` 逃逸 | `engine/sandbox.py` | **DONE** | 逃逸模式正则黑名单 |
+| B6 | 导出 compile 任意源码 | `routers/export_compile.py` | **DONE** | 默认禁 compile；路径净化；限流 |
 
 **验收**：未授权无法 `exec`/写 skills 逃出目录；危险工具默认 403。
 

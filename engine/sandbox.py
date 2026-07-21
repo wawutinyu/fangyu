@@ -18,10 +18,34 @@ SAFE_BUILTINS = {
     'NameError': NameError, 'Exception': Exception, 'ValueError': ValueError, 'TypeError': TypeError,
 }
 
-FORBIDDEN = ['__import__', 'open', 'eval', 'compile', 'globals', 'locals', 'vars', 'dir', 'getattr', 'setattr', 'delattr', 'hasattr']
+FORBIDDEN = [
+    '__import__', 'open', 'eval', 'compile', 'globals', 'locals', 'vars', 'dir',
+    'getattr', 'setattr', 'delattr', 'hasattr',
+]
 
 # 语句级 import/from-import（避免误伤变量名 important 等）
 _IMPORT_STMT = re.compile(r'(?m)^\s*(?:import\s+\w+|from\s+\S+\s+import\s+)')
+
+# S0-B5：经典 object 图逃逸（().__class__.__mro__ / __subclasses__ 等）
+_ESCAPE_PATTERNS = [
+    re.compile(p, re.I)
+    for p in (
+        r"__class__",
+        r"__bases__",
+        r"__mro__",
+        r"__subclasses__",
+        r"__globals__",
+        r"__code__",
+        r"__reduce__",
+        r"__builtins__",
+        r"gi_frame",
+        r"f_back",
+        r"f_globals",
+        r"f_builtins",
+        r"__loader__",
+        r"__getattribute__",
+    )
+]
 
 
 def _run_code(code: str, input_data: dict, params: dict, extra_globals: dict | None = None) -> dict:
@@ -45,6 +69,10 @@ def _run_code(code: str, input_data: dict, params: dict, extra_globals: dict | N
     for word in FORBIDDEN:
         if word in code:
             return {'result': None, 'error': f'禁止使用 {word}', 'logs': logs}
+
+    for pat in _ESCAPE_PATTERNS:
+        if pat.search(code):
+            return {'result': None, 'error': f'禁止使用逃逸模式 {pat.pattern}', 'logs': logs}
 
     if _IMPORT_STMT.search(code):
         return {'result': None, 'error': '禁止使用 import', 'logs': logs}

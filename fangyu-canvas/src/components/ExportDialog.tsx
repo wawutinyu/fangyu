@@ -80,7 +80,7 @@ export default function ExportDialog({ nodes, edges, onClose, onCompileStart, on
 
           <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
             {compileExe
-              ? '将尝试服务端编译并打包 ZIP（可能数分钟；Linux 服务器上通常不是 Windows .exe）'
+              ? '将尝试服务端编译并打包 ZIP（需 FANGYU_ALLOW_EXPORT_COMPILE=1；可能数分钟；Linux 上通常不是 Windows .exe）'
               : '默认导出源码 ZIP（秒级）：含 .py / flow_config.json / build_exe.bat，可在本机编译'}
           </div>
           <div style={{ fontSize: 11, color: '#b8860b', marginTop: 4 }}>

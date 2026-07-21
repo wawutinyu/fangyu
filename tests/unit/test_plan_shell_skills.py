@@ -45,16 +45,16 @@ def test_shell_ask_needs_confirm(tmp_path):
     init_bundle_workspace(root)
     tok = set_shell_policy("ask")
     try:
-        blocked = tool_shell(command="echo hi > out.txt")
+        blocked = tool_shell(command="touch out.txt")
         assert blocked.get("status") == "needs_approval"
         aid = blocked["approval_id"]
         # 仅 confirm 不够，必须先人审
-        still = tool_shell(command="echo hi > out.txt", confirm=True, approval_id=aid)
+        still = tool_shell(command="touch out.txt", confirm=True, approval_id=aid)
         assert still.get("status") == "needs_approval"
         resolve_approval(aid, approve=True)
-        ok = tool_shell(command="echo hi > out.txt", confirm=True, approval_id=aid)
+        ok = tool_shell(command="touch out.txt", confirm=True, approval_id=aid)
         assert ok.get("exit_code") == 0
-        assert (root / "workspace" / "out.txt").read_text(encoding="utf-8").startswith("hi")
+        assert (root / "workspace" / "out.txt").exists()
         # 只读无需 confirm
         ro = tool_shell(command="pwd")
         assert "exit_code" in ro and ro.get("status") != "needs_approval"
@@ -76,10 +76,10 @@ def test_fangyu_shell_policy_env_overrides_ask(tmp_path, monkeypatch):
     monkeypatch.setenv("FANGYU_SHELL_POLICY", "allow")
     try:
         assert get_shell_policy() == "allow"
-        out = tool_shell(command="echo env-allow > env.txt")
+        out = tool_shell(command="touch env.txt")
         assert out.get("status") != "needs_approval"
         assert out.get("exit_code") == 0
-        assert (root / "workspace" / "env.txt").read_text(encoding="utf-8").startswith("env-allow")
+        assert (root / "workspace" / "env.txt").exists()
     finally:
         monkeypatch.delenv("FANGYU_SHELL_POLICY", raising=False)
         reset_shell_policy(tok)
