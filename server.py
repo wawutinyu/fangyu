@@ -59,6 +59,17 @@ async def lifespan(app: FastAPI):
     async with async_session() as session:
         await maintain_asset_library(session)
     try:
+        from .core.auth_gate import require_auth
+        from .core.org_acl import enable_acl, load_acl
+
+        # S0-A3：强制鉴权时默认开启 ACL + require_principal
+        if require_auth():
+            doc = load_acl()
+            if not doc.get("enabled") or not doc.get("require_principal"):
+                enable_acl(True, require_principal=True)
+    except Exception:
+        pass
+    try:
         from .core.factory_heartbeat_loop import maybe_autostart_from_env
         maybe_autostart_from_env()
     except Exception:

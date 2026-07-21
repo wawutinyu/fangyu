@@ -50,13 +50,13 @@ class OrchestrateRequest(BaseModel):
 @router.post("/send")
 async def send_message(request: Request):
     """校验信封时使用原始请求体，避免 re-serialize 与前端签名不一致。"""
-    from fangyu.core.config import settings
+    from fangyu.core.auth_gate import platform_require_envelope
     from fangyu.engine.trust_runtime import verify_a2a_envelope
 
     raw = await request.body()
     body_json = raw.decode("utf-8")
     envelope_raw = request.headers.get("X-A2A-Envelope") or request.headers.get("x-a2a-envelope")
-    env_err = verify_a2a_envelope(envelope_raw, body_json, settings.PLATFORM_REQUIRE_ENVELOPE)
+    env_err = verify_a2a_envelope(envelope_raw, body_json, platform_require_envelope())
     if env_err:
         raise HTTPException(403, env_err)
     try:
@@ -89,13 +89,20 @@ def cancel_task(task_id: str):
 
 
 @router.post("/orchestrate")
-def orchestrate(body: OrchestrateRequest):
+def orchestrate(request: Request, body: OrchestrateRequest):
+    from fangyu.core.auth_gate import require_auth
+
+    # S0-D2：强制鉴权时只信中间件注入的主体，忽略 body 伪造
+    if require_auth():
+        principal_id = getattr(request.state, "principal_id", None)
+    else:
+        principal_id = getattr(request.state, "principal_id", None) or body.principal_id
     result = _orchestrator.run_pipeline(
         body.query,
         [s.model_dump() for s in body.steps],
         pass_mode=body.pass_mode,
         topology=body.topology,
-        principal_id=body.principal_id,
+        principal_id=principal_id,
     )
     return result
 
@@ -479,7 +486,7 @@ class JsonRpcRequest(BaseModel):
 @router.post("/rpc")
 def a2a_jsonrpc(body: JsonRpcRequest, request: Request):
     """JSON-RPC 2.0 端点 — 供跨机器 HTTPTransport 调用。受 FANGYU_PLATFORM_REQUIRE_ENVELOPE 约束。"""
-    from fangyu.core.config import settings
+    from fangyu.core.auth_gate import platform_require_envelope
     from fangyu.engine.trust_runtime import verify_a2a_envelope
 
     body_json = json.dumps(
@@ -488,7 +495,7 @@ def a2a_jsonrpc(body: JsonRpcRequest, request: Request):
         ensure_ascii=False,
     )
     envelope_raw = request.headers.get("X-A2A-Envelope") or request.headers.get("x-a2a-envelope")
-    env_err = verify_a2a_envelope(envelope_raw, body_json, settings.PLATFORM_REQUIRE_ENVELOPE)
+    env_err = verify_a2a_envelope(envelope_raw, body_json, platform_require_envelope())
     if env_err:
         return {"jsonrpc": "2.0", "id": body.id, "error": {"code": 403, "message": env_err}}
 

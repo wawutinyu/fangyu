@@ -55,6 +55,18 @@ def require_auth() -> bool:
     return bool(getattr(settings, "REQUIRE_AUTH", False))
 
 
+def platform_require_envelope() -> bool:
+    """A2A /send、/rpc 是否强制信封。显式 env 优先；强制鉴权时默认开启。"""
+    raw = (os.getenv("FANGYU_PLATFORM_REQUIRE_ENVELOPE") or "").strip().lower()
+    if raw in ("1", "true", "yes", "on"):
+        return True
+    if raw in ("0", "false", "no", "off"):
+        return False
+    if bool(getattr(settings, "PLATFORM_REQUIRE_ENVELOPE", False)):
+        return True
+    return require_auth()
+
+
 def allow_principal_header_bypass() -> bool:
     """SSO 关闭时是否允许 X-Fangyu-Principal。强制鉴权时关闭。"""
     if require_auth():

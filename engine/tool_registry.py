@@ -8,12 +8,90 @@ REGISTRY_FILE = REGISTRY_DIR / "registry.json"
 
 DANGEROUS_TOOL_NAMES = frozenset({"shell_execution", "file_operations"})
 
+# 普通 code 工具可用的 builtins（无 import / open / getattr）
+_SAFE_CODE_BUILTINS = {
+    "True": True, "False": False, "None": None,
+    "abs": abs, "all": all, "any": any, "bool": bool, "bytes": bytes,
+    "dict": dict, "enumerate": enumerate, "filter": filter,
+    "float": float, "hash": hash, "hex": hex, "int": int,
+    "isinstance": isinstance, "len": len, "list": list,
+    "map": map, "max": max, "min": min, "object": object,
+    "oct": oct, "ord": ord, "range": range, "repr": repr,
+    "reversed": reversed, "round": round, "set": set,
+    "slice": slice, "sorted": sorted, "str": str, "sum": sum,
+    "tuple": tuple, "zip": zip,
+    "Exception": Exception, "ValueError": ValueError, "KeyError": KeyError,
+    "TypeError": TypeError, "StopIteration": StopIteration,
+}
+
 
 def _tool_enabled(name: str) -> bool:
     from ..core.config import settings
     if name in DANGEROUS_TOOL_NAMES:
         return settings.ALLOW_DANGEROUS_TOOLS
     return True
+
+
+def _impl_looks_dangerous(implementation: dict) -> bool:
+    blob = json.dumps(implementation or {}, ensure_ascii=False).lower()
+    needles = ("subprocess", "shell=true", "__import__", "os.system", "pty.", "multiprocessing")
+    return any(n in blob for n in needles)
+
+
+def _run_shell_execution(args: dict) -> Any:
+    """仅 ALLOW_DANGEROUS_TOOLS 时可用；禁止 shell=True。"""
+    from ..core.config import settings
+    if not settings.ALLOW_DANGEROUS_TOOLS:
+        raise ValueError("工具 'shell_execution' 已禁用（设置 ALLOW_DANGEROUS_TOOLS=true 可启用）")
+    import os
+    import shlex
+    import subprocess
+    cmd = str(args.get("command") or "").strip()
+    if not cmd:
+        raise ValueError("command 为空")
+    argv = shlex.split(cmd, posix=(os.name != "nt"))
+    if not argv:
+        raise ValueError("无法解析 command")
+    result = subprocess.run(argv, shell=False, capture_output=True, text=True, timeout=60)
+    return {"stdout": result.stdout, "stderr": result.stderr, "returncode": result.returncode}
+
+
+def _run_file_operations(args: dict) -> Any:
+    """仅 ALLOW_DANGEROUS_TOOLS 时可用；路径限制在 cwd 下。"""
+    from ..core.config import settings
+    if not settings.ALLOW_DANGEROUS_TOOLS:
+        raise ValueError("工具 'file_operations' 已禁用（设置 ALLOW_DANGEROUS_TOOLS=true 可启用）")
+    import fnmatch
+    import os
+    from pathlib import Path
+
+    cwd = Path(os.getcwd()).resolve()
+    action = args.get("action")
+    raw_path = str(args.get("path") or "")
+    target = Path(raw_path)
+    full = (target if target.is_absolute() else (cwd / target)).resolve()
+    if not full.is_relative_to(cwd):
+        raise ValueError("path escape rejected")
+    if action == "read":
+        return full.read_text(encoding="utf-8")
+    if action == "write":
+        full.parent.mkdir(parents=True, exist_ok=True)
+        full.write_text(str(args.get("content", "")), encoding="utf-8")
+        return "ok"
+    if action == "list":
+        return os.listdir(full)
+    if action == "search":
+        pattern = args.get("pattern", "*")
+        return [
+            str(Path(dp) / f)
+            for dp, _dn, fn in os.walk(full)
+            for f in fn
+            if fnmatch.fnmatch(f, pattern)
+        ]
+    if action == "delete":
+        full.unlink()
+        return "ok"
+    return "unknown"
 
 
 def _ensure():
@@ -36,9 +114,18 @@ def _save(data: dict[str, Any]):
 
 
 def register_tool(name: str, description: str, parameters: dict, implementation: dict) -> dict:
+    from ..core.config import settings
+
     registry = _load()
     if name in registry:
         return {"success": False, "error": f"工具 '{name}' 已存在"}
+    if name in DANGEROUS_TOOL_NAMES and not settings.ALLOW_DANGEROUS_TOOLS:
+        return {"success": False, "error": f"工具 '{name}' 已禁用（设置 ALLOW_DANGEROUS_TOOLS=true 可启用）"}
+    if _impl_looks_dangerous(implementation) and not settings.ALLOW_DANGEROUS_TOOLS:
+        return {
+            "success": False,
+            "error": "实现含危险调用（subprocess/shell/__import__/os.system 等），已拒绝注册",
+        }
     registry[name] = {
         "name": name,
         "description": description,
@@ -97,10 +184,23 @@ async def execute_tool(name: str, args: dict, global_vars: dict) -> Any:
             return {"error": out["error"], "logs": out.get("logs", [])}
         return out.get("result")
 
+    # S0-B1：危险工具走原生实现，禁止 shell=True / 裸 open 的 exec 串
+    if name == "shell_execution":
+        return _run_shell_execution(args)
+    if name == "file_operations":
+        return _run_file_operations(args)
+
     impl = tool.get("implementation", {})
     impl_type = impl.get("type", "prompt")
 
+    if impl_type == "native":
+        raise ValueError(f"工具 '{name}' 无原生处理器")
+
     if impl_type == "code":
+        if _impl_looks_dangerous(impl):
+            from ..core.config import settings
+            if not settings.ALLOW_DANGEROUS_TOOLS:
+                raise ValueError("工具实现含危险调用，已拒绝执行（ALLOW_DANGEROUS_TOOLS=false）")
         code = impl.get("code", "")
         full_code = code
         after = impl.get("after", "")
@@ -109,29 +209,18 @@ async def execute_tool(name: str, args: dict, global_vars: dict) -> Any:
         suffix = impl.get("suffix", "")
         if suffix:
             full_code += "\n" + suffix
+        # 无 open / getattr / setattr；内置 memory/skill 仍需 __import__
         builtins = {
+            **_SAFE_CODE_BUILTINS,
             "__import__": __import__,
-            "True": True, "False": False, "None": None,
-            "abs": abs, "all": all, "any": any, "bool": bool, "bytes": bytes,
-            "dict": dict, "enumerate": enumerate, "filter": filter,
-            "float": float, "hash": hash, "hex": hex, "int": int,
-            "isinstance": isinstance, "len": len, "list": list,
-            "map": map, "max": max, "min": min, "object": object,
-            "oct": oct, "ord": ord, "range": range, "repr": repr,
-            "reversed": reversed, "round": round, "set": set,
-            "slice": slice, "sorted": sorted, "str": str, "sum": sum,
-            "tuple": tuple, "type": type, "zip": zip,
-            "hasattr": hasattr, "getattr": getattr, "setattr": setattr,
-            "ImportError": ImportError, "Exception": Exception,
-            "ValueError": ValueError, "KeyError": KeyError,
-            "AttributeError": AttributeError, "TypeError": TypeError,
+            "type": type,
+            "hasattr": hasattr,
+            "ImportError": ImportError,
+            "AttributeError": AttributeError,
             "ModuleNotFoundError": ModuleNotFoundError,
-            "OSError": OSError, "FileNotFoundError": FileNotFoundError,
-            "StopIteration": StopIteration,
+            "OSError": OSError,
+            "FileNotFoundError": FileNotFoundError,
         }
-        # 仅危险工具（默认禁用）需要 open；普通内置工具不再暴露 open
-        if name in DANGEROUS_TOOL_NAMES:
-            builtins["open"] = open
         safe_globals = {"__builtins__": builtins}
         safe_locals = {"args": args, "result": None}
         try:
@@ -262,21 +351,15 @@ BUILTIN_TOOLS: list[dict] = [
     },
     {
         "name": "file_operations",
-        "description": "读写、搜索、列出文件（支持绝对路径，默认工作目录）",
+        "description": "读写、搜索、列出文件（限制在工作目录内）",
         "parameters": {"type": "object", "properties": {"action": {"type": "string", "enum": ["read", "write", "list", "search", "delete"], "description": "操作类型"}, "path": {"type": "string", "description": "文件路径（绝对路径或相对于工作目录）"}, "content": {"type": "string", "description": "写入内容（write 时必填）"}, "pattern": {"type": "string", "description": "搜索模式（search 时必填）"}}, "required": ["action", "path"]},
-        "implementation": {"type": "code", "code": "import os, fnmatch; cwd = os.getcwd(); action = args['action']; p = args['path']; full = os.path.abspath(p) if os.path.isabs(p) else os.path.normpath(os.path.join(cwd, p)); os.makedirs(os.path.dirname(full), exist_ok=True)\n"
-        + "if action == 'read': result = open(full).read()\n"
-        + "elif action == 'write': open(full, 'w').write(args.get('content', '')); result = 'ok'\n"
-        + "elif action == 'list': result = os.listdir(full)\n"
-        + "elif action == 'search': result = [os.path.join(dp, f) for dp, dn, fn in os.walk(full) for f in fn if fnmatch.fnmatch(f, args.get('pattern', '*'))]\n"
-        + "elif action == 'delete': os.remove(full); result = 'ok'\n"
-        + "else: result = 'unknown'"},
+        "implementation": {"type": "native"},
     },
     {
         "name": "shell_execution",
-        "description": "在系统 shell 中执行命令（Windows CMD / PowerShell）",
-        "parameters": {"type": "object", "properties": {"command": {"type": "string", "description": "要执行的 shell 命令"}}, "required": ["command"]},
-        "implementation": {"type": "code", "code": "import subprocess, sys; cmd = args['command']; result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=60); r = {'stdout': result.stdout, 'stderr': result.stderr, 'returncode': result.returncode}"},
+        "description": "执行命令（argv 列表，无 shell=True；需 ALLOW_DANGEROUS_TOOLS）",
+        "parameters": {"type": "object", "properties": {"command": {"type": "string", "description": "要执行的命令"}}, "required": ["command"]},
+        "implementation": {"type": "native"},
     },
     {
         "name": "skill_write_file",

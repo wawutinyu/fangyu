@@ -14,7 +14,7 @@
 |----|----|----------|------|--------------|
 | A1 | `POST /api/v1/auth/token` 开放签发 | `routers/auth.py` + `FANGYU_ALLOW_DEV_TOKEN` | **DONE** | 默认随 REQUIRE_AUTH；生产 `=0` |
 | A2 | 全局强制鉴权 | `server.py` + `core/auth_gate.py` | **DONE** | `FANGYU_REQUIRE_AUTH=1` |
-| A3 | ACL 默认关 / require_principal=false | `core/org_acl.py` | **OPEN** | 下一批 |
+| A3 | ACL 默认关 / require_principal=false | `core/org_acl.py` + `server.py` lifespan | **DONE** | `REQUIRE_AUTH` 时自动 `enable_acl(True, require_principal=True)` |
 
 **验收**：无 Token 调 `/api/v1/flow/run`、`/api/v1/llm/chat`、`/api/v1/settings` → 401。
 
@@ -24,9 +24,9 @@
 
 | ID | 项 | 仓库现状 | 状态 | 改法（摘要） |
 |----|----|----------|------|--------------|
-| B1 | `tool_registry` `exec` + 危险内置 | `engine/tool_registry.py` 含 `exec`、`shell=True` 工具 | **OPEN** | 默认禁用危险工具；收紧 builtins；生产 `ALLOW_DANGEROUS_TOOLS` 必须 false |
+| B1 | `tool_registry` `exec` + 危险内置 | `engine/tool_registry.py` | **DONE** | shell/file 原生 argv；拒危险注册；收紧 builtins |
 | B2 | `bundle_tools` shell 黑名单可绕过 | `engine/bundle_tools.py` `_SHELL_DENY` + `shell=True` | **OPEN** | 禁止 shell=True，改 argv 列表；或强沙箱 |
-| B3 | skills 路径遍历 | `engine/skill.py` `SKILLS_DIR / name` 无净化 | **OPEN** | `resolve().is_relative_to(SKILLS_DIR)` |
+| B3 | skills 路径遍历 | `engine/skill.py` | **DONE** | `_resolve_under` / `is_relative_to` |
 | B4 | 前端 `new Function` | `fangyu-canvas/.../localExecutor.ts:475` | **OPEN** | 默认关 JS code 节点；或仅 Tauri/本机可信模式 |
 | B5 | 沙箱 `().__class__` 逃逸 | `engine/sandbox.py` | **OPEN** | 加重禁止模式或子进程隔离 |
 | B6 | 导出 compile 任意源码 | `routers/export_compile.py`（已有 to_thread，仍无鉴权） | **OPEN** | 挂鉴权 + 路径净化 + 限流；默认只允许 source ZIP |
@@ -51,9 +51,9 @@
 
 | ID | 项 | 仓库现状 | 状态 | 改法（摘要） |
 |----|----|----------|------|--------------|
-| D1 | 信封默认不强制 | `PLATFORM_REQUIRE_ENVELOPE` 默认 `"0"` | **OPEN** | 生产默认 `"1"` |
-| D2 | orchestrate / 关键 RPC 无身份 | A2A 路由 | **OPEN** | 复用全局鉴权 |
-| D3 | nonce `clear()` 重放 | trust registry | **OPEN** | 淘汰最旧条，禁止整表 clear |
+| D1 | 信封默认不强制 | `auth_gate.platform_require_envelope` | **DONE** | 显式 env 或随 `REQUIRE_AUTH`；生产设 `=1` |
+| D2 | orchestrate / 平台 RPC 无身份 | A2A 路由 | **DONE** | 全局鉴权 + orchestrate 只用 JWT principal |
+| D3 | nonce `clear()` 重放 | trust registry | **DONE** | OrderedDict FIFO 淘汰 |
 
 **验收**：无信封的 `send_message` 在生产配置下被拒。
 

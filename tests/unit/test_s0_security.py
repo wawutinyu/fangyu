@@ -130,3 +130,37 @@ def test_settings_masks_api_keys(data_dir, monkeypatch):
         assert body["theme"] == "dark"
         assert body["deepseek_api_key"] != "sk-abcdefghijklmnop"
         assert "***" in body["deepseek_api_key"]
+
+
+def test_orchestrate_ignores_body_principal_when_require_auth(data_dir, monkeypatch):
+    """S0-D2：强制鉴权时 principal 来自 JWT，忽略 body 伪造。"""
+    from unittest.mock import patch
+
+    monkeypatch.setenv("FANGYU_REQUIRE_AUTH", "1")
+    monkeypatch.setenv("FANGYU_ALLOW_DEV_TOKEN", "1")
+    monkeypatch.setattr(config_mod.settings, "REQUIRE_AUTH", True)
+    captured: dict = {}
+
+    def _fake(query, steps, pass_mode="replace", topology=None, principal_id=None):
+        captured["principal_id"] = principal_id
+        return {"ok": True, "steps": []}
+
+    with patch("fangyu.routers.a2a._orchestrator.run_pipeline", side_effect=_fake):
+        with TestClient(app) as client:
+            tok = client.post(
+                "/api/v1/auth/token",
+                json={"principal_id": "alice", "roles": ["operator"]},
+            )
+            assert tok.status_code == 200
+            access = tok.json()["access_token"]
+            r = client.post(
+                "/api/v1/a2a/orchestrate",
+                json={
+                    "query": "x",
+                    "steps": [{"agent": "A", "skill_id": "s"}],
+                    "principal_id": "attacker",
+                },
+                headers={"Authorization": f"Bearer {access}"},
+            )
+            assert r.status_code == 200
+            assert captured.get("principal_id") == "alice"

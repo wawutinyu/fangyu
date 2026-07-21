@@ -39,6 +39,8 @@ def test_platform_public_identity(client):
 
 
 def test_send_unsigned_ok_when_not_required(client, monkeypatch):
+    monkeypatch.setenv("FANGYU_PLATFORM_REQUIRE_ENVELOPE", "0")
+    monkeypatch.setenv("FANGYU_REQUIRE_AUTH", "0")
     monkeypatch.setattr(settings, "PLATFORM_REQUIRE_ENVELOPE", False)
     AgentRegistry.register("Echo", {"name": "Echo", "version": "1.0.0"}, {})
     body = {
@@ -52,6 +54,7 @@ def test_send_unsigned_ok_when_not_required(client, monkeypatch):
 
 
 def test_send_unsigned_rejected_when_required(client, monkeypatch):
+    monkeypatch.setenv("FANGYU_PLATFORM_REQUIRE_ENVELOPE", "1")
     monkeypatch.setattr(settings, "PLATFORM_REQUIRE_ENVELOPE", True)
     AgentRegistry.register("Echo", {"name": "Echo", "version": "1.0.0"}, {})
     body = {
@@ -64,6 +67,7 @@ def test_send_unsigned_rejected_when_required(client, monkeypatch):
 
 
 def test_send_signed_ok_when_required(client, monkeypatch):
+    monkeypatch.setenv("FANGYU_PLATFORM_REQUIRE_ENVELOPE", "1")
     monkeypatch.setattr(settings, "PLATFORM_REQUIRE_ENVELOPE", True)
     AgentRegistry.register("Echo", {"name": "Echo", "version": "1.0.0"}, {})
     body = {
@@ -81,3 +85,27 @@ def test_send_signed_ok_when_required(client, monkeypatch):
     )
     assert resp.status_code == 200, resp.text
     assert resp.json().get("id")
+
+
+def test_require_auth_implies_envelope(client, monkeypatch):
+    """S0-D1：强制鉴权时默认要求信封（即使 PLATFORM_REQUIRE_ENVELOPE 未显式开）。"""
+    monkeypatch.delenv("FANGYU_PLATFORM_REQUIRE_ENVELOPE", raising=False)
+    monkeypatch.setenv("FANGYU_REQUIRE_AUTH", "1")
+    monkeypatch.setenv("FANGYU_ALLOW_DEV_TOKEN", "1")
+    monkeypatch.setattr(settings, "PLATFORM_REQUIRE_ENVELOPE", False)
+    monkeypatch.setattr(settings, "REQUIRE_AUTH", True)
+    AgentRegistry.register("Echo", {"name": "Echo", "version": "1.0.0"}, {})
+    tok = client.post("/api/v1/auth/token", json={"principal_id": "op", "roles": ["operator"]})
+    assert tok.status_code == 200
+    access = tok.json()["access_token"]
+    body = {
+        "target_agent": "Echo",
+        "message": {"role": "user", "parts": [{"type": "text", "text": "hi"}]},
+        "task_id": "",
+    }
+    resp = client.post(
+        "/api/v1/a2a/send",
+        json=body,
+        headers={"Authorization": f"Bearer {access}"},
+    )
+    assert resp.status_code == 403
