@@ -88,18 +88,24 @@ async def _prepare_global_vars(raw: dict, db: AsyncSession) -> dict:
 @router.post("/run")
 async def run_flow_endpoint(body: RunFlowBody, db: AsyncSession = Depends(get_session)):
     from ..models.execution_log import ExecutionLog
+    from fangyu.core.tracer import drain_events, new_trace_id, persist_events
 
     global_vars = await _prepare_global_vars(body.global_vars, db)
+    flow_name = body.global_vars.get("flow_id", "") if isinstance(body.global_vars, dict) else ""
+    trace_id = new_trace_id(str(flow_name or "flow"))
+    global_vars["_trace_id"] = trace_id
+    global_vars.setdefault("flow_id", str(flow_name or ""))
+
     result = await run_flow(
         nodes=body.nodes,
         edges=body.edges,
         external_inputs=body.external_inputs,
         global_vars=global_vars,
     )
+    result["trace_id"] = result.get("trace_id") or trace_id
 
     # Persist execution logs
     session_id = global_vars.get("session_id", global_vars.get("_chatHistory", id(body)))
-    flow_name = body.global_vars.get("flow_id", "")
     if isinstance(session_id, list):
         session_id = str(id(body))
 
@@ -117,6 +123,7 @@ async def run_flow_endpoint(body: RunFlowBody, db: AsyncSession = Depends(get_se
         db.add(ExecutionLog(
             flow_id=str(flow_name),
             session_id=str(session_id),
+            trace_id=str(result.get("trace_id") or trace_id),
             node_id=nid,
             node_name=log_entry.get("nodeName", ""),
             node_type=log_entry.get("type", ""),
@@ -126,6 +133,11 @@ async def run_flow_endpoint(body: RunFlowBody, db: AsyncSession = Depends(get_se
             error=log_entry.get("data", {}).get("error", ""),
             duration_ms=duration,
         ))
+
+    try:
+        await persist_events(db, drain_events(), flow_id=str(flow_name))
+    except Exception:
+        pass
 
     await db.commit()
     return result
@@ -139,7 +151,12 @@ async def run_flow_stream(body: RunFlowBody, db: AsyncSession = Depends(get_sess
         await event_queue.put({"type": evt_type, **data})
 
     async def event_generator():
+        from fangyu.core.tracer import new_trace_id
+
         global_vars = await _prepare_global_vars(body.global_vars, db)
+        flow_name = body.global_vars.get("flow_id", "") if isinstance(body.global_vars, dict) else ""
+        global_vars["_trace_id"] = new_trace_id(str(flow_name or "flow"))
+        global_vars.setdefault("flow_id", str(flow_name or ""))
         task = asyncio.create_task(
             run_flow(
                 nodes=body.nodes,

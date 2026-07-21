@@ -20,5 +20,6 @@
 | 项目评估 | [PROJECT_ASSESSMENT](PROJECT_ASSESSMENT.md) |
 | **S0 安全止血** | [S0_ROADMAP](S0_ROADMAP.md) |
 | **Q0 质量地基** | [Q0_ROADMAP](Q0_ROADMAP.md) · [失败模式](FAILURE_MODES.md) |
+| **Q1 可观测** | [Q1_ROADMAP](Q1_ROADMAP.md) |
 
 其余文件多为工程/协议专题，按需查阅。

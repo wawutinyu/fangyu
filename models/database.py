@@ -79,11 +79,26 @@ async def init_db():
     from .execution_log import ExecutionLog  # noqa: F401
     from .conversation import ConversationLog  # noqa: F401
     from .asset import Asset  # noqa: F401
+    from .trace_log import TraceLog  # noqa: F401
 
     async with engine.begin() as conn:
         # run_sync：在异步连接中执行同步的 create_all
         # SQLite 的 DDL 操作不支持异步，需要通过此方式桥接
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_ensure_sqlite_columns)
+
+
+def _ensure_sqlite_columns(sync_conn) -> None:
+    """SQLite 无自动迁移：为已有表补列。"""
+    try:
+        rows = sync_conn.exec_driver_sql("PRAGMA table_info(execution_logs)").fetchall()
+        cols = {r[1] for r in rows}
+        if "trace_id" not in cols:
+            sync_conn.exec_driver_sql(
+                "ALTER TABLE execution_logs ADD COLUMN trace_id VARCHAR(64) DEFAULT ''"
+            )
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------

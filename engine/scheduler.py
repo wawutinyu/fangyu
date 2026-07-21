@@ -113,6 +113,24 @@ async def run_flow(nodes, edges, external_inputs=None, global_vars=None, on_even
     if not nodes:
         return {"success": False, "error": "画布为空", "results": [], "logs": []}
 
+    # Q1：结构化 trace
+    try:
+        from fangyu.core.tracer import begin_trace, new_trace_id, record_event, tracer_enabled
+
+        if tracer_enabled():
+            tid = str(global_vars.get("_trace_id") or "").strip() or new_trace_id(
+                str(global_vars.get("flow_id") or "flow")
+            )
+            global_vars["_trace_id"] = tid
+            begin_trace(tid)
+            record_event(
+                event_type="flow_start",
+                flow_id=str(global_vars.get("flow_id") or ""),
+                payload={"node_count": len(nodes)},
+            )
+    except Exception:
+        pass
+
     constitution_warnings: list = []
     try:
         from ..core.constitution import assert_flow_allowed, audit_event, ConstitutionViolation
@@ -130,6 +148,7 @@ async def run_flow(nodes, edges, external_inputs=None, global_vars=None, on_even
             "violation": e.to_dict(),
             "results": [],
             "logs": [],
+            "trace_id": global_vars.get("_trace_id"),
         }
 
     depth = global_vars.get("_flow_depth", 0)
@@ -225,6 +244,19 @@ async def run_flow(nodes, edges, external_inputs=None, global_vars=None, on_even
         config = nd.get("config", {}) if isinstance(nd, dict) else {}
         _add_log(node_id, node_name, "start", {"inputs": inputs, "config": config})
         _emit("node_start", {"nodeId": node_id, "nodeName": node_name})
+        try:
+            from fangyu.core.tracer import record_event
+
+            record_event(
+                node_id=node_id,
+                node_name=node_name,
+                node_type=origin_type,
+                event_type="start",
+                flow_id=str(global_vars.get("flow_id") or ""),
+                payload={"inputs": inputs},
+            )
+        except Exception:
+            pass
         if origin_type == "start":
             inputs.update(external_inputs)
 
@@ -241,18 +273,50 @@ async def run_flow(nodes, edges, external_inputs=None, global_vars=None, on_even
             node_outputs = {"error": f"[{origin_type}] {str(e)}"}
             _add_log(node_id, node_name, "error", {"error": str(e)})
             _emit("node_error", {"nodeId": node_id, "nodeName": node_name, "error": str(e)})
+            try:
+                from fangyu.core.tracer import record_event
+
+                record_event(
+                    node_id=node_id,
+                    node_name=node_name,
+                    node_type=origin_type,
+                    event_type="error",
+                    flow_id=str(global_vars.get("flow_id") or ""),
+                    payload={"error": str(e)},
+                )
+            except Exception:
+                pass
 
         if not isinstance(node_outputs, dict):
             node_outputs = {"result": node_outputs, "error": f"handler returned {type(node_outputs).__name__}"}
         outputs[node_id] = node_outputs
         outputs[node_name] = node_outputs
         is_error = "error" in node_outputs and node_outputs.get("error") is not None
+        elapsed_ms = _now() - t0
         if is_error:
             _add_log(node_id, node_name, "complete_with_error", {"outputs": node_outputs})
         else:
             _add_log(node_id, node_name, "complete", {"outputs": node_outputs})
         _emit("node_complete", {"nodeId": node_id, "nodeName": node_name, "outputs": node_outputs})
-        elapsed_ms = _now() - t0
+        try:
+            from fangyu.core.tracer import record_event
+
+            record_event(
+                node_id=node_id,
+                node_name=node_name,
+                node_type=origin_type,
+                event_type="error" if is_error else "end",
+                duration_ms=float(elapsed_ms),
+                flow_id=str(global_vars.get("flow_id") or ""),
+                payload={
+                    "outputs": node_outputs,
+                    "error": node_outputs.get("error") if is_error else None,
+                    "usage": node_outputs.get("usage"),
+                    "guardrail_warnings": node_outputs.get("guardrail_warnings"),
+                },
+            )
+        except Exception:
+            pass
         results.append({"nodeId": node_id, "nodeName": node_name, "type": origin_type, "outputs": node_outputs, "elapsed_ms": elapsed_ms})
 
     for depth in range(max_depth + 1):
@@ -264,7 +328,33 @@ async def run_flow(nodes, edges, external_inputs=None, global_vars=None, on_even
         await asyncio.sleep(0.2)
 
     _emit("flow_complete", {"success": True, "resultCount": len(results)})
-    out = {"success": True, "results": results, "logs": logs}
+    try:
+        from fangyu.core.tracer import record_event
+
+        record_event(
+            event_type="flow_end",
+            flow_id=str(global_vars.get("flow_id") or ""),
+            payload={"success": True, "result_count": len(results)},
+        )
+    except Exception:
+        pass
+
+    # Q1：连续错误质量告警（warn，不阻断）
+    try:
+        from fangyu.core.constitution import evaluate_runtime_quality
+
+        qw = evaluate_runtime_quality(results)
+        if qw:
+            constitution_warnings = list(constitution_warnings or []) + qw
+    except Exception:
+        pass
+
+    out = {
+        "success": True,
+        "results": results,
+        "logs": logs,
+        "trace_id": global_vars.get("_trace_id"),
+    }
     if constitution_warnings:
         out["constitution_warnings"] = constitution_warnings
     return out

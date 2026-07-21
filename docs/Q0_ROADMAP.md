@@ -23,4 +23,4 @@
 
 Eval / A/B / 配额 / Bundle 签名强制 / OpenTelemetry / 记忆去重全量。
 
-下一步 **Q1**：结构化 trace（ExecutionLog 字段扩展）+ 必要宪法策略。
+下一步 **Q1**：结构化 trace — 见 [Q1_ROADMAP](Q1_ROADMAP.md)。

@@ -9,6 +9,7 @@ class ExecutionLog(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     flow_id = Column(String(64), default="")
     session_id = Column(String(64), default="")
+    trace_id = Column(String(64), default="")  # Q1：与 execution_traces 对齐
     node_id = Column(String(32), default="")
     node_name = Column(String(128), default="")
     node_type = Column(String(32), default="")

@@ -41,6 +41,11 @@ DEFAULT_CONSTITUTION: dict[str, Any] = {
     "forbidden_node_types": [],
     "require_audit": True,
     "policies": [],
+    # Q1：质量策略（默认 warn，不 deny）
+    "quality": {
+        "max_consecutive_errors": 5,
+        "min_tool_description_length": 0,
+    },
 }
 
 
@@ -453,6 +458,40 @@ def assert_flow_allowed(nodes: list, *, context: str = "flow") -> list[dict]:
             context={"violations": gov["deny"], "warnings": gov["warn"], "context": context},
         )
     return gov["warn"]
+
+
+def evaluate_runtime_quality(results: list[dict] | None) -> list[dict]:
+    """Q1：按 flow 结果评估质量策略（仅 warn）。"""
+    constitution = load_constitution()
+    if not constitution.get("enabled", True):
+        return []
+    quality = {
+        **(DEFAULT_CONSTITUTION.get("quality") or {}),
+        **(constitution.get("quality") if isinstance(constitution.get("quality"), dict) else {}),
+    }
+    max_err = int(quality.get("max_consecutive_errors") or 0)
+    warnings: list[dict] = []
+    if max_err > 0 and results:
+        streak = 0
+        worst = 0
+        for row in results:
+            outs = row.get("outputs") if isinstance(row, dict) else None
+            is_err = isinstance(outs, dict) and outs.get("error")
+            if is_err:
+                streak += 1
+                worst = max(worst, streak)
+            else:
+                streak = 0
+        if worst >= max_err:
+            warnings.append({
+                "rule": "max_consecutive_errors",
+                "severity": "warn",
+                "message": f"连续节点错误 {worst} 次（阈值 {max_err}）",
+                "actual": worst,
+                "context": "runtime",
+            })
+            audit_event("quality_warning", {"rule": "max_consecutive_errors", "streak": worst})
+    return warnings
 
 
 def check_tool_allowed(tool_name: str, *, context: str = "tool") -> None:

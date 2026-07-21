@@ -31,6 +31,7 @@ async def list_logs(
                 "id": log.id,
                 "flow_id": log.flow_id,
                 "session_id": log.session_id,
+                "trace_id": getattr(log, "trace_id", "") or "",
                 "node_id": log.node_id,
                 "node_name": log.node_name,
                 "node_type": log.node_type,
@@ -45,6 +46,38 @@ async def list_logs(
             for log in logs
         ],
         "total": len(logs),
+    }
+
+
+@router.get("/traces/{trace_id}")
+async def get_trace(trace_id: str, db: AsyncSession = Depends(get_session)):
+    """Q1：按 trace_id 查询结构化事件。"""
+    from ..models.trace_log import TraceLog
+
+    result = await db.execute(
+        select(TraceLog)
+        .where(TraceLog.trace_id == trace_id)
+        .order_by(TraceLog.timestamp.asc(), TraceLog.id.asc())
+    )
+    rows = result.scalars().all()
+    return {
+        "trace_id": trace_id,
+        "events": [
+            {
+                "id": r.id,
+                "flow_id": r.flow_id,
+                "node_id": r.node_id,
+                "node_name": r.node_name,
+                "node_type": r.node_type,
+                "event_type": r.event_type,
+                "timestamp": r.timestamp,
+                "duration_ms": r.duration_ms,
+                "payload": json.loads(r.payload_json) if r.payload_json else {},
+                "created_at": str(r.created_at),
+            }
+            for r in rows
+        ],
+        "count": len(rows),
     }
 
 
